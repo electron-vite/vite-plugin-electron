@@ -3,7 +3,10 @@
   "version": "0.1.1",
   "description": "Integrate Vite and Electron",
   "main": "dist/index.js",
-  "repository": "https://github.com/caoxiemeihao/vite-plugins/tree/main/packages/electron",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caoxiemeihao/vite-plugin-electron.git"
+  },
   "author": "草鞋没号 <308487730@qq.com>",
   "license": "MIT",
   "scripts": {
