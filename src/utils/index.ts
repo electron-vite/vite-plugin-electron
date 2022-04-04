@@ -1,0 +1,1 @@
+export { mergeConfigRecursively } from './merge-config'
