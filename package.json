@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/caoxiemeihao/vite-plugin-electron.git"
+    "url": "git+https://github.com/electron-vite/vite-plugin-electron.git"
   },
   "author": "草鞋没号 <308487730@qq.com>",
   "license": "MIT",
