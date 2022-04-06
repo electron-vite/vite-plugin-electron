@@ -40,6 +40,9 @@ export default defineConfig({
 
 If you only need to build the Renderer-process, you can just use the `vite-plugin-electron-renderer` plugin
 
+**Example** 👉 [electron-vite-vue](https://github.com/electron-vite/electron-vite-vue)
+![GitHub stars](https://img.shields.io/github/stars/caoxiemeihao/electron-vite-vue?color=fa6470)
+
 **renderer/vite.config.ts**
 
 ```js
