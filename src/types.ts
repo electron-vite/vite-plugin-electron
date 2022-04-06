@@ -1,19 +1,20 @@
-import {
+import type {
   UserConfigExport,
   LibraryOptions,
 } from 'vite'
+import type { InputOption } from 'rollup'
 
-export interface GeneralConfig {
+export interface MainConfig {
   /** Alias of build.lib.entry */
   entry: LibraryOptions['entry']
   vite?: UserConfigExport
-}
-
-export interface MainConfig extends GeneralConfig {
   nodeIntegration?: boolean
 }
 
-export interface PreloadConfig extends GeneralConfig {
+export interface PreloadConfig {
+  // TODO: 
+  entry: InputOption
+  vite?: UserConfigExport
 }
 
 export interface Configuration {
