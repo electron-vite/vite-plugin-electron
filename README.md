@@ -35,3 +35,19 @@ export default defineConfig({
   },
 })
 ```
+
+---
+
+If you only need to build the Renderer-process, you can just use the `vite-plugin-electron-renderer` plugin
+
+**renderer/vite.config.ts**
+
+```js
+import electronRenderer from 'vite-plugin-electron/renderer'
+
+export default {
+  plugins: [
+    electronRenderer(),
+  ],
+}
+```
