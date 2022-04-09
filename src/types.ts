@@ -1,6 +1,6 @@
 import type {
-  UserConfigExport,
   LibraryOptions,
+  UserConfig,
 } from 'vite'
 import type { InputOption } from 'rollup'
 
@@ -9,7 +9,7 @@ export interface MainConfig {
    * Shortcut of `build.lib.entry`
    */
   entry: LibraryOptions['entry']
-  vite?: UserConfigExport
+  vite?: UserConfig
   nodeIntegration?: boolean
 }
 
@@ -18,7 +18,7 @@ export interface PreloadConfig {
    * Shortcut of `build.rollupOptions.input`
    */
   input?: InputOption
-  vite?: UserConfigExport
+  vite?: UserConfig
 }
 
 export interface Configuration {

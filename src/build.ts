@@ -1,16 +1,46 @@
 import { builtinModules } from 'module'
-import type { ResolvedConfig, UserConfig } from 'vite'
 import { build as viteBuild, mergeConfig } from 'vite'
+import type { ResolvedConfig, UserConfig } from 'vite'
 import type { Configuration } from './types'
 
 const isProduction = process.env./* from mode option */NODE_ENV === 'production'
 
-export function buildConfig(
+export async function build(config: Configuration, viteConfig: ResolvedConfig) {
+  if (config.preload) {
+    const preloadConfig = resolveBuildConfig(
+      'preload',
+      config,
+      viteConfig,
+      config.preload.vite,
+    )
+    await viteBuild({
+      configFile: false,
+      ...preloadConfig,
+    })
+  }
+
+  const mainConfig = resolveBuildConfig(
+    'main',
+    config,
+    viteConfig,
+    config.main.vite,
+  )
+  await viteBuild({
+    configFile: false,
+    ...mainConfig,
+  })
+}
+
+// -------------------------------------------------
+
+export function resolveBuildConfig(
+  proc: 'main' | 'preload',
   config: Configuration,
   viteConfig: ResolvedConfig,
-  proc: 'main' | 'preload'
+  overrides: Parameters<typeof mergeConfig>[1] = {},
 ) {
   const conf: UserConfig = {
+    publicDir: false,
     build: {
       minify: isProduction,
       sourcemap: true,
@@ -45,21 +75,9 @@ export function buildConfig(
       fileName: () => '[name].js',
     }
   }
-  return conf
-}
 
-export async function build(config: Configuration, viteConfig: ResolvedConfig) {
-  if (config.preload) {
-    const preloadConfig = buildConfig(config, viteConfig, 'preload')
-    await viteBuild({
-      configFile: false,
-      ...mergeConfig(preloadConfig, config.preload.vite || {}),
-    })
-  }
+  // Assign default dir
+  conf.build.outDir = `${viteConfig.build.outDir}/electron-${proc}`
 
-  const mainConfig = buildConfig(config, viteConfig, 'main')
-  await viteBuild({
-    configFile: false,
-    ...mergeConfig(mainConfig, config.main.vite || {}),
-  })
+  return mergeConfig(conf, overrides) as UserConfig
 }
