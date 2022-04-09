@@ -5,15 +5,19 @@ import type {
 import type { InputOption } from 'rollup'
 
 export interface MainConfig {
-  /** Alias of build.lib.entry */
+  /**
+   * Shortcut of `build.lib.entry`
+   */
   entry: LibraryOptions['entry']
   vite?: UserConfigExport
   nodeIntegration?: boolean
 }
 
 export interface PreloadConfig {
-  // TODO: 
-  entry: InputOption
+  /**
+   * Shortcut of `build.rollupOptions.input`
+   */
+  input?: InputOption
   vite?: UserConfigExport
 }
 

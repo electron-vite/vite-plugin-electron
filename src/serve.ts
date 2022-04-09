@@ -3,9 +3,8 @@ import { spawn } from 'child_process'
 import { AddressInfo } from 'net'
 import path from 'path'
 import type { ViteDevServer, UserConfig } from 'vite'
-import { build as viteBuild } from 'vite'
+import { build as viteBuild, mergeConfig } from 'vite'
 import { buildConfig } from './build'
-import { mergeConfigRecursively } from './utils'
 import type { Configuration } from './types'
 
 export async function bootstrap(config: Configuration, server: ViteDevServer) {
@@ -13,7 +12,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
   const { config: viteConfig } = server
 
   if (config.preload) {
-    const preloadConfig = mergeConfigRecursively(
+    const preloadConfig = mergeConfig(
       buildConfig(config, viteConfig, 'preload'),
       {
         mode: 'development',
@@ -30,7 +29,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
     )
     await viteBuild({
       configFile: false,
-      ...mergeConfigRecursively(preloadConfig, config.preload.vite || {}),
+      ...mergeConfig(preloadConfig, config.preload.vite || {}),
     })
   }
 
@@ -44,7 +43,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
   })
 
   let mainConfig = buildConfig(config, viteConfig, 'main')
-  mainConfig = mergeConfigRecursively(
+  mainConfig = mergeConfig(
     mainConfig,
     {
       mode: 'development',
@@ -65,6 +64,6 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
   )
   await viteBuild({
     configFile: false,
-    ...mergeConfigRecursively(mainConfig, config.main.vite || {}),
+    ...mergeConfig(mainConfig, config.main.vite || {}),
   })
 }
