@@ -1,34 +1,15 @@
 import { builtinModules } from 'module'
-import { build as viteBuild, mergeConfig } from 'vite'
-import type { ResolvedConfig, UserConfig } from 'vite'
+import { build as viteBuild, InlineConfig, mergeConfig } from 'vite'
+import type { ResolvedConfig } from 'vite'
 import type { Configuration } from './types'
 
 const isProduction = process.env./* from mode option */NODE_ENV === 'production'
 
 export async function build(config: Configuration, viteConfig: ResolvedConfig) {
   if (config.preload) {
-    const preloadConfig = resolveBuildConfig(
-      'preload',
-      config,
-      viteConfig,
-      config.preload.vite,
-    )
-    await viteBuild({
-      configFile: false,
-      ...preloadConfig,
-    })
+    await viteBuild(resolveBuildConfig('preload', config, viteConfig))
   }
-
-  const mainConfig = resolveBuildConfig(
-    'main',
-    config,
-    viteConfig,
-    config.main.vite,
-  )
-  await viteBuild({
-    configFile: false,
-    ...mainConfig,
-  })
+  await viteBuild(resolveBuildConfig('main', config, viteConfig))
 }
 
 // -------------------------------------------------
@@ -37,10 +18,13 @@ export function resolveBuildConfig(
   proc: 'main' | 'preload',
   config: Configuration,
   viteConfig: ResolvedConfig,
-  overrides: Parameters<typeof mergeConfig>[1] = {},
-) {
-  const conf: UserConfig = {
+): InlineConfig {
+  const conf: InlineConfig = {
+    // 🚧 Avoid recursive build caused by load config file
+    configFile: false,
+    envFile: false,
     publicDir: false,
+
     build: {
       minify: isProduction,
       sourcemap: true,
@@ -79,5 +63,5 @@ export function resolveBuildConfig(
   // Assign default dir
   conf.build.outDir = `${viteConfig.build.outDir}/electron-${proc}`
 
-  return mergeConfig(conf, overrides) as UserConfig
+  return mergeConfig(conf, config[proc]?.vite || {}) as InlineConfig
 }

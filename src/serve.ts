@@ -2,7 +2,7 @@ import path from 'path'
 import { spawn } from 'child_process'
 import type { ChildProcessWithoutNullStreams } from 'child_process'
 import type { AddressInfo } from 'net'
-import type { ViteDevServer, UserConfig } from 'vite'
+import type { ViteDevServer, UserConfig, InlineConfig } from 'vite'
 import { build as viteBuild, mergeConfig } from 'vite'
 import { resolveBuildConfig } from './build'
 import type { Configuration } from './types'
@@ -12,31 +12,23 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
   const { config: viteConfig } = server
 
   if (config.preload) {
-    const preloadConfig = resolveBuildConfig(
-      'preload',
-      config,
-      viteConfig,
-      mergeConfig(
-        {
-          mode: 'development',
-          build: {
-            watch: true,
+    const preloadConfig = mergeConfig(
+      resolveBuildConfig('preload', config, viteConfig),
+      {
+        mode: 'development',
+        build: {
+          watch: true,
+        },
+        plugins: [{
+          name: 'electron-preload-watcher',
+          writeBundle() {
+            server.ws.send({ type: 'full-reload' })
           },
-          plugins: [{
-            name: 'electron-preload-watcher',
-            writeBundle() {
-              server.ws.send({ type: 'full-reload' })
-            },
-          }],
-        } as UserConfig,
-        config.preload.vite || {},
-      )
-    )
+        }],
+      } as UserConfig,
+    ) as InlineConfig
 
-    await viteBuild({
-      configFile: false,
-      ...preloadConfig,
-    })
+    await viteBuild(preloadConfig)
   }
 
   // ----------------------------------------------------------------
@@ -48,33 +40,26 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
     VITE_DEV_SERVER_PORT: address.port,
   })
 
-  const mainConfig = resolveBuildConfig(
-    'main',
-    config,
-    viteConfig,
-    mergeConfig(
-      {
-        mode: 'development',
-        build: {
-          watch: true,
-        },
-        plugins: [{
-          name: 'electron-main-watcher',
-          writeBundle() {
-            electronProcess && electronProcess.kill()
+  const mainConfig = mergeConfig(
+    resolveBuildConfig('main', config, viteConfig),
+    {
+      mode: 'development',
+      build: {
+        watch: true,
+      },
+      plugins: [{
+        name: 'electron-main-watcher',
+        writeBundle() {
+          electronProcess && electronProcess.kill()
 
-            // TODO: Check if electronEntry is a directory
-            let electronEntry = path.join(mainConfig.build.outDir, path.parse(config.main.entry).name)
-            // Start Electron App
-            electronProcess = spawn(electronPath, [electronEntry], { stdio: 'inherit', env })
-          },
-        }],
-      } as UserConfig,
-      config.main.vite || {},
-    )
-  )
-  await viteBuild({
-    configFile: false,
-    ...mainConfig,
-  })
+          // TODO: Check if electronEntry is a directory
+          let electronEntry = path.join(mainConfig.build.outDir, path.parse(config.main.entry).name)
+          // Start Electron App
+          electronProcess = spawn(electronPath, [electronEntry], { stdio: 'inherit', env })
+        },
+      }],
+    } as UserConfig,
+  ) as InlineConfig
+
+  await viteBuild(mainConfig)
 }

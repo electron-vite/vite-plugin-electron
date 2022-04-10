@@ -1,6 +1,5 @@
 import type { Configuration } from './types'
 import type { Plugin } from 'vite'
-import renderer from '../renderer'
 import { bootstrap } from './serve'
 import { build } from './build'
 
@@ -30,6 +29,5 @@ export default function electron(config: Configuration): Plugin[] {
         await build(config, viteConfig)
       },
     },
-    ...(config.main.nodeIntegration ? renderer() : []),
   ]
 }
