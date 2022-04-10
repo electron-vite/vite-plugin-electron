@@ -12,16 +12,14 @@ Example 👉 [vite-plugin-electron-quick-start](https://github.com/caoxiemeihao/
 vite.config.ts
 
 ```js
-import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
 import electronConfig from './vite-electron.config'
 
-// https://vitejs.dev/config/
-export default defineConfig({
+export {
   plugins: [
     electron(electronConfig),
   ],
-})
+}
 ```
 
 vite-electron.config.ts
@@ -36,14 +34,67 @@ export default defineConfig({
 })
 ```
 
+## API
+
+`electron(config: Configuration)`
+
+```ts
+import type { LibraryOptions, UserConfig } from 'vite'
+import type { InputOption } from 'rollup'
+
+export interface MainConfig {
+  /**
+   * Shortcut of `build.lib.entry`
+   */
+  entry: LibraryOptions['entry']
+  vite?: UserConfig
+  nodeIntegration?: boolean
+}
+
+export interface PreloadConfig {
+  /**
+   * Shortcut of `build.rollupOptions.input`
+   */
+  input: InputOption
+  vite?: UserConfig
+}
+
+export interface Configuration {
+  main: MainConfig
+  preload?: PreloadConfig
+}
+```
+
+## How to work
+
+This plugin is just a builtin scripts of [electron-vite-boilerplate](https://github.com/electron-vite/electron-vite-boilerplate)
+
 ---
 
-If you only need to build the Renderer-process, you can just use the `vite-plugin-electron/renderer` plugin
+# vite-plugin-electron/renderer
 
-Example 👉 [electron-vite-vue](https://github.com/electron-vite/electron-vite-vue)
-![GitHub stars](https://img.shields.io/github/stars/caoxiemeihao/electron-vite-vue?color=fa6470)
+Use Electron and Node.js API in Renderer-process
 
-renderer/vite.config.ts
+> If you only need to build the Renderer-process, you can just use the `vite-plugin-electron/renderer` plugin
+
+Example 👉 [electron-vite-boilerplate](https://github.com/electron-vite/electron-vite-boilerplate)
+![GitHub stars](https://img.shields.io/github/stars/caoxiemeihao/electron-vite-boilerplate?color=fa6470)
+
+```js
+// renderer/vite.config.ts
+import electronRenderer from 'vite-plugin-electron/renderer'
+
+export default {
+  plugins: [
+    electronRenderer(),
+  ],
+}
+```
+
+
+## Usage
+
+vite.config.ts
 
 ```js
 import electronRenderer from 'vite-plugin-electron/renderer'
@@ -54,3 +105,52 @@ export default {
   ],
 }
 ```
+
+renderer.js
+
+```ts
+import { readFile } from 'fs'
+import { ipcRenderer } from 'electron'
+
+readFile(/* something code... */)
+ipcRenderer.on('event-name', () => {/* something code... */})
+```
+
+## How to work
+
+**Using Electron API in Renderer-process**
+
+```js
+import { ipcRenderer } from 'electron'
+```
+
+Actually redirect to [node_modules/vite-plugin-electron/renderer/modules/electron-renderer.js](modules/electron-renderer.js) by `resolve.alias`
+
+**Using Node.js API in Renderer-process**
+
+```js
+import { readFile } from 'fs'
+```
+
+All Node.js API will be built into the `node_modules/.vite-plugin-electron-renderer` directory by [vite-plugin-optimizer](https://www.npmjs.com/package/vite-plugin-optimizer)
+
+
+**Config presets**
+
+1. Fist, the plugin will configuration something.
+
+> If you do not configure the following options, the plugin will modify their default values
+
+  * `base = './'`
+  * `build.assetsDir = ''` -> *TODO: Automatic splicing `build.assetsDir`*
+  * `build.rollupOptions.output.format = 'cjs'`
+  * `resolve.conditions = ['node']`
+
+2. The plugin transform Electron and Node.js built-in modules to ESModule format in `vite serve` phase.
+
+3. Add Electron and Node.js built-in modules to Rollup `output.external` option in the `vite build` phase.
+
+## FAQ
+
+1. You may need to use some Node.js modules from npm in the Main-process/Renderer-process  
+  I suggest you look at [electron-vite-boilerplate](https://github.com/electron-vite/electron-vite-boilerplate)
