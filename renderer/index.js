@@ -27,18 +27,24 @@ module.exports = function () {
 
         if (!config.build.rollupOptions) config.build.rollupOptions = {};
         if (!config.build.rollupOptions.output) config.build.rollupOptions.output = {};
+
+				const prodExternals = [...builtinModules.filter(e => !e.startsWith('_')), 'electron'];
+
+				const modifyOutput = output => {
+					if (!output.format) {
+						// the packaged Electron app should use "cjs"
+						output.format = 'cjs';
+					}
+
+					// make builtin modules & electron external when rollup
+					output.external = [...(output.external || []), ...prodExternals];
+				};
         if (Array.isArray(config.build.rollupOptions.output)) {
           config.build.rollupOptions.output.forEach(output => {
-            if (!output.format) {
-              // the packaged Electron app should use "cjs"
-              output.format = 'cjs';
-            }
+            modifyOutput(output);
           });
         } else {
-          if (!config.build.rollupOptions.output.format) {
-            // the packaged Electron app should use "cjs"
-            config.build.rollupOptions.output.format = 'cjs';
-          }
+          modifyOutput(config.build.rollupOptions.output);
         }
 
         // ----------------------------------------
@@ -70,7 +76,7 @@ module.exports = function () {
 
 /**
  * @typedef {Record<string, import('vite-plugin-optimizer').ResultDescription>} ExportCollected
- * @type {(modules: string[]) => ExportCollected} 
+ * @type {(modules: string[]) => ExportCollected}
  */
 function builtinModulesExport(modules) {
   return modules.map((moduleId) => {
@@ -90,7 +96,7 @@ ${exportMembers}
      * @type {ExportCollected}
      */
     const collect = {
-      // 
+      //
       [moduleId]: {
         alias: { find: new RegExp(`^(node:)?${moduleId}$`) },
         code: nodeModuleCode,
