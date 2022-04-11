@@ -28,17 +28,17 @@ module.exports = function () {
         if (!config.build.rollupOptions) config.build.rollupOptions = {};
         if (!config.build.rollupOptions.output) config.build.rollupOptions.output = {};
 
-				const prodExternals = [...builtinModules.filter(e => !e.startsWith('_')), 'electron'];
+        const prodExternals = [...builtinModules.filter(e => !e.startsWith('_')), 'electron'];
 
-				const modifyOutput = output => {
-					if (!output.format) {
-						// the packaged Electron app should use "cjs"
-						output.format = 'cjs';
-					}
+        const modifyOutput = output => {
+          if (!output.format) {
+            // the packaged Electron app should use "cjs"
+            output.format = 'cjs';
+          }
 
-					// make builtin modules & electron external when rollup
-					output.external = [...(output.external || []), ...prodExternals];
-				};
+          // make builtin modules & electron external when rollup
+          output.external = [...(output.external || []), ...prodExternals];
+        };
         if (Array.isArray(config.build.rollupOptions.output)) {
           config.build.rollupOptions.output.forEach(output => {
             modifyOutput(output);
