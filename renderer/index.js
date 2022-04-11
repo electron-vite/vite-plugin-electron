@@ -25,6 +25,9 @@ module.exports = function () {
         // ensure that static resources are loaded normally
         if (!config.build.assetsDir) config.build.assetsDir = '';
 
+        // ----------------------------------------
+        // Rollup: output.format, output.external
+
         if (!config.build.rollupOptions) config.build.rollupOptions = {};
         if (!config.build.rollupOptions.output) config.build.rollupOptions.output = {};
 
@@ -48,6 +51,7 @@ module.exports = function () {
         }
 
         // ----------------------------------------
+        // Vite: resolve.alias
 
         if (!config.resolve) config.resolve = {};
         if (!config.resolve.conditions) config.resolve.conditions = ['node'];
@@ -64,6 +68,7 @@ module.exports = function () {
         }
 
         // ----------------------------------------
+        // Vite: optimizeDeps.exclude
 
         if (!config.optimizeDeps) config.optimizeDeps = {};
         if (!config.optimizeDeps.exclude) config.optimizeDeps.exclude = [];
