@@ -96,7 +96,6 @@ ${exportMembers}
      * @type {ExportCollected}
      */
     const collect = {
-      //
       [moduleId]: {
         alias: { find: new RegExp(`^(node:)?${moduleId}$`) },
         code: nodeModuleCode,
