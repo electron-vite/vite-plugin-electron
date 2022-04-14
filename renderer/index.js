@@ -50,9 +50,11 @@ module.exports = function () {
         // ensure that static resources are loaded normally
         if (!config.build.assetsDir) config.build.assetsDir = '';
 
-        // Rollup ---- output.external ----
+        // Rollup ---- init ----
         if (!config.build.rollupOptions) config.build.rollupOptions = {};
+        if (!config.build.rollupOptions.output) config.build.rollupOptions.output = {};
 
+        // Rollup ---- external ----
         let external = config.build.rollupOptions.external;
         const electronBuiltins = builtins.map(e => [e, `node:${e}`]).flat().concat('electron');
         if (
@@ -75,6 +77,18 @@ module.exports = function () {
 
         // make builtin modules & electron external when rollup
         config.build.rollupOptions.external = external;
+
+        // Rollup ---- output.format ----
+        const output = config.build.rollupOptions.output;
+        if (Array.isArray(output)) {
+          for (const o of output) {
+            if (o.format === undefined) o.format = 'cjs';
+          }
+        } else {
+          // external modules such as `electron`, `fs`
+          // they can only be loaded normally under CommonJs
+          if (output.format === undefined) output.format = 'cjs';
+        }
       },
     },
   ];
