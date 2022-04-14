@@ -62,7 +62,7 @@ export interface Configuration {
 
 ## How to work
 
-The plugin is just the encapsulation of the built-in scripts of [electron-vite-boilerplate/scripts](https://github.com/electron-vite/electron-vite-boilerplate/tree/main/scripts)
+The plugin is just the encapsulation of the built-in scripts of [electron-vite-vue/scripts](https://github.com/electron-vite/electron-vite-vue/tree/main/scripts)
 
 🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧
 
@@ -72,8 +72,8 @@ Use Electron and Node.js API in Renderer-process
 
 > If you only need to build the Renderer-process, you can just use the `vite-plugin-electron/renderer` plugin
 
-Example 👉 [electron-vite-boilerplate](https://github.com/electron-vite/electron-vite-boilerplate)
-![GitHub stars](https://img.shields.io/github/stars/caoxiemeihao/electron-vite-boilerplate?color=fa6470)
+Example 👉 [electron-vite-vue/packages/renderer/vite.config.ts](https://github.com/electron-vite/electron-vite-vue/blob/main/packages/renderer/vite.config.ts)
+![GitHub stars](https://img.shields.io/github/stars/caoxiemeihao/electron-vite-vue?color=fa6470)
 
 ```js
 // renderer/vite.config.ts
@@ -118,7 +118,7 @@ ipcRenderer.on('event-name', () => {/* something code... */})
 import { ipcRenderer } from 'electron'
 ```
 
-Actually redirect to [node_modules/vite-plugin-electron/renderer/modules/electron-renderer.js](modules/electron-renderer.js) by `resolve.alias`
+Actually redirect to [node_modules/vite-plugin-electron/renderer/modules/electron-renderer.js](https://github.com/electron-vite/vite-plugin-electron/blob/main/renderer/modules/electron-renderer.js) by `resolve.alias`
 
 **Using Node.js API in Renderer-process**
 
@@ -147,4 +147,4 @@ All Node.js API will be built into the `node_modules/.vite-plugin-electron-rende
 ## FAQ
 
 1. You may need to use some Node.js modules from npm in the Main-process/Renderer-process  
-  I suggest you look at [electron-vite-boilerplate](https://github.com/electron-vite/electron-vite-boilerplate)
+  I suggest you look at [electron-vite-vue](https://github.com/electron-vite/electron-vite-vue)
