@@ -62,7 +62,7 @@ export interface Configuration {
 
 ## How to work
 
-This plugin is just a builtin scripts of [electron-vite-boilerplate](https://github.com/electron-vite/electron-vite-boilerplate)
+The plugin is just the encapsulation of the built-in scripts of [electron-vite-boilerplate/scripts](https://github.com/electron-vite/electron-vite-boilerplate/tree/main/scripts)
 
 🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧
 
