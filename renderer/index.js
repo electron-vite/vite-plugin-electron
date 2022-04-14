@@ -7,15 +7,40 @@ const optimizer = require('vite-plugin-optimizer');
  */
 module.exports = function () {
   const name = 'vite-plugin-electron-renderer';
-  const plugin = optimizer(
-    builtinModulesExport(builtinModules.filter(e => !e.startsWith('_'))),
-    { dir: `.${name}` },
-  );
-  plugin.name = name;
+  const builtins = builtinModules.filter(e => !e.startsWith('_'));
+  const plugin = optimizer(builtinModulesExport(builtins), { dir: `.${name}` },);
+
+  plugin.name = `${name}:optimizer`;
+  plugin.apply = 'serve';
 
   return [
+    plugin,
     {
-      name: `${name}:config`,
+      name: `${name}:config-serve`,
+      apply: 'serve',
+      config(config) {
+        // Vite ---- resolve.alias ----
+        if (!config.resolve) config.resolve = {};
+        if (!config.resolve.conditions) config.resolve.conditions = ['node'];
+        if (!config.resolve.alias) config.resolve.alias = [];
+
+        const electronjs = path.join(__dirname, 'modules/electron-renderer.js');
+        if (Array.isArray(config.resolve.alias)) {
+          config.resolve.alias.push({ find: 'electron', replacement: electronjs });
+        } else {
+          config.resolve.alias['electron'] = electronjs;
+        }
+
+        // Vite ---- optimizeDeps.exclude ----
+        if (!config.optimizeDeps) config.optimizeDeps = {};
+        if (!config.optimizeDeps.exclude) config.optimizeDeps.exclude = [];
+
+        config.optimizeDeps.exclude.push('electron');
+      },
+    },
+    {
+      name: `${name}:config-build`,
+      apply: 'build',
       config(config) {
         // make sure that Electron can be loaded into the local file using `loadFile` after packaging
         if (!config.base) config.base = './';
@@ -25,52 +50,33 @@ module.exports = function () {
         // ensure that static resources are loaded normally
         if (!config.build.assetsDir) config.build.assetsDir = '';
 
-        // ----------------------------------------
-        // Rollup: output.format, output.external
-
+        // Rollup ---- output.external ----
         if (!config.build.rollupOptions) config.build.rollupOptions = {};
-        if (!config.build.rollupOptions.output) config.build.rollupOptions.output = {};
 
-        const prodExternals = [...builtinModules.filter(e => !e.startsWith('_')), 'electron'];
-
-        const modifyOutput = output => {
-          // make builtin modules & electron external when rollup
-          output.external = [...(output.external || []), ...prodExternals];
-        };
-        if (Array.isArray(config.build.rollupOptions.output)) {
-          config.build.rollupOptions.output.forEach(output => {
-            modifyOutput(output);
-          });
+        let external = config.build.rollupOptions.external;
+        const electronBuiltins = builtins.map(e => [e, `node:${e}`]).flat().concat('electron');
+        if (
+          Array.isArray(external) ||
+          typeof external === 'string' ||
+          external instanceof RegExp
+        ) {
+          external = electronBuiltins.concat(external);
+        } else if (typeof external === 'function') {
+          const original = external;
+          external = function (source, importer, isResolved) {
+            if (electronBuiltins.includes(source)) {
+              return true;
+            }
+            return original(source, importer, isResolved);
+          };
         } else {
-          modifyOutput(config.build.rollupOptions.output);
+          external = electronBuiltins;
         }
 
-        // ----------------------------------------
-        // Vite: resolve.alias
-
-        if (!config.resolve) config.resolve = {};
-        if (!config.resolve.conditions) config.resolve.conditions = ['node'];
-        if (!config.resolve.alias) config.resolve.alias = [];
-        const electronjs = path.join(__dirname, 'modules/electron-renderer.js');
-
-        if (Array.isArray(config.resolve.alias)) {
-          config.resolve.alias.push({
-            find: 'electron',
-            replacement: electronjs,
-          });
-        } else {
-          config.resolve.alias['electron'] = electronjs;
-        }
-
-        // ----------------------------------------
-        // Vite: optimizeDeps.exclude
-
-        if (!config.optimizeDeps) config.optimizeDeps = {};
-        if (!config.optimizeDeps.exclude) config.optimizeDeps.exclude = [];
-        config.optimizeDeps.exclude.push('electron');
+        // make builtin modules & electron external when rollup
+        config.build.rollupOptions.external = external;
       },
     },
-    plugin,
   ];
 };
 
