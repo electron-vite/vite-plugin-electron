@@ -1,37 +1,30 @@
 # vite-plugin-electron
 
-Integrate Vite and Electron
-
 [![NPM version](https://img.shields.io/npm/v/vite-plugin-electron.svg?style=flat)](https://npmjs.org/package/vite-plugin-electron)
 [![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron.svg?style=flat)](https://npmjs.org/package/vite-plugin-electron)
 
-Example 👉 [vite-plugin-electron-quick-start](https://github.com/caoxiemeihao/vite-plugin-electron-quick-start)
+Integrate Vite and Electron
+
+![vite-plugin-electron.gif](https://github.com/caoxiemeihao/blog/blob/main/vite/vite-plugin-electron.gif?raw=true)
 
 ## Usage
+
+> Example 👉 [vite-plugin-electron-quick-start](https://github.com/caoxiemeihao/vite-plugin-electron-quick-start)
 
 vite.config.ts
 
 ```js
 import electron from 'vite-plugin-electron'
-import electronConfig from './vite-electron.config'
 
-export {
+export default {
   plugins: [
-    electron(electronConfig),
+    electron({
+      main: {
+        entry: 'electron-main.ts',
+      },
+    }),
   ],
 }
-```
-
-vite-electron.config.ts
-
-```js
-import { defineConfig } from 'vite-plugin-electron'
-
-export default defineConfig({
-  main: {
-    entry: 'electron-main.ts',
-  },
-})
 ```
 
 ## API
@@ -146,5 +139,30 @@ All Node.js API will be built into the `node_modules/.vite-plugin-electron-rende
 
 ## FAQ
 
-1. You may need to use some Node.js modules from npm in the Main-process/Renderer-process  
-  I suggest you look at [electron-vite-vue](https://github.com/electron-vite/electron-vite-vue)
+You may need to use some Node.js modules from npm in the Main-process/Renderer-process.  
+I suggest you look at [electron-vite-vue](https://github.com/electron-vite/electron-vite-vue).
+
+---
+
+When we use Node.js API in the Renderer-process, we will build the code into the CommonJs format.  
+Sometimes it will cause the console to report an error `exports is not defined`.  
+Now, before we find the answer, we can fix it using the **vite-plugin-electron/polyfill-exports**
+
+```js
+import polyfillExports from 'vite-plugin-electron/polyfill-exports'
+
+export default {
+  plugins: [
+    polyfillExports(),
+  ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Errors may occur
+        format: 'cjs',
+      }
+    }
+  }
+}
+```
+
