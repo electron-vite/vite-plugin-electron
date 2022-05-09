@@ -2,7 +2,7 @@
 /**
  * @type {() => import('vite').Plugin}
  */
- module.exports = function polyfilleExports() {
+module.exports = function polyfilleExports() {
   /**
    * @type {import('vite').ResolvedConfig}
    */
