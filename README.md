@@ -145,7 +145,7 @@ I suggest you look at [electron-vite-vue](https://github.com/electron-vite/elect
 ---
 
 When we use Node.js API in the Renderer-process, we will build the code into the CommonJs format.  
-Sometimes it will cause the console to report an error `exports is not defined`.  
+Sometimes it will cause the console to report an error `exports is not defined`. See [👉 issues#103](https://github.com/electron-vite/electron-vite-vue/issues/103)  
 Now, before we find the answer, we can fix it using the **vite-plugin-electron/polyfill-exports**
 
 ```js
@@ -155,14 +155,6 @@ export default {
   plugins: [
     polyfillExports(),
   ],
-  build: {
-    rollupOptions: {
-      output: {
-        // Errors may occur
-        format: 'cjs',
-      }
-    }
-  }
 }
 ```
 
