@@ -21,7 +21,7 @@ module.exports = function polyfilleExports() {
 
       // https://github.com/electron-vite/electron-vite-vue/issues/103#issuecomment-1097540635
       if (['cjs', 'commonjs'].includes(format)) {
-        const polyfill = '<script>var exports = module.exports;</script>';
+        const polyfill = '<script>var exports = {};</script>';
         return html.replace(/(<\/[\s\r\n]*?head[\s\r\n]*?>)/, polyfill + '\n$1');
       }
     },
