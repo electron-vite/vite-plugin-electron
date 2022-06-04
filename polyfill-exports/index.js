@@ -19,9 +19,10 @@ module.exports = function polyfilleExports() {
 
       const format = Array.isArray(output) ? output.find(e => e.format) : output.format;
 
-      // https://github.com/electron-vite/electron-vite-vue/issues/103#issuecomment-1097540635
+      // https://github.com/electron-vite/vite-plugin-electron/issues/6
+      // https://github.com/electron-vite/vite-plugin-electron/commit/e6decf42164bc1e3801e27984322c41b9c2724b7#r75138942
       if (['cjs', 'commonjs'].includes(format)) {
-        const polyfill = '<script>var exports = module.exports;</script>';
+        const polyfill = `<script>var exports = typeof module !== 'undefined' ? module.exports : {};</script>`;
         return html.replace(/(<\/[\s\r\n]*?head[\s\r\n]*?>)/, polyfill + '\n$1');
       }
     },
