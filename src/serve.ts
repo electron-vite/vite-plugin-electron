@@ -50,12 +50,17 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
       plugins: [{
         name: 'electron-main-watcher',
         writeBundle() {
-          electronProcess && electronProcess.kill()
+          if (electronProcess) {
+            electronProcess.removeAllListeners()
+            electronProcess.kill()
+          }
 
           // TODO: Check if electronEntry is a directory
           let electronEntry = path.join(mainConfig.build.outDir, path.parse(config.main.entry).name)
-          // Start Electron App
+          // Start Electron.app
           electronProcess = spawn(electronPath, [electronEntry], { stdio: 'inherit', env })
+          // Exit command after Electron.app exits
+          electronProcess.once('exit', process.exit)
         },
       }],
     } as UserConfig,
