@@ -2,6 +2,7 @@ import type { Configuration } from './types'
 import type { Plugin } from 'vite'
 import { bootstrap } from './serve'
 import { build } from './build'
+import polyfillExports from '../polyfill-exports'
 
 export { Configuration }
 
@@ -29,5 +30,7 @@ export default function electron(config: Configuration): Plugin[] {
         await build(config, viteConfig)
       },
     },
+    // [🐞] exports is not defined 
+    polyfillExports(),
   ]
 }
