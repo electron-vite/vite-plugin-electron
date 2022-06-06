@@ -130,6 +130,7 @@ All Node.js API will be built into the `node_modules/.vite-plugin-electron-rende
 
   * `base = './'`
   * `build.assetsDir = ''` -> *TODO: Automatic splicing `build.assetsDir`*
+  * `build.emptyOutDir = false`
   * `build.rollupOptions.output.format = 'cjs'`
   * `resolve.conditions = ['node']`
 
@@ -141,20 +142,3 @@ All Node.js API will be built into the `node_modules/.vite-plugin-electron-rende
 
 You may need to use some Node.js modules from npm in the Main-process/Renderer-process.  
 I suggest you look at [electron-vite-vue](https://github.com/electron-vite/electron-vite-vue).
-
----
-
-When we use Node.js API in the Renderer-process, we will build the code into the CommonJs format.  
-Sometimes it will cause the console to report an error `exports is not defined`. See [👉 issues#103](https://github.com/electron-vite/electron-vite-vue/issues/103)  
-Now, before we find the answer, we can fix it using the **vite-plugin-electron/polyfill-exports**
-
-```js
-import polyfillExports from 'vite-plugin-electron/polyfill-exports'
-
-export default {
-  plugins: [
-    polyfillExports(),
-  ],
-}
-```
-
