@@ -66,6 +66,7 @@ import { readFile } from 'fs'
 
   * `base = './'`
   * `build.assetsDir = ''`
+  * `build.emptyOutDir = false`
   * `build.rollupOptions.output.format = 'cjs'`
   * `resolve.conditions = ['node']`
 
