@@ -9,3 +9,8 @@
 - 1346707 refactor: better assign default `build.outDir`
 - f489da1 chore: commnets
 - 6db3bf3 fix: check `output` is Array
+
+## [2022-06-08] v0.4.8
+
+- c13eb49 fix(🐞): assign default value `dist/electron/[process]` of `build.outDir`
+  https://github.com/electron-vite/vite-plugin-electron/issues/10
