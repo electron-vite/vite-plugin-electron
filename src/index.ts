@@ -16,7 +16,7 @@ export default function electron(config: Configuration): Plugin[] {
     config(_config) {
       if (!_config.build) _config.build = {}
       if (_config.build.emptyOutDir === undefined) {
-        // Prevent accidental clearing of `dist/electron-main`, `dist/electron-preload`
+        // Prevent accidental clearing of `dist/electron/main`, `dist/electron/preload`
         _config.build.emptyOutDir = false
       }
     },
@@ -41,7 +41,7 @@ export default function electron(config: Configuration): Plugin[] {
       },
       ...opts,
     },
-    // [🐞] exports is not defined 
+    // fix(🐞): exports is not defined 
     polyfillExports(),
   ]
 }
