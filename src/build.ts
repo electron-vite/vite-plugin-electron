@@ -1,3 +1,4 @@
+import { dirname, join } from 'path'
 import { builtinModules } from 'module'
 import { build as viteBuild, InlineConfig, mergeConfig } from 'vite'
 import type { ResolvedConfig } from 'vite'
@@ -36,12 +37,14 @@ export function resolveBuildConfig(
       },
     },
   }
+  let entry: string
 
   // In fact, there may be more than one `preload`, but there is only one `main`
   if (proc === 'preload') {
+    const input = config[proc].input
     conf.build.rollupOptions = {
       ...conf.build.rollupOptions,
-      input: config[proc].input,
+      input,
       output: {
         format: 'cjs',
         // Only one file will be bundled, which is consistent with the behavior of `build.lib`
@@ -52,16 +55,30 @@ export function resolveBuildConfig(
         assetFileNames: '[name].[ext]',
       },
     }
+
+    if (Array.isArray(input)) {
+      // This may inaccuracy, you can explicitly specify `build.outDir` to avoid it
+      entry = input[0]
+    } else if (typeof input === 'object') {
+      // This may inaccuracy, you can explicitly specify `build.outDir` to avoid it
+      entry = Object.values(input)[0]
+    } else {
+      entry = input
+    }
   } else {
     conf.build.lib = {
-      entry: config[proc].entry,
+      entry: entry = config[proc].entry,
       formats: ['cjs'],
       fileName: () => '[name].js',
     }
   }
 
   // Assign default dir
-  conf.build.outDir = `${viteConfig.build.outDir}/electron-${proc}`
+  const outDir = dirname(join(
+    viteConfig.build.outDir,
+    entry.replace(viteConfig.root, '')
+  ))
+  conf.build.outDir = outDir
 
   return mergeConfig(conf, config[proc]?.vite || {}) as InlineConfig
 }
