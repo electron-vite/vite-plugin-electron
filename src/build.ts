@@ -31,8 +31,8 @@ export function resolveBuildConfig(
     publicDir: false,
 
     build: {
+      emptyOutDir: false,
       minify: isProduction,
-      sourcemap: true,
       rollupOptions: {
         external: [
           'electron',
