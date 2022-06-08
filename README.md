@@ -1,9 +1,11 @@
 # vite-plugin-electron
 
+Integrate Vite and Electron
+
 [![NPM version](https://img.shields.io/npm/v/vite-plugin-electron.svg?style=flat)](https://npmjs.org/package/vite-plugin-electron)
 [![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron.svg?style=flat)](https://npmjs.org/package/vite-plugin-electron)
 
-Integrate Vite and Electron
+English | [简体中文](https://github.com/electron-vite/vite-plugin-electron/blob/main/README.zh-CN.md)
 
 ![vite-plugin-electron.gif](https://github.com/caoxiemeihao/blog/blob/main/vite/vite-plugin-electron.gif?raw=true)
 
@@ -20,7 +22,7 @@ export default {
   plugins: [
     electron({
       main: {
-        entry: 'electron-main.ts',
+        entry: 'electron/main.ts',
       },
     }),
   ],
@@ -55,7 +57,28 @@ export interface Configuration {
 
 ## How to work
 
-The plugin is just the encapsulation of the built-in scripts of [electron-vite-vue/scripts](https://github.com/electron-vite/electron-vite-vue/tree/main/scripts)
+The plugin is just the encapsulation of the built-in scripts of [electron-vite-boilerplate/scripts](https://github.com/electron-vite/electron-vite-boilerplate/tree/main/scripts)
+
+## Recommend structure
+
+Let's use the [vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-vanilla-ts) template created based on `create vite` as an example
+
+```diff
++ ├─┬ electron
++ │ └── main.ts
+  ├─┬ src
+  │ ├── main.ts
+  │ ├── style.css
+  │ └── vite-env.d.ts
+  ├── .gitignore
+  ├── favicon.svg
+  ├── index.html
+  ├── package.json
+  ├── tsconfig.json
++ └── vite.config.ts
+```
+
+*🚨 By default, the files in `electron` folder will be built into the `dist/electron`*
 
 🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧
 
@@ -65,30 +88,19 @@ Use Electron and Node.js API in Renderer-process
 
 > If you only need to build the Renderer-process, you can just use the `vite-plugin-electron/renderer` plugin
 
-Example 👉 [electron-vite-vue/packages/renderer/vite.config.ts](https://github.com/electron-vite/electron-vite-vue/blob/main/packages/renderer/vite.config.ts)
-![GitHub stars](https://img.shields.io/github/stars/caoxiemeihao/electron-vite-vue?color=fa6470)
-
-```js
-// renderer/vite.config.ts
-import electronRenderer from 'vite-plugin-electron/renderer'
-
-export default {
-  plugins: [
-    electronRenderer(),
-  ],
-}
-```
+Example 👉 [electron-vite-boilerplate/packages/renderer/vite.config.ts](https://github.com/electron-vite/electron-vite-boilerplate/blob/main/packages/renderer/vite.config.ts)
+![GitHub stars](https://img.shields.io/github/stars/caoxiemeihao/electron-vite-boilerplate?color=fa6470)
 
 ## Usage
 
 vite.config.ts
 
 ```js
-import electronRenderer from 'vite-plugin-electron/renderer'
+import renderer from 'vite-plugin-electron/renderer'
 
 export default {
   plugins: [
-    electronRenderer(),
+    renderer(),
   ],
 }
 ```
@@ -141,4 +153,4 @@ All Node.js API will be built into the `node_modules/.vite-plugin-electron-rende
 ## FAQ
 
 You may need to use some Node.js modules from npm in the Main-process/Renderer-process.  
-I suggest you look at [electron-vite-vue](https://github.com/electron-vite/electron-vite-vue).
+I suggest you look at [electron-vite-boilerplate](https://github.com/electron-vite/electron-vite-boilerplate).
