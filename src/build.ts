@@ -1,6 +1,11 @@
 import { builtinModules } from 'module'
-import { build as viteBuild, InlineConfig, mergeConfig } from 'vite'
-import type { ResolvedConfig } from 'vite'
+import {
+  type InlineConfig,
+  type ResolvedConfig,
+  build as viteBuild,
+  mergeConfig,
+  normalizePath,
+} from 'vite'
 import type { Configuration } from './types'
 
 const isProduction = process.env./* from mode option */NODE_ENV === 'production'
@@ -61,7 +66,7 @@ export function resolveBuildConfig(
   }
 
   // Assign default dir
-  conf.build.outDir = `${viteConfig.build.outDir}/electron/${proc}`
+  conf.build.outDir = normalizePath(`${viteConfig.build.outDir}/electron`)
 
   return mergeConfig(conf, config[proc]?.vite || {}) as InlineConfig
 }
