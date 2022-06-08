@@ -1,4 +1,3 @@
-import { dirname, join } from 'path'
 import { builtinModules } from 'module'
 import {
   type InlineConfig,
@@ -42,14 +41,12 @@ export function resolveBuildConfig(
       },
     },
   }
-  let entry: string
 
   // In fact, there may be more than one `preload`, but there is only one `main`
   if (proc === 'preload') {
-    const input = config[proc].input
     conf.build.rollupOptions = {
       ...conf.build.rollupOptions,
-      input,
+      input: config[proc].input,
       output: {
         format: 'cjs',
         // Only one file will be bundled, which is consistent with the behavior of `build.lib`
@@ -60,19 +57,9 @@ export function resolveBuildConfig(
         assetFileNames: '[name].[ext]',
       },
     }
-
-    if (Array.isArray(input)) {
-      // This may inaccuracy, you can explicitly specify `build.outDir` to avoid it
-      entry = input[0]
-    } else if (typeof input === 'object') {
-      // This may inaccuracy, you can explicitly specify `build.outDir` to avoid it
-      entry = Object.values(input)[0]
-    } else {
-      entry = input
-    }
   } else {
     conf.build.lib = {
-      entry: entry = config[proc].entry,
+      entry: config[proc].entry,
       formats: ['cjs'],
       fileName: () => '[name].js',
     }
