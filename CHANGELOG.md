@@ -12,5 +12,7 @@
 
 ## [2022-06-08] v0.4.8
 
+- ab40088 fix(🐞): set `emptyOutDir=false` for prevent accidental deletion of files
+- 7baafa0 break: set `electron` `build.outDir` value is `dist/electron` by default
 - c13eb49 fix(🐞): assign default value `dist/electron/[process]` of `build.outDir`
   https://github.com/electron-vite/vite-plugin-electron/issues/10
