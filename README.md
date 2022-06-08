@@ -117,34 +117,35 @@ ipcRenderer.on('event-name', () => {/* something code... */})
 
 ## How to work
 
-**Using Electron API in Renderer-process**
+Using Electron API in Renderer-process
 
 ```js
 import { ipcRenderer } from 'electron'
+↓
+// Actually will redirect by `resolve.alias`
+import { ipcRenderer } from 'vite-plugin-electron/renderer/modules/electron-renderer.js'
 ```
 
-Actually redirect to [node_modules/vite-plugin-electron/renderer/modules/electron-renderer.js](https://github.com/electron-vite/vite-plugin-electron/blob/main/renderer/modules/electron-renderer.js) by `resolve.alias`
-
-**Using Node.js API in Renderer-process**
+Using Node.js API in Renderer-process
 
 ```js
 import { readFile } from 'fs'
+↓
+// All Node.js API will redirect to the directory created based on `vite-plugin-optimizer` by `resolve.alias`
+import { readFile } from '.vite-plugin-electron-renderer/fs'
 ```
 
-All Node.js API will be built into the `node_modules/.vite-plugin-electron-renderer` directory by [vite-plugin-optimizer](https://www.npmjs.com/package/vite-plugin-optimizer)
-
-
-**Config presets**
+Config presets
 
 1. Fist, the plugin will configuration something.
-
-> If you do not configure the following options, the plugin will modify their default values
+  *If you do not configure the following options, the plugin will modify their default values*
 
   * `base = './'`
   * `build.assetsDir = ''` -> *TODO: Automatic splicing `build.assetsDir`*
   * `build.emptyOutDir = false`
   * `build.rollupOptions.output.format = 'cjs'`
   * `resolve.conditions = ['node']`
+  * Always insert the `electron` module into `optimizeDeps.exclude`
 
 2. The plugin transform Electron and Node.js built-in modules to ESModule format in `vite serve` phase.
 
