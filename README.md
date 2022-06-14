@@ -143,6 +143,7 @@ Config presets
   * `base = './'`
   * `build.assetsDir = ''` -> *TODO: Automatic splicing `build.assetsDir`*
   * `build.emptyOutDir = false`
+  * `build.cssCodeSplit = false`
   * `build.rollupOptions.output.format = 'cjs'`
   * `resolve.conditions = ['node']`
   * Always insert the `electron` module into `optimizeDeps.exclude`
