@@ -142,6 +142,7 @@ import { readFile } from '.vite-plugin-electron-renderer/fs'
   * `base = './'`
   * `build.assetsDir = ''` -> *TODO: Automatic splicing `build.assetsDir`*
   * `build.emptyOutDir = false`
+  * `build.cssCodeSplit = false`
   * `build.rollupOptions.output.format = 'cjs'`
   * `resolve.conditions = ['node']`
   * 总是将 `electron` 模块插入到 `optimizeDeps.exclude` 中

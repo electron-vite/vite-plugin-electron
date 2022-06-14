@@ -16,3 +16,8 @@
 - 7baafa0 break: set `electron` `build.outDir` value is `dist/electron` by default
 - c13eb49 fix(🐞): assign default value `dist/electron/[process]` of `build.outDir`
   https://github.com/electron-vite/vite-plugin-electron/issues/10
+
+## [2022-06-14] v0.4.9
+
+- abf460f chore: variable rename
+- ceb559f chore: `build.cssCodeSplit=false`
