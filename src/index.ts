@@ -13,11 +13,11 @@ export function defineConfig(config: Configuration) {
 export default function electron(config: Configuration): Plugin[] {
   const name = 'vite-plugin-electron'
   const opts: Partial<Plugin> = {
-    config(_config) {
-      if (!_config.build) _config.build = {}
-      if (_config.build.emptyOutDir === undefined) {
-        // Prevent accidental clearing of `dist/electron/main`, `dist/electron/preload`
-        _config.build.emptyOutDir = false
+    config(conf) {
+      if (!conf.build) conf.build = {}
+      if (conf.build.emptyOutDir === undefined) {
+        // prevent accidental clearing of `dist/electron/main`, `dist/electron/preload`
+        conf.build.emptyOutDir = false
       }
     },
   }
