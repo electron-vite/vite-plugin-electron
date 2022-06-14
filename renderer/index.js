@@ -48,7 +48,9 @@ module.exports = function () {
         if (!config.build) config.build = {};
 
         // ensure that static resources are loaded normally
-        if (!config.build.assetsDir) config.build.assetsDir = '';
+        if (config.build.assetsDir === undefined) config.build.assetsDir = '';
+        // https://github.com/electron-vite/electron-vite-vue/issues/107
+        if (config.build.cssCodeSplit === undefined) config.build.cssCodeSplit = false;
 
         // Rollup ---- init ----
         if (!config.build.rollupOptions) config.build.rollupOptions = {};
