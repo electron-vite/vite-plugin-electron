@@ -55,6 +55,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
             electronProcess.kill()
           }
 
+          // TODO: Check `package.json` whether the `main` entry in JOSN is correct
           // Start Electron.app
           electronProcess = spawn(electronPath, ['.'], { stdio: 'inherit', env })
           // Exit command after Electron.app exits
