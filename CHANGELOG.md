@@ -21,3 +21,8 @@
 
 - abf460f chore: variable rename
 - ceb559f chore: `build.cssCodeSplit=false`
+
+## [2022-06-24] v0.5.0
+
+- 0c5155c chore: TODO
+- 892940e fix app,getName() return error name
