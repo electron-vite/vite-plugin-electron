@@ -37,6 +37,7 @@ export function resolveBuildConfig(
         external: [
           'electron',
           ...builtinModules,
+          ...builtinModules.map(module => `node:${module}`)
         ],
       },
     },
