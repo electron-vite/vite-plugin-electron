@@ -13,7 +13,9 @@
     "build": "rm -rf dist && tsc",
     "prepublishOnly": "npm run build"
   },
-  "dependencies": {},
+  "dependencies": {
+    "vite-plugin-electron-renderer": "^0.4.0"
+  },
   "devDependencies": {
     "@types/node": "^17.0.31",
     "typescript": "^4.6.4",
