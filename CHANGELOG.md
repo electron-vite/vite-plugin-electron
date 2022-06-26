@@ -1,4 +1,7 @@
 
+## [2022-06-26] v0.6.0
+
+
 ## [2022-06-25] v0.5.1
 
 - ccf6b29 [feat: make prefix-only core module as external module](https://github.com/electron-vite/vite-plugin-electron/pull/22)
