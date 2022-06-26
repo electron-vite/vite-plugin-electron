@@ -2,7 +2,7 @@ import type { Configuration } from './types'
 import type { Plugin } from 'vite'
 import { bootstrap } from './serve'
 import { build } from './build'
-import polyfillExports from '../polyfill-exports'
+import renderer from 'vite-plugin-electron-renderer'
 
 export { Configuration }
 
@@ -23,6 +23,8 @@ export default function electron(config: Configuration): Plugin[] {
   }
 
   return [
+    // Enable use Electron, Node.js API in Renderer-process
+    ...(config.renderer ? renderer(config.renderer) : []),
     {
       name: `${name}:serve`,
       apply: 'serve',
@@ -41,7 +43,5 @@ export default function electron(config: Configuration): Plugin[] {
       },
       ...opts,
     },
-    // fix(🐞): exports is not defined 
-    polyfillExports(),
   ]
 }
