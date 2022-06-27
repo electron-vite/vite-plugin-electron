@@ -1,6 +1,16 @@
 
 ## [2022-06-26] v0.6.0
 
+- 5204eca docs: v0.6.0
+- e885e54 feat: `withExternal()`
+- dee6d6a feat: `CommonConfiguration`
+- 55f9e11 node.js.ts
+- 83d0b8d remove README.zh-CN.md
+- 5f488b8 remove `polyfille-exports`
+- e118fbd remove `renderer`
+- 6e5761f refactor: integrate `vite-plugin-electron-renderer`
+- 0e696ec add `vite-plugin-electron-renderer`
+- 87bc5bb remove `vite-plugin-optimizer`
 
 ## [2022-06-25] v0.5.1
 
