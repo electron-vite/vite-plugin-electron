@@ -6,6 +6,7 @@ import type { ViteDevServer, UserConfig, InlineConfig } from 'vite'
 import { build as viteBuild, mergeConfig } from 'vite'
 import { resolveBuildConfig } from './build'
 import type { Configuration } from './types'
+import { createWithExternal } from './node.js'
 
 export async function bootstrap(config: Configuration, server: ViteDevServer) {
   const electronPath = require('electron')
@@ -27,8 +28,9 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
         }],
       } as UserConfig,
     ) as InlineConfig
+    const withExternal = createWithExternal('preload', config, viteConfig)
 
-    await viteBuild(preloadConfig)
+    await viteBuild(withExternal(preloadConfig))
   }
 
   // ----------------------------------------------------------------
@@ -64,6 +66,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
       }],
     } as UserConfig,
   ) as InlineConfig
+  const withExternal = createWithExternal('main', config, viteConfig)
 
-  await viteBuild(mainConfig)
+  await viteBuild(withExternal(mainConfig))
 }

@@ -6,15 +6,24 @@ import {
   mergeConfig,
   normalizePath,
 } from 'vite'
+import { createWithExternal } from './node.js'
 import type { Configuration } from './types'
 
 const isProduction = process.env./* from mode option */NODE_ENV === 'production'
 
 export async function build(config: Configuration, viteConfig: ResolvedConfig) {
   if (config.preload) {
-    await viteBuild(resolveBuildConfig('preload', config, viteConfig))
+    await viteBuild(
+      createWithExternal('preload', config, viteConfig)(
+        resolveBuildConfig('preload', config, viteConfig)
+      )
+    )
   }
-  await viteBuild(resolveBuildConfig('main', config, viteConfig))
+  await viteBuild(
+    createWithExternal('main', config, viteConfig)(
+      resolveBuildConfig('main', config, viteConfig)
+    )
+  )
 }
 
 // -------------------------------------------------
@@ -33,13 +42,6 @@ export function resolveBuildConfig(
     build: {
       emptyOutDir: false,
       minify: isProduction,
-      rollupOptions: {
-        external: [
-          'electron',
-          ...builtinModules,
-          ...builtinModules.map(module => `node:${module}`)
-        ],
-      },
     },
   }
 
