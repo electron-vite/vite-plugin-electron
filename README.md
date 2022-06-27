@@ -97,13 +97,13 @@ Let's use the [vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/cre
 
 *🚨 By default, the files in `electron` folder will be built into the `dist/electron`*
 
-## `dependencies`
+## Put Node.js packages in dependencies
 
-Electron-Main
+**Electron-Main**
 
-Note that if your pacakge is Node.js module, you need to put them in `dependencies` of `package.json`, unless you know how to build them correctly with Vite.  
-*需要注意的是，如果你的包是 Node.js 的模块，那么需要放到 `package.json` 的 `dependencies` 中，除非你知道怎么用 Vite 正确的构建它们。*   
+In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages. So, put your Node.js package in `dependencies`. Unless you know how to properly build them with Vite.  
+*通常的，Vite 可能不能正确的构建 Node.js 的包，尤其是 C/C++ 原生模块，但是 Vite 可以将它们以外部包的形式加载。所以，请将 Node.js 包放到 `dependencies` 中。除非你知道如何用 Vite 正确的构建它们。*  
 
-Electron-Renderer
+**Electron-Renderer**
 
 You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies)
