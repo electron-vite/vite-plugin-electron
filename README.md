@@ -5,9 +5,13 @@ Integrate Vite and Electron
 [![NPM version](https://img.shields.io/npm/v/vite-plugin-electron.svg?style=flat)](https://npmjs.org/package/vite-plugin-electron)
 [![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron.svg?style=flat)](https://npmjs.org/package/vite-plugin-electron)
 
-English | [简体中文](https://github.com/electron-vite/vite-plugin-electron/blob/main/README.zh-CN.md)
-
 ![vite-plugin-electron.gif](https://github.com/caoxiemeihao/blog/blob/main/vite/vite-plugin-electron.gif?raw=true)
+
+## Install
+
+```sh
+npm i vite-plugin-electron -D
+```
 
 ## Usage
 
@@ -36,22 +40,35 @@ export default {
 ```ts
 import type { LibraryOptions, UserConfig } from 'vite'
 import type { InputOption } from 'rollup'
+import type { VitePluginElectronRenderer } from 'vite-plugin-electron-renderer'
+
+export interface CommonConfiguration {
+  vite?: UserConfig
+  /**
+   * Explicitly include/exclude some CJS modules  
+   * `modules` includes `dependencies` of package.json, Node.js's `builtinModules` and `electron`  
+   */
+  resolve?: (modules: string[]) => typeof modules | undefined
+}
 
 export interface Configuration {
-  main: {
+  main: CommonConfiguration & {
     /**
      * Shortcut of `build.lib.entry`
      */
     entry: LibraryOptions['entry']
-    vite?: UserConfig
   }
-  preload?: {
+  preload?: CommonConfiguration & {
     /**
      * Shortcut of `build.rollupOptions.input`
      */
     input: InputOption
-    vite?: UserConfig
   }
+  /**
+   * Support use Node.js API in Electron-Renderer
+   * @see https://github.com/electron-vite/vite-plugin-electron-renderer
+   */
+  renderer?: Parameters<VitePluginElectronRenderer>[0]
 }
 ```
 
@@ -80,79 +97,13 @@ Let's use the [vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/cre
 
 *🚨 By default, the files in `electron` folder will be built into the `dist/electron`*
 
-🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧🚧
+## `dependencies`
 
-# vite-plugin-electron/renderer
+Electron-Main
 
-Use Electron and Node.js API in Renderer-process
+Note that if your pacakge is Node.js module, you need to put them in `dependencies` of `package.json`, unless you know how to build them correctly with Vite.  
+*需要注意的是，如果你的包是 Node.js 的模块，那么需要放到 `package.json` 的 `dependencies` 中，除非你知道怎么用 Vite 正确的构建它们。*   
 
-> If you only need to build the Renderer-process, you can just use the `vite-plugin-electron/renderer` plugin
+Electron-Renderer
 
-Example 👉 [electron-vite-boilerplate/packages/renderer/vite.config.ts](https://github.com/electron-vite/electron-vite-boilerplate/blob/main/packages/renderer/vite.config.ts)
-![GitHub stars](https://img.shields.io/github/stars/caoxiemeihao/electron-vite-boilerplate?color=fa6470)
-
-## Usage
-
-vite.config.ts
-
-```js
-import renderer from 'vite-plugin-electron/renderer'
-
-export default {
-  plugins: [
-    renderer(),
-  ],
-}
-```
-
-renderer.js
-
-```ts
-import { readFile } from 'fs'
-import { ipcRenderer } from 'electron'
-
-readFile(/* something code... */)
-ipcRenderer.on('event-name', () => {/* something code... */})
-```
-
-## How to work
-
-Using Electron API in Renderer-process
-
-```js
-import { ipcRenderer } from 'electron'
-↓
-// Actually will redirect by `resolve.alias`
-import { ipcRenderer } from 'vite-plugin-electron/renderer/modules/electron-renderer.js'
-```
-
-Using Node.js API in Renderer-process
-
-```js
-import { readFile } from 'fs'
-↓
-// All Node.js API will redirect to the directory created based on `vite-plugin-optimizer` by `resolve.alias`
-import { readFile } from '.vite-plugin-electron-renderer/fs'
-```
-
-Config presets
-
-1. Fist, the plugin will configuration something.
-  *If you do not configure the following options, the plugin will modify their default values*
-
-  * `base = './'`
-  * `build.assetsDir = ''` -> *TODO: Automatic splicing `build.assetsDir`*
-  * `build.emptyOutDir = false`
-  * `build.cssCodeSplit = false`
-  * `build.rollupOptions.output.format = 'cjs'`
-  * `resolve.conditions = ['node']`
-  * Always insert the `electron` module into `optimizeDeps.exclude`
-
-2. The plugin transform Electron and Node.js built-in modules to ESModule format in `vite serve` phase.
-
-3. Add Electron and Node.js built-in modules to Rollup `output.external` option in the `vite build` phase.
-
-## FAQ
-
-You may need to use some Node.js modules from npm in the Main-process/Renderer-process.  
-I suggest you look at [electron-vite-boilerplate](https://github.com/electron-vite/electron-vite-boilerplate).
+You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies)
