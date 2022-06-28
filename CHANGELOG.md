@@ -1,4 +1,10 @@
 
+## [2022-06-26] v0.6.1
+
+- 5b736fa bump vite-plugin-electron-renderer to 0.5.0
+- f70e030 fix(🐞): ensure always load into `buildConfig()`
+- 73ae8f2 docs: update
+
 ## [2022-06-26] v0.6.0
 
 - 5204eca docs: v0.6.0
