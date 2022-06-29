@@ -101,8 +101,13 @@ Let's use the [vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/cre
 
 **Electron-Main**
 
-In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages. So, put your Node.js package in `dependencies`. Unless you know how to properly build them with Vite.  
-*通常的，Vite 可能不能正确的构建 Node.js 的包，尤其是 C/C++ 原生模块，但是 Vite 可以将它们以外部包的形式加载。所以，请将 Node.js 包放到 `dependencies` 中。除非你知道如何用 Vite 正确的构建它们。*  
+In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages. So, put your Node.js package in `dependencies`. Unless you know how to properly build them with Vite.
+
+By default, `vite-plugin-electron` treats packages in `dependencies` as `external` modules. If you don't want this, you can control this behavior with `options.resolve()`.
+
+*通常的，Vite 可能不能正确的构建 Node.js 的包，尤其是 C/C++ 原生模块，但是 Vite 可以将它们以外部包的形式加载。所以，请将 Node.js 包放到 `dependencies` 中。除非你知道如何用 Vite 正确的构建它们。*
+
+*默认情况下，`vite-plugin-electron` 会将 `dependencies` 中的包视为 `external` 模块。如果你不希望这样，你可以通过 `options.resolve()` 来控制改行为。*
 
 **Electron-Renderer**
 
