@@ -1,4 +1,9 @@
 
+## [2022-07-01] v0.6.2
+
+- 5779397 chore: bump vite-plugin-electron-renderer to 0.5.1
+- 2a2f77d docs: `Put Node.js packages in dependencies`
+
 ## [2022-06-26] v0.6.1
 
 - 5b736fa bump vite-plugin-electron-renderer to 0.5.0
