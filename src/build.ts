@@ -6,7 +6,7 @@ import {
   mergeConfig,
   normalizePath,
 } from 'vite'
-import { createWithExternal } from './node.js'
+import { createWithExternal } from './config'
 import type { Configuration } from './types'
 
 const isProduction = process.env./* from mode option */NODE_ENV === 'production'

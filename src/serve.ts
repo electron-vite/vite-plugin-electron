@@ -6,7 +6,7 @@ import type { ViteDevServer, UserConfig, InlineConfig } from 'vite'
 import { build as viteBuild, mergeConfig } from 'vite'
 import { resolveBuildConfig } from './build'
 import type { Configuration } from './types'
-import { createWithExternal } from './node.js'
+import { createWithExternal } from './config'
 
 export async function bootstrap(config: Configuration, server: ViteDevServer) {
   const electronPath = require('electron')

@@ -34,6 +34,7 @@ export function createWithExternal(
 
   const fn = config[proc].resolve
   if (fn) {
+    // TODO: 应该仅仅是 dependencies
     const tmp = fn(modules[proc])
     if (tmp) modules[proc] = tmp
   }
