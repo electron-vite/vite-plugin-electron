@@ -15,11 +15,22 @@ const modules = {
   preload: [],
 }
 
-export function createWithExternal(
+export interface Runtime {
+  proc: 'main' | 'preload'
+  config: Configuration
+  viteConfig: ResolvedConfig
+}
+
+export function resolveRuntime(
   proc: 'main' | 'preload',
   config: Configuration,
   viteConfig: ResolvedConfig,
-) {
+): Runtime {
+  return { proc, config, viteConfig }
+}
+
+export function createWithExternal(runtime: Runtime) {
+  const { proc, config, viteConfig } = runtime
   // Resolve package.json dependencies
   let pkgId = path.join(viteConfig.root, 'package.json')
   if (!fs.existsSync(pkgId)) {
