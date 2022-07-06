@@ -1,5 +1,4 @@
 import { spawn } from 'child_process'
-import type { ChildProcessWithoutNullStreams } from 'child_process'
 import type { AddressInfo } from 'net'
 import type { ViteDevServer, UserConfig, InlineConfig } from 'vite'
 import { build as viteBuild, mergeConfig } from 'vite'
@@ -33,7 +32,6 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
   }
 
   // ---- Electron-Main ----
-  let electronProcess: ChildProcessWithoutNullStreams = null
   const address = server.httpServer.address() as AddressInfo
   const env = Object.assign(process.env, {
     VITE_DEV_SERVER_HOST: address.address,
@@ -51,16 +49,17 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
       plugins: [{
         name: 'electron-main-watcher',
         writeBundle() {
-          if (electronProcess) {
-            electronProcess.removeAllListeners()
-            electronProcess.kill()
+          if (process.electronApp) {
+            process.electronApp.removeAllListeners()
+            process.electronApp.kill()
           }
 
           // TODO: Check `package.json` whether the `main` entry in JOSN is correct
+
           // Start Electron.app
-          electronProcess = spawn(electronPath, ['.'], { stdio: 'inherit', env })
+          process.electronApp = spawn(electronPath, ['.'], { stdio: 'inherit', env })
           // Exit command after Electron.app exits
-          electronProcess.once('exit', process.exit)
+          process.electronApp.once('exit', process.exit)
         },
       }],
     } as UserConfig,

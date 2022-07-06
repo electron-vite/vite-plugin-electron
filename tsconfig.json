@@ -12,5 +12,5 @@
     "baseUrl": ".",
     "outDir": "dist"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "electron-env.d.ts"]
 }

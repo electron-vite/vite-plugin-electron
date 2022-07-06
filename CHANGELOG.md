@@ -1,3 +1,13 @@
+## [2022-07-06] v0.7.0
+
+- 661a146 docs: v0.7.0
+- 8ee091d feat: support restart on `vite.config.ts` changed #24
+- ca15795 add `electron-env.d.ts`
+- 76863bb electron-env.d.ts
+- 3fbef04 refactor: optimize code
+- cc3c8c0 feat: `resolveBuildConfig()`
+- 50c3afe feat: `resolveRuntime()`
+- 1184dd3 `node.js.ts` -> `config.ts`
 
 ## [2022-07-01] v0.6.2
 

@@ -97,7 +97,7 @@ Let's use the [vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/cre
 
 *🚨 By default, the files in `electron` folder will be built into the `dist/electron`*
 
-## Put Node.js packages in dependencies
+## 🚨 Put Node.js packages in dependencies
 
 **Electron-Main**
 
@@ -111,4 +111,36 @@ By default, `vite-plugin-electron` treats packages in `dependencies` as `externa
 
 **Electron-Renderer**
 
-You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies)
+You can see 👉 [🚨 dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies)
+
+## 🚨 ESM packages
+
+**Electron-Main**
+
+**e.g.** `node-fetch` `execa` `got` ...others
+
+1. `npm i vite-plugin-esmodule -D`
+2. Configure in vite.config.ts
+
+```ts
+import electron from 'vite-plugin-electron'
+import esmodule from 'vite-plugin-esmodule'
+export default {
+  plugins: [
+    electron({
+      main: {
+        entry: 'electron/main.ts',
+        vite: {
+          plugins: [
+            esmodule(['got', 'execa', 'node-fetch']),
+          ],
+        },
+      },
+    }),
+  ],
+}
+```
+
+**Electron-Renderer**
+
+You can see 👉 [🚨 ESM packages](https://github.com/electron-vite/vite-plugin-electron-renderer#-esm-packages)
