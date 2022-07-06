@@ -1,20 +1,20 @@
-import path from 'path'
 import { spawn } from 'child_process'
 import type { ChildProcessWithoutNullStreams } from 'child_process'
 import type { AddressInfo } from 'net'
 import type { ViteDevServer, UserConfig, InlineConfig } from 'vite'
 import { build as viteBuild, mergeConfig } from 'vite'
-import { resolveBuildConfig } from './build'
 import type { Configuration } from './types'
-import { createWithExternal } from './config'
+import { createWithExternal, resolveRuntime, resolveBuildConfig } from './config'
 
 export async function bootstrap(config: Configuration, server: ViteDevServer) {
   const electronPath = require('electron')
   const { config: viteConfig } = server
 
+  // ---- Electron-Preload ----
   if (config.preload) {
+    const preloadRuntime = resolveRuntime('preload', config, viteConfig)
     const preloadConfig = mergeConfig(
-      resolveBuildConfig('preload', config, viteConfig),
+      resolveBuildConfig(preloadRuntime),
       {
         mode: 'development',
         build: {
@@ -28,13 +28,11 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
         }],
       } as UserConfig,
     ) as InlineConfig
-    const withExternal = createWithExternal('preload', config, viteConfig)
 
-    await viteBuild(withExternal(preloadConfig))
+    await viteBuild(createWithExternal(preloadRuntime)(preloadConfig))
   }
 
-  // ----------------------------------------------------------------
-
+  // ---- Electron-Main ----
   let electronProcess: ChildProcessWithoutNullStreams = null
   const address = server.httpServer.address() as AddressInfo
   const env = Object.assign(process.env, {
@@ -42,8 +40,9 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
     VITE_DEV_SERVER_PORT: address.port,
   })
 
+  const mainRuntime = resolveRuntime('main', config, viteConfig)
   const mainConfig = mergeConfig(
-    resolveBuildConfig('main', config, viteConfig),
+    resolveBuildConfig(mainRuntime),
     {
       mode: 'development',
       build: {
@@ -66,7 +65,6 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
       }],
     } as UserConfig,
   ) as InlineConfig
-  const withExternal = createWithExternal('main', config, viteConfig)
 
-  await viteBuild(withExternal(mainConfig))
+  await viteBuild(createWithExternal(mainRuntime)(mainConfig))
 }
