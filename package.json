@@ -22,7 +22,8 @@
     "vite": "^2.9.8"
   },
   "files": [
-    "dist"
+    "dist",
+    "electron-env.d.ts"
   ],
   "keywords": [
     "vite",
