@@ -31,8 +31,10 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
     },
   }
 
-  // In fact, there may be more than one `preload`, but there is only one `main`
+  // In practice, there may be multiple Electron-Preload, but only one Electron-Main
+
   if (proc === 'preload') {
+    // Electron-Preload
     conf.build.rollupOptions = {
       ...conf.build.rollupOptions,
       input: config[proc].input,
@@ -47,6 +49,8 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
       },
     }
   } else {
+    // Electron-Main
+    // TODO: consider also support `build.rollupOptions`
     conf.build.lib = {
       entry: config[proc].entry,
       formats: ['cjs'],
