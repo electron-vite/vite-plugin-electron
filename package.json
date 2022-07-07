@@ -14,12 +14,12 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "vite-plugin-electron-renderer": "^0.5.1"
+    "vite-plugin-electron-renderer": "^0.5.2"
   },
   "devDependencies": {
-    "@types/node": "^17.0.31",
-    "typescript": "^4.6.4",
-    "vite": "^2.9.8"
+    "@types/node": "^18.0.3",
+    "typescript": "^4.7.4",
+    "vite": "^2.9.9"
   },
   "files": [
     "dist",
