@@ -78,7 +78,7 @@ The plugin is just the encapsulation of the built-in scripts of [electron-vite-b
 
 ## Recommend structure
 
-Let's use the [vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-vanilla-ts) template created based on `create vite` as an example
+Let's use the official [vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-vanilla-ts) template created based on `create vite` as an example
 
 ```diff
 + ├─┬ electron
@@ -132,7 +132,7 @@ export default {
         entry: 'electron/main.ts',
         vite: {
           plugins: [
-            esmodule(['got', 'execa', 'node-fetch']),
+            esmodule(),
           ],
         },
       },
