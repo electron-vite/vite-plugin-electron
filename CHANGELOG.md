@@ -1,4 +1,9 @@
 
+## [2022-07-07] v0.7.2
+
+- 8fb064e fix(🐞): bump vite-plugin-electron-renderer to 0.5.3
+- 44006b2 chore: comments
+
 ## [2022-07-07] v0.7.1
 
 - 42acf37 docs: update
