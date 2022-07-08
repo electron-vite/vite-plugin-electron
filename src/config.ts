@@ -1,20 +1,7 @@
-import fs from 'fs'
-import path from 'path'
-import { builtinModules } from 'module'
 import type { InlineConfig, ResolvedConfig } from 'vite'
 import { mergeConfig, normalizePath } from 'vite'
 import type { Configuration } from './types'
-
-const builtins = builtinModules
-  .filter(e => !e.startsWith('_'))
-  .map(e => [e, `node:${e}`]).flat()
-  .concat('electron')
-// dependencies of package.json
-const dependencies = []
-const modules = {
-  main: [],
-  preload: [],
-}
+import { resolveModules } from 'vite-plugin-electron-renderer/plugins/use-node.js'
 
 export interface Runtime {
   proc: 'main' | 'preload'
@@ -44,8 +31,10 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
     },
   }
 
-  // In fact, there may be more than one `preload`, but there is only one `main`
+  // In practice, there may be multiple Electron-Preload, but only one Electron-Main
+
   if (proc === 'preload') {
+    // Electron-Preload
     conf.build.rollupOptions = {
       ...conf.build.rollupOptions,
       input: config[proc].input,
@@ -60,6 +49,8 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
       },
     }
   } else {
+    // Electron-Main
+    // TODO: consider also support `build.rollupOptions`
     conf.build.lib = {
       entry: config[proc].entry,
       formats: ['cjs'],
@@ -75,48 +66,31 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
 
 export function createWithExternal(runtime: Runtime) {
   const { proc, config, viteConfig } = runtime
-  // Resolve package.json dependencies
-  let pkgId = path.join(viteConfig.root, 'package.json')
-  if (!fs.existsSync(pkgId)) {
-    pkgId = path.join(process.cwd(), 'package.json')
-  }
-  if (fs.existsSync(pkgId)) {
-    const pkg = require(pkgId)
-    // TODO: Nested package name
-    dependencies.push(...Object.keys(pkg.dependencies || {}))
-  }
-  modules[proc] = builtins.concat(dependencies)
-
-  const fn = config[proc].resolve
-  if (fn) {
-    // TODO: 应该仅仅是 dependencies
-    const tmp = fn(modules[proc])
-    if (tmp) modules[proc] = tmp
-  }
+  const { builtins, dependencies } = resolveModules(viteConfig, config[proc] || { /* TODO: optional */ })
+  const modules = builtins.concat(dependencies)
 
   return function withExternal(ICG: InlineConfig) {
 
     if (!ICG.build) ICG.build = {}
     if (!ICG.build.rollupOptions) ICG.build.rollupOptions = {}
 
-    const mods = modules[proc]
     let external = ICG.build.rollupOptions.external
     if (
       Array.isArray(external) ||
       typeof external === 'string' ||
       external instanceof RegExp
     ) {
-      external = mods.concat(external)
+      external = modules.concat(external as string[])
     } else if (typeof external === 'function') {
       const original = external
       external = function (source, importer, isResolved) {
-        if (mods.includes(source)) {
+        if (modules.includes(source)) {
           return true
         }
         return original(source, importer, isResolved)
       }
     } else {
-      external = mods
+      external = modules
     }
     ICG.build.rollupOptions.external = external
 

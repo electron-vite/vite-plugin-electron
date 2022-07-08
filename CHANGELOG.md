@@ -1,3 +1,15 @@
+
+## [2022-07-07] v0.7.2
+
+- 8fb064e fix(🐞): bump vite-plugin-electron-renderer to 0.5.3
+- 44006b2 chore: comments
+
+## [2022-07-07] v0.7.1
+
+- 42acf37 docs: update
+- 6d878f7 refactor: use `resolveModules()`
+- acf1751 chore: bump deps
+
 ## [2022-07-06] v0.7.0
 
 - 661a146 docs: v0.7.0

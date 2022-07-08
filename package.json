@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-electron",
-  "version": "0.7.0",
+  "version": "0.7.2",
   "description": "Integrate Vite and Electron",
   "main": "dist/index.js",
   "repository": {
@@ -14,12 +14,12 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "vite-plugin-electron-renderer": "^0.5.1"
+    "vite-plugin-electron-renderer": "^0.5.3"
   },
   "devDependencies": {
-    "@types/node": "^17.0.31",
-    "typescript": "^4.6.4",
-    "vite": "^2.9.8"
+    "@types/node": "^18.0.3",
+    "typescript": "^4.7.4",
+    "vite": "^2.9.9"
   },
   "files": [
     "dist",
