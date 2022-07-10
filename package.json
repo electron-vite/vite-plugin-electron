@@ -14,7 +14,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "vite-plugin-electron-renderer": "^0.5.3"
+    "vite-plugin-electron-renderer": "^0.5.4"
   },
   "devDependencies": {
     "@types/node": "^18.0.3",
