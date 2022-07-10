@@ -1,4 +1,8 @@
 
+## [2022-07-10] v0.7.3
+
+- 2033256 chore: bump deps
+
 ## [2022-07-07] v0.7.2
 
 - 8fb064e fix(🐞): bump vite-plugin-electron-renderer to 0.5.3
