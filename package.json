@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-electron",
-  "version": "0.7.3",
+  "version": "0.7.5",
   "description": "Integrate Vite and Electron",
   "main": "dist/index.js",
   "repository": {
