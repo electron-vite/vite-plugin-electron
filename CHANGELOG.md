@@ -1,4 +1,8 @@
 
+## [2022-07-11] v0.7.5
+
+- 1ed6e19 chore: bump vite-plugin-electron-renderer to v0.5.7
+
 ## [2022-07-11] v0.7.4
 
 - c60fb17 chore: update params
