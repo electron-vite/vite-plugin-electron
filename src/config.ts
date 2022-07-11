@@ -66,7 +66,7 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
 
 export function createWithExternal(runtime: Runtime) {
   const { proc, config, viteConfig } = runtime
-  const { builtins, dependencies } = resolveModules(viteConfig, config[proc] || { /* TODO: optional */ })
+  const { builtins, dependencies } = resolveModules(viteConfig.root, config[proc])
   const modules = builtins.concat(dependencies)
 
   return function withExternal(ICG: InlineConfig) {
