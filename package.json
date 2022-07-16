@@ -1,0 +1,14 @@
+{
+  "name": "vite-plugin-electron-monorepo",
+  "private": true,
+  "engines": {
+    "node": "^14.18.0 || >=16.0.0"
+  },
+  "homepage": "https://github.com/electron-vite/vite-plugin-electron",
+  "keywords": [
+    "vite",
+    "plugin",
+    "electron"
+  ],
+  "scripts": {}
+}
