@@ -76,12 +76,12 @@ export function createWithExternal(runtime: Runtime) {
   const { builtins, dependencies } = resolveModules(viteConfig.root, config[proc])
   const modules = builtins.concat(dependencies)
 
-  return function withExternal(ICG: InlineConfig) {
+  return function withExternal(ILCG: InlineConfig) {
 
-    if (!ICG.build) ICG.build = {}
-    if (!ICG.build.rollupOptions) ICG.build.rollupOptions = {}
+    if (!ILCG.build) ILCG.build = {}
+    if (!ILCG.build.rollupOptions) ILCG.build.rollupOptions = {}
 
-    let external = ICG.build.rollupOptions.external
+    let external = ILCG.build.rollupOptions.external
     if (
       Array.isArray(external) ||
       typeof external === 'string' ||
@@ -99,9 +99,9 @@ export function createWithExternal(runtime: Runtime) {
     } else {
       external = modules
     }
-    ICG.build.rollupOptions.external = external
+    ILCG.build.rollupOptions.external = external
 
-    return ICG
+    return ILCG
   }
 }
 
