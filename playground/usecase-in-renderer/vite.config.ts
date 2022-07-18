@@ -12,6 +12,7 @@ export default defineConfig({
       preload: {
         input: path.join(__dirname, 'electron/preload.ts'),
       },
+      // Enables use of Node.js API in the Renderer-process
       renderer: {},
     }),
     esmodule(),
