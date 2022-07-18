@@ -53,9 +53,6 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
             process.electronApp.removeAllListeners()
             process.electronApp.kill()
           }
-
-          // TODO: Check `package.json` whether the `main` entry in JOSN is correct
-
           // Start Electron.app
           process.electronApp = spawn(electronPath, ['.'], { stdio: 'inherit', env })
           // Exit command after Electron.app exits
