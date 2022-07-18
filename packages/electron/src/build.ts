@@ -1,6 +1,13 @@
-import type { ResolvedConfig } from 'vite'
-import { build as viteBuild } from 'vite'
-import { createWithExternal, resolveBuildConfig, resolveRuntime } from './config'
+import {
+  type ResolvedConfig,
+  build as viteBuild,
+} from 'vite'
+import {
+  checkPkgMain,
+  createWithExternal,
+  resolveBuildConfig,
+  resolveRuntime,
+} from './config'
 import type { Configuration } from './types'
 
 export async function build(config: Configuration, viteConfig: ResolvedConfig) {
@@ -14,9 +21,9 @@ export async function build(config: Configuration, viteConfig: ResolvedConfig) {
   }
 
   const mainRuntime = resolveRuntime('main', config, viteConfig)
-  await viteBuild(
-    createWithExternal(mainRuntime)(
-      resolveBuildConfig(mainRuntime)
-    )
-  )
+  const ILCG = createWithExternal(mainRuntime)(resolveBuildConfig(mainRuntime))
+  if (!ILCG.plugins) ILCG.plugins = []
+  ILCG.plugins.push(checkPkgMain(config))
+
+  await viteBuild(ILCG)
 }
