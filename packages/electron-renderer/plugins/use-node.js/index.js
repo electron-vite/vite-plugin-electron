@@ -61,12 +61,24 @@ export {
 
       // https://github.com/vitejs/vite/blob/53799e1cced7957f9877a5b5c9b6351b48e216a7/packages/vite/src/node/config.ts#L439-L442
       const root = normalizePath(config.root ? path.resolve(config.root) : process.cwd());
-      const resolved = resolveModules(root, options);
+      const resolved = resolveModules(root);
 
       builtins.push(...resolved.builtins);
       dependencies.push(...resolved.dependencies);
       ESM_deps.push(...resolved.ESM_deps);
-      CJS_modules.push(...builtins.concat(dependencies));
+
+      // Since `vite-plugin-electron-renderer@0.5.10` `dependencies(NodeJs_pkgs)` fully controlled by the user.
+      // Because `dependencies(NodeJs_pkgs)` may contain Web packages. e.g. `vue`, `react`.
+      // Opinionated treat Web packages as external modules, which will cause errors.
+      let NodeJs_pkgs = [];
+      if (options.resolve) {
+        const pkgs = options.resolve(dependencies)
+        if (pkgs) {
+          NodeJs_pkgs = pkgs;
+        }
+      }
+
+      CJS_modules.push(...builtins.concat(NodeJs_pkgs));
 
       if (env.command === 'serve') {
         if (!config.resolve) config.resolve = {};
@@ -74,7 +86,9 @@ export {
 
         if (!config.optimizeDeps) config.optimizeDeps = {};
         if (!config.optimizeDeps.exclude) config.optimizeDeps.exclude = [];
-        if (!config.optimizeDeps.exclude.includes('electron')) config.optimizeDeps.exclude.push('electron');
+
+        // Node.js packages in dependencies and `electron` should not be Pre-Building
+        config.optimizeDeps.exclude.push(...NodeJs_pkgs, 'electron');
 
         return config;
       }
