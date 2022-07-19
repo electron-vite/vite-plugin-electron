@@ -3,7 +3,7 @@ import type { Plugin } from 'vite'
 import { bootstrap } from './serve'
 import { build } from './build'
 import renderer from 'vite-plugin-electron-renderer'
-import buildConfig from 'vite-plugin-electron-renderer/plugins/build-config'
+import buildConfig from 'vite-plugin-electron-renderer/dist/plugins/build-config'
 
 export { Configuration }
 
