@@ -1,9 +1,9 @@
 import { spawn } from 'child_process'
 import type { AddressInfo } from 'net'
-import type { ViteDevServer, UserConfig, InlineConfig } from 'vite'
+import type { ViteDevServer, UserConfig, InlineConfig, ResolvedConfig } from 'vite'
 import { build as viteBuild, mergeConfig } from 'vite'
 import type { Configuration } from './types'
-import { createWithExternal, resolveRuntime, resolveBuildConfig } from './config'
+import { createWithExternal, resolveRuntime, resolveBuildConfig, checkPkgMain } from './config'
 
 export async function bootstrap(config: Configuration, server: ViteDevServer) {
   const electronPath = require('electron')
@@ -37,6 +37,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
     VITE_DEV_SERVER_HOST: address.address,
     VITE_DEV_SERVER_PORT: address.port,
   })
+  let RDCG: ResolvedConfig
 
   const mainRuntime = resolveRuntime('main', config, viteConfig)
   const mainConfig = mergeConfig(
@@ -48,11 +49,15 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
       },
       plugins: [{
         name: 'electron-main-watcher',
+        configResolved(_RDCG) {
+          RDCG = _RDCG
+        },
         writeBundle() {
           if (process.electronApp) {
             process.electronApp.removeAllListeners()
             process.electronApp.kill()
           }
+          checkPkgMain(Object.assign(mainRuntime, { mainConfig: RDCG }))
           // Start Electron.app
           process.electronApp = spawn(electronPath, ['.'], { stdio: 'inherit', env })
           // Exit command after Electron.app exits
