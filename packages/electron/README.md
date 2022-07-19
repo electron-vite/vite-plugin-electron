@@ -2,12 +2,12 @@
 
 Integrate Vite and Electron
 
-[![NPM version](https://img.shields.io/npm/v/vite-plugin-electron.svg?style=flat)](https://npmjs.org/package/vite-plugin-electron)
-[![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron.svg?style=flat)](https://npmjs.org/package/vite-plugin-electron)
-
-![vite-plugin-electron.gif](https://github.com/caoxiemeihao/blog/blob/main/vite/vite-plugin-electron.gif?raw=true)
+[![NPM version](https://img.shields.io/npm/v/vite-plugin-electron.svg)](https://npmjs.org/package/vite-plugin-electron)
+[![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron.svg)](https://npmjs.org/package/vite-plugin-electron)
 
 English | [简体中文](https://github.com/electron-vite/vite-plugin-electron/tree/main/packages/electron/README.zh-CN.md)
+
+![vite-plugin-electron.gif](https://github.com/caoxiemeihao/blog/blob/main/vite/vite-plugin-electron.gif?raw=true)
 
 ## Install
 
