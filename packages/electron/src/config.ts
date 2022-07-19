@@ -1,7 +1,14 @@
-import type { InlineConfig, ResolvedConfig } from 'vite'
-import { mergeConfig, normalizePath } from 'vite'
+import fs from 'fs'
+import path from 'path'
+import {
+  type InlineConfig,
+  type ResolvedConfig,
+  type Plugin,
+  mergeConfig,
+  normalizePath,
+} from 'vite'
 import type { Configuration } from './types'
-import { resolveModules } from 'vite-plugin-electron-renderer/plugins/use-node.js'
+import { resolveModules } from 'vite-plugin-electron-renderer/dist/plugins/use-node.js'
 
 export interface Runtime {
   proc: 'main' | 'preload'
@@ -69,12 +76,12 @@ export function createWithExternal(runtime: Runtime) {
   const { builtins, dependencies } = resolveModules(viteConfig.root, config[proc])
   const modules = builtins.concat(dependencies)
 
-  return function withExternal(ICG: InlineConfig) {
+  return function withExternal(ILCG: InlineConfig) {
 
-    if (!ICG.build) ICG.build = {}
-    if (!ICG.build.rollupOptions) ICG.build.rollupOptions = {}
+    if (!ILCG.build) ILCG.build = {}
+    if (!ILCG.build.rollupOptions) ILCG.build.rollupOptions = {}
 
-    let external = ICG.build.rollupOptions.external
+    let external = ILCG.build.rollupOptions.external
     if (
       Array.isArray(external) ||
       typeof external === 'string' ||
@@ -92,8 +99,51 @@ export function createWithExternal(runtime: Runtime) {
     } else {
       external = modules
     }
-    ICG.build.rollupOptions.external = external
+    ILCG.build.rollupOptions.external = external
 
-    return ICG
+    return ILCG
+  }
+}
+
+export function checkPkgMain(runtime: Runtime, electronMainBuildResolvedConfig: ResolvedConfig) {
+  const mainConfig = electronMainBuildResolvedConfig
+  const { config, viteConfig } = runtime
+
+  const cwd = process.cwd()
+  const pkgId = path.join(cwd, 'package.json')
+  if (!fs.existsSync(pkgId)) return
+
+  const distfile = path.resolve(
+    mainConfig.root,
+    mainConfig.build.outDir,
+    path.parse(config.main.entry).name,
+  )
+    // https://github.com/electron-vite/vite-plugin-electron/blob/5cd2c2ce68bb76b2a1770d50aa4164a59ab8110c/packages/electron/src/config.ts#L57
+    + '.js'
+
+  let message: string
+  const pkg = require(pkgId)
+  if (!(pkg.main && distfile.endsWith(pkg.main))) {
+    message = `
+[${new Date().toLocaleString()}]
+  Command: "vite ${viteConfig.command}".
+  The main field in package.json may be incorrect, which causes the App to fail to start.
+  File build path: "${distfile}".
+  Recommended main value: "${distfile.replace(cwd + '/', '')}".
+`
+  }
+
+  if (message) {
+    fs.appendFileSync(path.join(cwd, 'vite-plugin-electron.log'), message)
+    return message
+  }
+}
+
+checkPkgMain.buildElectronMainPlugin = function buildElectronMainPlugin(runtime: Runtime): Plugin {
+  return {
+    name: 'vite-plugin-electron:check-package.json-main',
+    configResolved(config) {
+      checkPkgMain(runtime, config)
+    },
   }
 }

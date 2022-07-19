@@ -1,11 +1,12 @@
 {
   "name": "vite-plugin-electron",
-  "version": "0.7.5",
+  "version": "0.8.0",
   "description": "Integrate Vite and Electron",
   "main": "dist/index.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/electron-vite/vite-plugin-electron.git"
+    "url": "git+https://github.com/electron-vite/vite-plugin-electron.git",
+    "directory": "packages/electron"
   },
   "author": "草鞋没号 <308487730@qq.com>",
   "license": "MIT",
@@ -20,7 +21,7 @@
   "devDependencies": {
     "@types/node": "^18.0.3",
     "typescript": "^4.7.4",
-    "vite": "^2.9.9",
+    "vite": "^3.0.2",
     "rollup": "^2.77.0"
   },
   "files": [

@@ -10,7 +10,7 @@ importers:
       '@types/node': ^18.0.3
       rollup: ^2.77.0
       typescript: ^4.7.4
-      vite: ^2.9.9
+      vite: ^3.0.2
       vite-plugin-electron-renderer: workspace:*
     dependencies:
       vite-plugin-electron-renderer: link:../electron-renderer
@@ -18,15 +18,19 @@ importers:
       '@types/node': 18.0.5
       rollup: 2.77.0
       typescript: 4.7.4
-      vite: 2.9.14
+      vite: 3.0.2
 
   packages/electron-renderer:
     specifiers:
-      vite: ^2.9.9
+      '@types/node': ^18.0.3
+      typescript: ^4.7.4
+      vite: ^3.0.2
     devDependencies:
-      vite: 2.9.14
+      '@types/node': 18.0.5
+      typescript: 4.7.4
+      vite: 3.0.2
 
-  playground/usecase-electron-main:
+  playground/usecase-in-main:
     specifiers:
       '@types/sqlite3': ^3.1.8
       electron: ^19.0.8
@@ -37,7 +41,7 @@ importers:
       node-fetch: ^3.2.8
       serialport: ^10.4.0
       sqlite3: ^5.0.9
-      vite: ^2.9.9
+      vite: ^3.0.2
       vite-plugin-electron: workspace:*
       vite-plugin-esmodule: ^1.4.1
     dependencies:
@@ -51,11 +55,11 @@ importers:
       execa: 6.1.0
       got: 12.1.0
       node-fetch: 3.2.8
-      vite: 2.9.14
+      vite: 3.0.2
       vite-plugin-electron: link:../../packages/electron
       vite-plugin-esmodule: 1.4.1
 
-  playground/usecase-electron-renderer:
+  playground/usecase-in-renderer:
     specifiers:
       '@types/sqlite3': ^3.1.8
       electron: ^19.0.8
@@ -66,7 +70,7 @@ importers:
       node-fetch: ^3.2.8
       serialport: ^10.4.0
       sqlite3: ^5.0.9
-      vite: ^2.9.9
+      vite: ^3.0.2
       vite-plugin-electron: workspace:*
       vite-plugin-esmodule: ^1.4.1
     dependencies:
@@ -80,7 +84,7 @@ importers:
       execa: 6.1.0
       got: 12.1.0
       node-fetch: 3.2.8
-      vite: 2.9.14
+      vite: 3.0.2
       vite-plugin-electron: link:../../packages/electron
       vite-plugin-esmodule: 1.4.1
 
@@ -3580,20 +3584,23 @@ packages:
     resolution: {integrity: sha512-hTY1pdtSmN/BNOnjvmcmK+2fW1Ac9wD0gFBy67i5IsKwhr1fS1/GGmssdCaik2SpnplHjoDrmCgVsgBv20HzrA==}
     dev: true
 
-  /vite/2.9.14:
-    resolution: {integrity: sha512-P/UCjSpSMcE54r4mPak55hWAZPlyfS369svib/gpmz8/01L822lMPOJ/RYW6tLCe1RPvMvOsJ17erf55bKp4Hw==}
-    engines: {node: '>=12.2.0'}
+  /vite/3.0.2:
+    resolution: {integrity: sha512-TAqydxW/w0U5AoL5AsD9DApTvGb2iNbGs3sN4u2VdT1GFkQVUfgUldt+t08TZgi23uIauh1TUOQJALduo9GXqw==}
+    engines: {node: ^14.18.0 || >=16.0.0}
     hasBin: true
     peerDependencies:
       less: '*'
       sass: '*'
       stylus: '*'
+      terser: ^5.4.0
     peerDependenciesMeta:
       less:
         optional: true
       sass:
         optional: true
       stylus:
+        optional: true
+      terser:
         optional: true
     dependencies:
       esbuild: 0.14.49

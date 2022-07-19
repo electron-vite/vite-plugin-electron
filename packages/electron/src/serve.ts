@@ -1,9 +1,19 @@
 import { spawn } from 'child_process'
 import type { AddressInfo } from 'net'
-import type { ViteDevServer, UserConfig, InlineConfig } from 'vite'
-import { build as viteBuild, mergeConfig } from 'vite'
+import {
+  type ViteDevServer,
+  type UserConfig,
+  type InlineConfig,
+  build as viteBuild,
+  mergeConfig,
+} from 'vite'
 import type { Configuration } from './types'
-import { createWithExternal, resolveRuntime, resolveBuildConfig } from './config'
+import {
+  createWithExternal,
+  resolveRuntime,
+  resolveBuildConfig,
+  checkPkgMain,
+} from './config'
 
 export async function bootstrap(config: Configuration, server: ViteDevServer) {
   const electronPath = require('electron')
@@ -46,22 +56,23 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
       build: {
         watch: true,
       },
-      plugins: [{
-        name: 'electron-main-watcher',
-        writeBundle() {
-          if (process.electronApp) {
-            process.electronApp.removeAllListeners()
-            process.electronApp.kill()
-          }
+      plugins: [
+        {
+          name: 'electron-main-watcher',
+          writeBundle() {
+            if (process.electronApp) {
+              process.electronApp.removeAllListeners()
+              process.electronApp.kill()
+            }
 
-          // TODO: Check `package.json` whether the `main` entry in JOSN is correct
-
-          // Start Electron.app
-          process.electronApp = spawn(electronPath, ['.'], { stdio: 'inherit', env })
-          // Exit command after Electron.app exits
-          process.electronApp.once('exit', process.exit)
+            // Start Electron.app
+            process.electronApp = spawn(electronPath, ['.'], { stdio: 'inherit', env })
+            // Exit command after Electron.app exits
+            process.electronApp.once('exit', process.exit)
+          },
         },
-      }],
+        checkPkgMain.buildElectronMainPlugin(mainRuntime),
+      ],
     } as UserConfig,
   ) as InlineConfig
 

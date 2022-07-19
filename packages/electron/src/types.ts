@@ -1,6 +1,6 @@
 import type { LibraryOptions, UserConfig } from 'vite'
 import type { InputOption } from 'rollup'
-import type { VitePluginElectronRenderer } from 'vite-plugin-electron-renderer'
+import { Options } from 'vite-plugin-electron-renderer/dist/plugins/use-node.js'
 
 export interface CommonConfiguration {
   vite?: UserConfig
@@ -26,7 +26,7 @@ export interface Configuration {
   }
   /**
    * Support use Node.js API in Electron-Renderer
-   * @see https://github.com/electron-vite/vite-plugin-electron-renderer
+   * @see https://github.com/electron-vite/vite-plugin-electron/tree/main/packages/electron-renderer
    */
-  renderer?: Parameters<VitePluginElectronRenderer>[0]
+  renderer?: Options
 }

@@ -13,7 +13,13 @@ export default defineConfig({
         input: path.join(__dirname, 'electron/preload.ts'),
       },
       // Enables use of Node.js API in the Renderer-process
-      renderer: {},
+      renderer: {
+        // Explicitly specify external modules
+        resolve: () => [
+          'serialport',
+          'sqlite3',
+        ],
+      },
     }),
     esmodule(),
   ]
