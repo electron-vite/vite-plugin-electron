@@ -4,7 +4,6 @@ import {
   type ViteDevServer,
   type UserConfig,
   type InlineConfig,
-  type ResolvedConfig,
   build as viteBuild,
   mergeConfig,
 } from 'vite'
