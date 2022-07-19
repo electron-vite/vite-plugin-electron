@@ -94,7 +94,7 @@ First, put the Node.js(CJS) packages into `dependencies`.
 
 Second, you need to explicitly specify which packages are Node.js(CJS) packages for `vite-plugin-electron-renderer` by `options.resolve()`. This way they will be treated as `external` modules and loaded correctly. Thereby avoiding the problems caused by the Pre-Bundling of Vite.
 
-Its actual works principle is to generate a virtual module in ESM format by `load-hook` during `vite serve` to ensure that it can work normally. It's inserted into `rollupOptions.external` during `vite build` time.
+It's essentially works principle is to generate a virtual module in ESM format by `load-hook` during `vite serve` to ensure that it can work normally. It's inserted into `rollupOptions.external` during `vite build` time.
 
 #### Load Node.js C/C++ native modules
 
