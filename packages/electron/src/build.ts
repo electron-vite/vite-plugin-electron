@@ -23,7 +23,13 @@ export async function build(config: Configuration, viteConfig: ResolvedConfig) {
   const mainRuntime = resolveRuntime('main', config, viteConfig)
   const ILCG = createWithExternal(mainRuntime)(resolveBuildConfig(mainRuntime))
   if (!ILCG.plugins) ILCG.plugins = []
-  ILCG.plugins.push(checkPkgMain(config))
+
+  ILCG.plugins.push({
+    name: 'vite-plugin-electron:check-package.json-main',
+    configResolved(RDCG) {
+      checkPkgMain(Object.assign(mainRuntime, { mainConfig: RDCG }))
+    },
+  })
 
   await viteBuild(ILCG)
 }

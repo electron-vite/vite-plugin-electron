@@ -105,36 +105,35 @@ export function createWithExternal(runtime: Runtime) {
   }
 }
 
-export function checkPkgMain(config: Configuration): Plugin {
-  return {
-    name: 'vite-plugin-electron:check-package.json-main',
-    configResolved(CGRD) {
-      const cwd = process.cwd()
-      const pkgId = path.join(cwd, 'package.json')
-      if (!fs.existsSync(pkgId)) return
+export function checkPkgMain(runtime: Runtime & { mainConfig: ResolvedConfig }) {
+  const { config, mainConfig, viteConfig } = runtime
 
-      const distfile = path.resolve(
-        CGRD.root,
-        CGRD.build.outDir,
-        path.parse(config.main.entry).name,
-      )
-        // https://github.com/electron-vite/vite-plugin-electron/blob/5cd2c2ce68bb76b2a1770d50aa4164a59ab8110c/packages/electron/src/config.ts#L57
-        + '.js'
+  const cwd = process.cwd()
+  const pkgId = path.join(cwd, 'package.json')
+  if (!fs.existsSync(pkgId)) return
 
-      let message: string
-      const pkg = require(pkgId)
-      if (!(pkg.main && distfile.endsWith(pkg.main))) {
-        message = `
-[${new Date().toJSON()}]
-  The main field in package.json may be incorrect, which causes the app to fail to start after build.
-  File path after build: "${distfile}".
-  Recommended value for the main field: "${distfile.replace(cwd + '/', '')}".
+  const distfile = path.resolve(
+    mainConfig.root,
+    mainConfig.build.outDir,
+    path.parse(config.main.entry).name,
+  )
+    // https://github.com/electron-vite/vite-plugin-electron/blob/5cd2c2ce68bb76b2a1770d50aa4164a59ab8110c/packages/electron/src/config.ts#L57
+    + '.js'
+
+  let message: string
+  const pkg = require(pkgId)
+  if (!(pkg.main && distfile.endsWith(pkg.main))) {
+    message = `
+[${new Date().toLocaleString()}]
+  Command: "vite ${viteConfig.command}".
+  The main field in package.json may be incorrect, which causes the App to fail to start.
+  File build path: "${distfile}".
+  Recommended main value: "${distfile.replace(cwd + '/', '')}".
 `
-      }
+  }
 
-      if (message) {
-        fs.appendFileSync(path.join(cwd, 'vite-plugin-electron.log'), message)
-      }
-    },
+  if (message) {
+    fs.appendFileSync(path.join(cwd, 'vite-plugin-electron.log'), message)
+    return message
   }
 }
