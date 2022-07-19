@@ -1,4 +1,19 @@
 
+## [2022-07-19] v0.6.0
+
+- be80d0c vite-plugin-electron-renderer@0.6.0
+- 7e69a7c docs: `vite-plugin-electron-renderer@0.6.0`
+- da89e79 remove `electron-renderer/index.d.ts`
+- 581ef71 chore(deps): bump vite to 3.0.2
+- 716485b refactor vite-plugin-electron-renderer with TypeScript
+- baf5e80 refactor use-node.js with TypeScript
+- 7e3fd3d refactor polyfill-exports with TypeScript
+- 2249834 refactor build-config with TypeScript
+- 8dad5e2 refactor(🚨): exclude `dependencies` as external by default
+- 0163d12 feat: `scripts.dev`
+- 3ad4b41 feat: `scripts.build` `scripts.dev`
+- 48a0338 monorepo: add `packages/electron-renderer`
+
 ## [2022-07-11] v0.5.7
 
 - 71799c7 fix(🐞): `cwd is not defined`
