@@ -1,9 +1,20 @@
 import { spawn } from 'child_process'
 import type { AddressInfo } from 'net'
-import type { ViteDevServer, UserConfig, InlineConfig, ResolvedConfig } from 'vite'
-import { build as viteBuild, mergeConfig } from 'vite'
+import {
+  type ViteDevServer,
+  type UserConfig,
+  type InlineConfig,
+  type ResolvedConfig,
+  build as viteBuild,
+  mergeConfig,
+} from 'vite'
 import type { Configuration } from './types'
-import { createWithExternal, resolveRuntime, resolveBuildConfig, checkPkgMain } from './config'
+import {
+  createWithExternal,
+  resolveRuntime,
+  resolveBuildConfig,
+  checkPkgMain,
+} from './config'
 
 export async function bootstrap(config: Configuration, server: ViteDevServer) {
   const electronPath = require('electron')
