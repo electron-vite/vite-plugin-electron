@@ -48,7 +48,6 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
     VITE_DEV_SERVER_HOST: address.address,
     VITE_DEV_SERVER_PORT: address.port,
   })
-  let RDCG: ResolvedConfig
 
   const mainRuntime = resolveRuntime('main', config, viteConfig)
   const mainConfig = mergeConfig(
@@ -58,23 +57,23 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
       build: {
         watch: true,
       },
-      plugins: [{
-        name: 'electron-main-watcher',
-        configResolved(_RDCG) {
-          RDCG = _RDCG
+      plugins: [
+        {
+          name: 'electron-main-watcher',
+          writeBundle() {
+            if (process.electronApp) {
+              process.electronApp.removeAllListeners()
+              process.electronApp.kill()
+            }
+
+            // Start Electron.app
+            process.electronApp = spawn(electronPath, ['.'], { stdio: 'inherit', env })
+            // Exit command after Electron.app exits
+            process.electronApp.once('exit', process.exit)
+          },
         },
-        writeBundle() {
-          if (process.electronApp) {
-            process.electronApp.removeAllListeners()
-            process.electronApp.kill()
-          }
-          checkPkgMain(Object.assign(mainRuntime, { mainConfig: RDCG }))
-          // Start Electron.app
-          process.electronApp = spawn(electronPath, ['.'], { stdio: 'inherit', env })
-          // Exit command after Electron.app exits
-          process.electronApp.once('exit', process.exit)
-        },
-      }],
+        checkPkgMain.buildElectronMainPlugin(mainRuntime),
+      ],
     } as UserConfig,
   ) as InlineConfig
 

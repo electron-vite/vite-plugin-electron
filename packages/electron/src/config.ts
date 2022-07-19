@@ -105,8 +105,9 @@ export function createWithExternal(runtime: Runtime) {
   }
 }
 
-export function checkPkgMain(runtime: Runtime & { mainConfig: ResolvedConfig }) {
-  const { config, mainConfig, viteConfig } = runtime
+export function checkPkgMain(runtime: Runtime, electronMainBuildResolvedConfig: ResolvedConfig) {
+  const mainConfig = electronMainBuildResolvedConfig
+  const { config, viteConfig } = runtime
 
   const cwd = process.cwd()
   const pkgId = path.join(cwd, 'package.json')
@@ -135,5 +136,14 @@ export function checkPkgMain(runtime: Runtime & { mainConfig: ResolvedConfig }) 
   if (message) {
     fs.appendFileSync(path.join(cwd, 'vite-plugin-electron.log'), message)
     return message
+  }
+}
+
+checkPkgMain.buildElectronMainPlugin = function buildElectronMainPlugin(runtime: Runtime): Plugin {
+  return {
+    name: 'vite-plugin-electron:check-package.json-main',
+    configResolved(config) {
+      checkPkgMain(runtime, config)
+    },
   }
 }
