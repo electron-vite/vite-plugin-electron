@@ -2,8 +2,8 @@
 
 Support use Node.js API in Electron-Renderer
 
-[![NPM version](https://img.shields.io/npm/v/vite-plugin-electron-renderer.svg?style=flat)](https://npmjs.org/package/vite-plugin-electron-renderer)
-[![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron-renderer.svg?style=flat)](https://npmjs.org/package/vite-plugin-electron-renderer)
+[![NPM version](https://img.shields.io/npm/v/vite-plugin-electron-renderer.svg)](https://npmjs.org/package/vite-plugin-electron-renderer)
+[![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron-renderer.svg)](https://npmjs.org/package/vite-plugin-electron-renderer)
 
 English | [简体中文](https://github.com/electron-vite/vite-plugin-electron/blob/main/packages/electron-renderer/README.zh-CN.md)
 
@@ -90,9 +90,9 @@ export interface Options {
   </tbody>
 </table>
 
-First put the Node.js(CJS) packages into `dependencies`.
+First, put the Node.js(CJS) packages into `dependencies`.
 
-Second, you need to explicitly specify which packages are Node.js(CJS) packages for `vite-plugin-electron-renderer` by `options.resolve()`. This way they will be treated as `external` modules and loaded correctly. Thereby avoiding the problems caused by the Pre-Building of Vite.
+Second, you need to explicitly specify which packages are Node.js(CJS) packages for `vite-plugin-electron-renderer` by `options.resolve()`. This way they will be treated as `external` modules and loaded correctly. Thereby avoiding the problems caused by the Pre-Bundling of Vite.
 
 Its actual works principle is to generate a virtual module in ESM format by `load-hook` during `vite serve` to ensure that it can work normally. It's inserted into `rollupOptions.external` during `vite build` time.
 
@@ -133,7 +133,7 @@ const { ipcRenderer } = require('electron')
                    │                                                   │
                    │                                                   │
                    │ 2. Intercept in load-hook(Plugin)                 │
-                   │ 3. Generate a virtual module(electron)            │
+                   │ 3. Generate a virtual ESM module(electron)        │
                    │    ↓                                              │
                    │    const { ipcRenderer } = require('electron')    │
                    │    export { ipcRenderer }                         │

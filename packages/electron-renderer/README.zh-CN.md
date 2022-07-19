@@ -4,7 +4,7 @@
 
 ## `dependencies` 与 `devDependencies`
 
-> 通常的，Vite 可能不能正确的构建 Node.js 包，尤其是 C/C++ 原生模块，但是 Vite 可以将它们以外部包(`external`)的形式加载它们。**除非你知道如何用 Vite 正确的构建它们 -- 鲁迅**
+> 通常的，Vite 可能不能正确的构建 Node.js 包，尤其是 Node.js C/C++ 原生模块，但是 Vite 可以将它们以外部包(`external`)的形式加载它们。**除非你知道如何用 Vite 正确的构建它们 -- 鲁迅**
 
 <table>
   <thead>
@@ -84,7 +84,7 @@ const { ipcRenderer } = require('electron')
                    │                                                   │
                    │                                                   │
                    │ 2. Intercept in load-hook(Plugin)                 │
-                   │ 3. Generate a virtual module(electron)            │
+                   │ 3. Generate a virtual ESM module(electron)        │
                    │    ↓                                              │
                    │    const { ipcRenderer } = require('electron')    │
                    │    export { ipcRenderer }                         │
