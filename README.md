@@ -4,7 +4,7 @@
 
 <table>
   <thead>
-    <th width="217">Name</th>
+    <th>Name</th>
     <th>Description</th>
     <th>Npm</th>
   </thead>
@@ -16,9 +16,6 @@
       <td>Integrate Vite and Electron</td>
       <td>
         <a href="https://npmjs.org/package/vite-plugin-electron">
-          <img src="https://img.shields.io/npm/v/vite-plugin-electron.svg">
-        </a>
-        <a href="https://npmjs.org/package/vite-plugin-electron">
           <img src="https://img.shields.io/npm/dw/vite-plugin-electron.svg">
         </a>
       </td>
@@ -29,9 +26,6 @@
       </td>
       <td>Support use Node.js API in Electron-Renderer</td>
       <td>
-        <a href="https://npmjs.org/package/vite-plugin-electron-renderer">
-          <img src="https://img.shields.io/npm/v/vite-plugin-electron-renderer.svg">
-        </a>
         <a href="https://npmjs.org/package/vite-plugin-electron-renderer">
           <img src="https://img.shields.io/npm/dw/vite-plugin-electron-renderer.svg">
         </a>
