@@ -1,4 +1,26 @@
 
+## [2022-07-11] v0.8.0
+
+- 45f34d9 vite-plugin-electron@0.8.0
+- daa1c52 docs: `vite-plugin-electron@0.8.0`
+- e4e7ee0 chore: fix link
+- d1d4c82 chroe: bump deps
+- 581ef71 chore(deps): bump vite to 3.0.2
+- 481368a chore: remove unused def
+- 71d54c1 chore(🐞): update import path
+- 3bae8e5 refactor: `checkPkgMain.buildElectronMainPlugin()`
+- dba119d chore: format code
+- 739e659 feat: use `checkPkgMain()`
+- 192a8ca refactor: standlone `checkPkgMain` function
+- aaa9030 chore: explicitly specify external modules
+- 3eac722 chore: remove TODO
+- c03abe9 feat: add `checkPkgMain()` plugin
+- d8c0f8e chore: rename param
+- 04c94dd feat: `checkPkgMain()`
+- 7b9631a deps: add `rollup`
+- cec6db6 deps(🐞): add rollup for import `InputOption`
+- a4de86e monorepo: move `vite-plugin-electron` to `packages/electron`
+
 ## [2022-07-11] v0.7.5
 
 - 1ed6e19 chore: bump vite-plugin-electron-renderer to v0.5.7
