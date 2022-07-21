@@ -15,6 +15,27 @@ export interface Options {
   resolve?: (modules: string[]) => string[] | void
 }
 
+// https://www.w3schools.com/js/js_reserved.asp
+const keywords = [
+  'abstract', 'arguments', 'await',
+  'boolean', 'break', 'byte',
+  'case', 'catch', 'char', 'class', 'const', 'continue',
+  'debugger', 'default', 'delete', 'do', 'double',
+  'else', 'enum', 'eval', 'export', 'extends',
+  'false', 'final', 'finally', 'float', 'for', 'function',
+  'goto',
+  'if', 'implements', 'import', 'in', 'instanceof', 'int', 'interface',
+  'let', 'long',
+  'native', 'new', 'null',
+  'package', 'private', 'protected', 'public',
+  'return',
+  'short', 'static', 'super', 'switch', 'synchronized',
+  'this', 'throw', 'throws', 'transient', 'true', 'try', 'typeof',
+  'var', 'void', 'volatile',
+  'while', 'with',
+  'yield',
+]
+
 export default function useNodeJs(options: Options = {}): Plugin {
   let env: ConfigEnv
   const builtins: string[] = []
@@ -189,7 +210,8 @@ export {
           const exportDefault = `const _D_ = _M_.default || _M_;\nexport { _D_ as default };`
           const exportMembers = Object
             .keys(nodeModule)
-            .filter(n => n !== 'default')
+            // https://github.com/electron-vite/electron-vite-react/issues/48
+            .filter(n => !keywords.includes(n))
             .map(attr => `export const ${attr} = _M_.${attr};`).join('\n')
           const nodeModuleCodeSnippet = `
   ${requireModule}
