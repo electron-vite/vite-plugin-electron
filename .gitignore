@@ -108,3 +108,5 @@ dist
 package-lock.json
 # pnpm-lock.yaml
 yarn.lock
+
+packages/electron-renderer/plugins
