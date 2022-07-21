@@ -12,7 +12,7 @@ export interface Options {
    * Explicitly include/exclude some CJS modules  
    * `modules` includes `dependencies` of package.json  
    */
-  resolve?: (modules: string[]) => typeof modules | undefined
+  resolve?: (modules: string[]) => string[] | void
 }
 
 export default function useNodeJs(options: Options = {}): Plugin {
