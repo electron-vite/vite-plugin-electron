@@ -42,7 +42,7 @@ export default {
 ```ts
 import type { LibraryOptions, UserConfig } from 'vite'
 import type { InputOption } from 'rollup'
-import { Options } from 'vite-plugin-electron-renderer/dist/plugins/use-node.js'
+import { Options } from 'vite-plugin-electron-renderer/plugins/use-node.js'
 
 export interface CommonConfiguration {
   vite?: UserConfig

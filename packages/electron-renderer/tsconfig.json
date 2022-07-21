@@ -10,7 +10,7 @@
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
-    "outDir": "dist"
+    "outDir": "plugins"
   },
-  "include": ["plugins/**/*.ts", "index.ts"]
+  "include": ["src/**/*.ts"]
 }

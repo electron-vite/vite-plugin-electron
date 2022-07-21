@@ -1,4 +1,14 @@
 
+## [2022-07-21] v0.8.1
+
+- 33b121a chore(deps): hoist `typescript`
+- 9d5fd94 fix(🐞): filter out keywords
+- d3c1d7a chore(renderer): update config
+- 298e4de refactor(renderer): `electron-renderer/plugins` -> `electron-renderer/src`
+- 841cbd1 docs(electron-renderer): update
+- 3994b9a chore(electron-renderer): fix link
+- 72efa81 docs(electron-renderer): update
+
 ## [2022-07-19] v0.6.0
 
 - be80d0c vite-plugin-electron-renderer@0.6.0
