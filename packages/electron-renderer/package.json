@@ -2,7 +2,7 @@
   "name": "vite-plugin-electron-renderer",
   "version": "0.6.0",
   "description": "Support use Node.js API in Electron-Renderer",
-  "main": "dist/index.js",
+  "main": "plugins/index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/electron-vite/vite-plugin-electron.git",
@@ -22,7 +22,7 @@
     "vite": "^3.0.2"
   },
   "files": [
-    "dist"
+    "plugins"
   ],
   "keywords": [
     "vite",
