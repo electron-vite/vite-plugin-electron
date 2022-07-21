@@ -1,5 +1,10 @@
 
-## [2022-07-11] v0.8.0
+## [2022-07-21] v0.8.1
+
+- 33b121a chore(deps): hoist `typescript`
+- d3bd37a chore(electron): change import path
+
+## [2022-07-19] v0.8.0
 
 - 45f34d9 vite-plugin-electron@0.8.0
 - daa1c52 docs: `vite-plugin-electron@0.8.0`
