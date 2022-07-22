@@ -113,13 +113,13 @@ export function checkPkgMain(runtime: Runtime, electronMainBuildResolvedConfig: 
   const pkgId = path.join(cwd, 'package.json')
   if (!fs.existsSync(pkgId)) return
 
-  const distfile = path.resolve(
+  const distfile = normalizePath(path.resolve(
     mainConfig.root,
     mainConfig.build.outDir,
     path.parse(config.main.entry).name,
   )
     // https://github.com/electron-vite/vite-plugin-electron/blob/5cd2c2ce68bb76b2a1770d50aa4164a59ab8110c/packages/electron/src/config.ts#L57
-    + '.js'
+    + '.js')
 
   let message: string
   const pkg = require(pkgId)
