@@ -1,5 +1,5 @@
 
-## [2022-07-21] v0.8.1
+## [2022-07-25] v0.8.2
 
 - 9ee720f chore(electron): remove `envFile: false`
 - 0016d52 fix(🐞): `normalizePath()`
