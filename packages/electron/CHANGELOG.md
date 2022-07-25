@@ -1,6 +1,11 @@
 
 ## [2022-07-21] v0.8.1
 
+- 9ee720f chore(electron): remove `envFile: false`
+- 0016d52 fix(🐞): `normalizePath()`
+
+## [2022-07-21] v0.8.1
+
 - 33b121a chore(deps): hoist `typescript`
 - d3bd37a chore(electron): change import path
 
