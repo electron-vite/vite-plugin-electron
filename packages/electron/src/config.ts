@@ -29,7 +29,6 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
   const conf: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
     configFile: false,
-    envFile: false,
     publicDir: false,
 
     build: {
