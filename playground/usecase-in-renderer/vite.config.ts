@@ -21,6 +21,6 @@ export default defineConfig({
         ],
       },
     }),
-    esmodule(),
+    esmodule(['execa', 'got', 'node-fetch']),
   ]
 })
