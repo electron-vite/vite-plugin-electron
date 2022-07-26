@@ -17,33 +17,73 @@ export interface Options {
 
 // https://www.w3schools.com/js/js_reserved.asp
 const keywords = [
-  'abstract', 'arguments', 'await',
-  'boolean', 'break', 'byte',
-  'case', 'catch', 'char', 'class', 'const', 'continue',
-  'debugger', 'default', 'delete', 'do', 'double',
-  'else', 'enum', 'eval', 'export', 'extends',
-  'false', 'final', 'finally', 'float', 'for', 'function',
+  'abstract',
+  'arguments',
+  'await',
+  'boolean',
+  'break',
+  'byte',
+  'case',
+  'catch',
+  'char',
+  'class',
+  'const',
+  'continue',
+  'debugger',
+  'default',
+  'delete',
+  'do',
+  'double',
+  'else',
+  'enum',
+  'eval',
+  'export',
+  'extends',
+  'false',
+  'final',
+  'finally',
+  'float',
+  'for',
+  'function',
   'goto',
-  'if', 'implements', 'import', 'in', 'instanceof', 'int', 'interface',
-  'let', 'long',
-  'native', 'new', 'null',
-  'package', 'private', 'protected', 'public',
+  'if',
+  'implements',
+  'import',
+  'in',
+  'instanceof',
+  'int',
+  'interface',
+  'let',
+  'long',
+  'native',
+  'new',
+  'null',
+  'package',
+  'private',
+  'protected',
+  'public',
   'return',
-  'short', 'static', 'super', 'switch', 'synchronized',
-  'this', 'throw', 'throws', 'transient', 'true', 'try', 'typeof',
-  'var', 'void', 'volatile',
-  'while', 'with',
+  'short',
+  'static',
+  'super',
+  'switch',
+  'synchronized',
+  'this',
+  'throw',
+  'throws',
+  'transient',
+  'true',
+  'try',
+  'typeof',
+  'var',
+  'void',
+  'volatile',
+  'while',
+  'with',
   'yield',
 ]
 
-export default function useNodeJs(options: Options = {}): Plugin {
-  let env: ConfigEnv
-  const builtins: string[] = []
-  const dependencies: string[] = []
-  const ESM_deps: string[] = []
-  const CJS_modules: string[] = [] // builtins + dependencies
-  const moduleCache = new Map([
-    ['electron', `
+const electron = `
 /**
  * All exports module see https://www.electronjs.org -> API -> Renderer Process Modules
  */
@@ -71,8 +111,16 @@ export {
   webFrame,
   desktopCapturer,
   deprecate,
-}`],
-  ])
+}
+`.trim()
+
+export default function useNodeJs(options: Options = {}): Plugin {
+  let env: ConfigEnv
+  const builtins: string[] = []
+  const dependencies: string[] = []
+  const ESM_deps: string[] = []
+  const CJS_modules: string[] = [] // builtins + dependencies
+  const moduleCache = new Map([['electron', electron]])
 
   // When `electron` files or folders exist in the root directory, it will cause Vite to incorrectly splicing the `/@fs/` prefix.
   // Here, use `\0` prefix avoid this behavior
@@ -133,7 +181,8 @@ export {
           typeof external === 'string' ||
           external instanceof RegExp
         ) {
-          external = CJS_modules.concat(external as string)
+          // @ts-ignore
+          external = CJS_modules.concat(external)
         } else if (typeof external === 'function') {
           const original = external
           external = function externalFn(source, importer, isResolved) {
@@ -175,27 +224,27 @@ export {
          * ```
          * 🎯 Using Node.js packages(CJS) in Electron-Renderer(vite serve)
          * 
-         * ┏———————————————————————————————┓                                ┏—————————————————┓
-         * │ import { readFile } from 'fs' │                                │ Vite dev server │
-         * ┗———————————————————————————————┛                                ┗—————————————————┛
-         *                │                                                          │
-         *                │ 1. HTTP(Request): fs module                              │
-         *                │ ———————————————————————————————————————————————————————> │
-         *                │                                                          │
-         *                │                                                          │
-         *                │ 2. Intercept in load-hook(vite-plugin-electron-renderer) │
-         *                │ 3. Generate a virtual module(fs)                         │
-         *                │    ↓                                                     │
-         *                │    const _M_ = require('fs')                             │
-         *                │    export const readFile = _M_.readFile                  │
-         *                │                                                          │
-         *                │                                                          │
-         *                │ 4. HTTP(Response): fs module                             │
-         *                │ <——————————————————————————————————————————————————————— │
-         *                │                                                          │
-         * ┏———————————————————————————————┓                                ┏—————————————————┓
-         * │ import { readFile } from 'fs' │                                │ Vite dev server │
-         * ┗———————————————————————————————┛                                ┗—————————————————┛
+         * ┏————————————————————————————————————————┓                    ┏—————————————————┓
+         * │ import { ipcRenderer } from 'electron' │                    │ Vite dev server │
+         * ┗————————————————————————————————————————┛                    ┗—————————————————┛
+         *                    │                                                   │
+         *                    │ 1. HTTP(Request): electron module                 │
+         *                    │ ————————————————————————————————————————————————> │
+         *                    │                                                   │
+         *                    │                                                   │
+         *                    │ 2. Intercept in load-hook(Plugin)                 │
+         *                    │ 3. Generate a virtual ESM module(electron)        │
+         *                    │    ↓                                              │
+         *                    │    const { ipcRenderer } = require('electron')    │
+         *                    │    export { ipcRenderer }                         │
+         *                    │                                                   │
+         *                    │                                                   │
+         *                    │ 4. HTTP(Response): electron module                │
+         *                    │ <———————————————————————————————————————————————— │
+         *                    │                                                   │
+         * ┏————————————————————————————————————————┓                    ┏—————————————————┓
+         * │ import { ipcRenderer } from 'electron' │                    │ Vite dev server │
+         * ┗————————————————————————————————————————┛                    ┗—————————————————┛
          * 
          * ```
          */
