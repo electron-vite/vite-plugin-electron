@@ -3,6 +3,7 @@
 
 - 🌱 c8b59ba Support `envFile` options [electron-vite-vue/issues/209](https://github.com/electron-vite/electron-vite-vue/issues/209)
 - 🌱 2d7f033 Add `ImportMeta['env']` declaration
+- 🌱 20d0a22 Must use `pnpm publish` instead of `npm publish` #43
 
 ## [2022-07-25] v0.8.2
 
