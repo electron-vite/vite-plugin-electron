@@ -10,3 +10,8 @@ declare namespace NodeJS {
     electronApp: import('child_process').ChildProcessWithoutNullStreams
   }
 }
+
+interface ImportMeta {
+  /** shims Vite */
+  env: Record<string, any>
+}
