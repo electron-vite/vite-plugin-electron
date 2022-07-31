@@ -1,9 +1,9 @@
-import type { LibraryOptions, UserConfig } from 'vite'
+import type { InlineConfig, LibraryOptions } from 'vite'
 import type { InputOption } from 'rollup'
 import { Options } from 'vite-plugin-electron-renderer/plugins/use-node.js'
 
 export interface CommonConfiguration {
-  vite?: UserConfig
+  vite?: InlineConfig
   /**
    * Explicitly include/exclude some CJS modules  
    * `modules` includes `dependencies` of package.json, Node.js's `builtinModules` and `electron`  

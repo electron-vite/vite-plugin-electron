@@ -26,7 +26,7 @@ export function resolveRuntime(
 
 export function resolveBuildConfig(runtime: Runtime): InlineConfig {
   const { proc, config, viteConfig } = runtime
-  const conf: InlineConfig = {
+  const defaultConfig: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
     configFile: false,
     publicDir: false,
@@ -41,8 +41,8 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
 
   if (proc === 'preload') {
     // Electron-Preload
-    conf.build.rollupOptions = {
-      ...conf.build.rollupOptions,
+    defaultConfig.build.rollupOptions = {
+      ...defaultConfig.build.rollupOptions,
       input: config[proc].input,
       output: {
         format: 'cjs',
@@ -57,7 +57,7 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
   } else {
     // Electron-Main
     // TODO: consider also support `build.rollupOptions`
-    conf.build.lib = {
+    defaultConfig.build.lib = {
       entry: config[proc].entry,
       formats: ['cjs'],
       fileName: () => '[name].js',
@@ -65,9 +65,9 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
   }
 
   // Assign default dir
-  conf.build.outDir = normalizePath(`${viteConfig.build.outDir}/electron`)
+  defaultConfig.build.outDir = normalizePath(`${viteConfig.build.outDir}/electron`)
 
-  return mergeConfig(conf, config[proc]?.vite || {}) as InlineConfig
+  return mergeConfig(defaultConfig, config[proc]?.vite || {}) as InlineConfig
 }
 
 export function createWithExternal(runtime: Runtime) {
