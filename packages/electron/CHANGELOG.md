@@ -1,4 +1,9 @@
 
+## [2022-07-31] v0.8.4
+
+- 🌱 c8b59ba Support `envFile` options [electron-vite-vue/issues/209](https://github.com/electron-vite/electron-vite-vue/issues/209)
+- 🌱 2d7f033 Add `ImportMeta['env']` declaration
+
 ## [2022-07-25] v0.8.2
 
 - 9ee720f chore(electron): remove `envFile: false`
