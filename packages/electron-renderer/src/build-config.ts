@@ -5,8 +5,6 @@ export default function buildConfig(): Plugin {
     name: 'vite-plugin-electron-renderer:build-config',
     apply: 'build',
     config(config) {
-      if (!config.build) config.build = {}
-
       // make sure that Electron can be loaded into the local file using `loadFile` after packaging
       if (config.base === undefined) config.base = './'
 
