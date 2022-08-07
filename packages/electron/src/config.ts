@@ -7,8 +7,8 @@ import {
   mergeConfig,
   normalizePath,
 } from 'vite'
-import type { Configuration } from './types'
 import { resolveModules } from 'vite-plugin-electron-renderer/plugins/use-node.js'
+import type { Configuration } from './types'
 
 export interface Runtime {
   proc: 'main' | 'preload'
