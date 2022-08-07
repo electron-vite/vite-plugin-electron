@@ -30,6 +30,7 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
     // 🚧 Avoid recursive build caused by load config file
     configFile: false,
     publicDir: false,
+    mode: viteConfig.mode,
 
     build: {
       emptyOutDir: false,

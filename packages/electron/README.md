@@ -35,6 +35,22 @@ export default {
 }
 ```
 
+you can use `process.env.VITE_DEV_SERVER_URL` when the vite command is called 'serve'
+
+```js
+// electron main.js
+const win = new BrowserWindow({
+  title: 'Main window',
+})
+
+if (process.env.VITE_DEV_SERVER_URL) {
+  win.loadURL(process.env.VITE_DEV_SERVER_URL)
+} else {
+  // load your file
+  win.loadFile('yourOutputFile.html');
+}
+```
+
 ## API
 
 `electron(config: Configuration)`

@@ -1,5 +1,5 @@
 import type { Configuration } from './types'
-import type { Plugin } from 'vite'
+import type { Plugin, ResolvedConfig } from 'vite'
 import { bootstrap } from './serve'
 import { build } from './build'
 import renderer from 'vite-plugin-electron-renderer'
@@ -30,12 +30,19 @@ export default function electron(config: Configuration): Plugin[] {
         })
       },
     },
-    {
-      name: `${name}:build`,
-      apply: 'build',
-      async configResolved(viteConfig) {
-        await build(config, viteConfig)
-      },
-    },
+    ((): Plugin => {
+      let viteConfig: ResolvedConfig
+
+      return {
+        name: `${name}:build`,
+        apply: 'build',
+        configResolved(config) {
+          viteConfig = config
+        },
+        async closeBundle() {
+          await build(config, viteConfig)
+        }
+      }
+    })()
   ]
 }
