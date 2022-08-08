@@ -1,4 +1,29 @@
 
+## [2022-08-08] v0.8.5
+
+PR: #51
+
+1. feat: add `VITE_DEV_SERVER_URL` to electron
+process env, so that it is easier to use
+
+2. fix(🐞): VITE_DEV_SERVER_HOST cannot be used directly when
+VITE_DEV_SERVER_HOST is a ipv6 address or
+vite config `server.host` is true
+
+3. fix(🐞): use vite config `mode` as default build
+mode to avoid build mode not equal to vite config `mode` when
+vite config `mode` !== 'development' which would lead to render env
+not equal to electron main or preload
+
+4. fix(🐞): build electron output after render to avoid the electron
+output being deleted when the vite config emptyOutDir
+is `true` and the vite command is `build`
+
+5. fix(🐞): use `closeBundle` to replace `writeBundle`, because in
+extreme cases, an error will be reported. For example,
+`can't find preload module` will occur as an error
+when `preload` update frequently
+
 ## [2022-07-31] v0.8.4
 
 - 🌱 c8b59ba Support `envFile` options [electron-vite-vue/issues/209](https://github.com/electron-vite/electron-vite-vue/issues/209)

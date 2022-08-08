@@ -1,4 +1,9 @@
 
+## [2022-08-08] v0.8.5
+
+- 1cc4f40 fix(🌱): support Vite3 - [Uncaught TypeError: Failed to construct 'URL': Invalid URL (vite 3) #44](https://github.com/electron-vite/vite-plugin-electron/issues/44)
+- 32f7755 feat(🌱): output ESM format - [TypeError: electron is not a function #45](https://github.com/electron-vite/vite-plugin-electron/issues/45)
+
 ## [2022-07-21] v0.8.1
 
 - 33b121a chore(deps): hoist `typescript`
