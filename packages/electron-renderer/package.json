@@ -10,9 +10,10 @@
   },
   "author": "草鞋没号 <308487730@qq.com>",
   "license": "MIT",
+  "type": "module",
   "scripts": {
-    "dev": "rm -rf dist && tsc --watch",
-    "build": "rm -rf dist && tsc",
+    "dev": "rm -rf plugins && tsc --watch",
+    "build": "rm -rf plugins && tsc",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {},

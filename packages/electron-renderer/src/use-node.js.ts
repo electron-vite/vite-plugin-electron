@@ -7,7 +7,7 @@ import {
   normalizePath,
 } from 'vite'
 
-export interface Options {
+export interface UseNodeJsOptions {
   /**
    * Explicitly include/exclude some CJS modules  
    * `modules` includes `dependencies` of package.json  
@@ -114,7 +114,7 @@ export {
 }
 `.trim()
 
-export default function useNodeJs(options: Options = {}): Plugin {
+export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin {
   let env: ConfigEnv
   const builtins: string[] = []
   const dependencies: string[] = []
@@ -277,7 +277,7 @@ export default function useNodeJs(options: Options = {}): Plugin {
   }
 }
 
-export function resolveModules(root: string, options: Options = {}) {
+export function resolveModules(root: string, options: UseNodeJsOptions = {}) {
   const cwd = process.cwd()
   const builtins = builtinModules.filter(e => !e.startsWith('_')); builtins.push('electron', ...builtins.map(m => `node:${m}`))
   // dependencies of package.json
