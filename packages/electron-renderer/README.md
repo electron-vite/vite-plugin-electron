@@ -167,7 +167,9 @@ The plugin is just the encapsulation of the built-in plugins of [electron-vite-b
 If you do not configure the following options, the plugin will modify their default values
 
 - `base = './'`
+- `build.assetsDir = ''` -> *TODO: Support nested dir*
 - `build.emptyOutDir = false`
+- `build.cssCodeSplit = false`
 - `build.rollupOptions.output.format = 'cjs'`
 - `resolve.conditions = ['node']`
 - `optimizeDeps.exclude = ['electron']` - always
