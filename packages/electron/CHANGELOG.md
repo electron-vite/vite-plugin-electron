@@ -1,4 +1,12 @@
 
+## [2022-08-10] v0.8.7
+
+70a8c6e fix: https://github.com/electron-vite/electron-vite-vue/issues/229
+
+## [2022-08-08] v0.8.6
+
+ESM -> CJS
+
 ## [2022-08-08] v0.8.5
 
 PR: #51
