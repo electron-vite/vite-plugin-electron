@@ -1,7 +1,7 @@
 
 ## [2022-08-10] v0.8.7
 
-70a8c6e fix: #229
+70a8c6e fix: https://github.com/electron-vite/vite-plugin-electron/pull/54
 
 ## [2022-08-08] v0.8.6
 
