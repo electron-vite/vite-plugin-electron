@@ -1,4 +1,8 @@
 
+## [2022-08-11] v0.8.8
+
+sync `vite-plugin-electron-renderer` version
+
 ## [2022-08-10] v0.8.7
 
 70a8c6e fix: https://github.com/electron-vite/electron-vite-vue/issues/229
