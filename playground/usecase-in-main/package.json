@@ -5,10 +5,10 @@
   "main": "dist/electron/main/index.js",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build && electron-builder"
+    "build": "vite build && electron-builder"
   },
   "keywords": [],
-  "author": "",
+  "author": "草鞋没号 <308487730@qq.com>",
   "license": "ISC",
   "dependencies": {
     "serialport": "^10.4.0",
@@ -24,6 +24,6 @@
     "node-fetch": "^3.2.8",
     "vite-plugin-electron": "workspace:*",
     "vite-plugin-esmodule": "^1.4.1",
-    "vite": "^3.0.2"
+    "vite": "^3.0.6"
   }
 }
