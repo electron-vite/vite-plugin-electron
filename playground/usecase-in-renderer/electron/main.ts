@@ -5,7 +5,7 @@ process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
 
 export const ROOT_PATH = {
   // /dist
-  dist: path.join(__dirname, '../..'),
+  dist: path.join(__dirname, '..'),
   // /dist or /public
   public: path.join(__dirname, app.isPackaged ? '../..' : '../../../public'),
 }

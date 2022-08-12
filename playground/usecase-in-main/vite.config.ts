@@ -1,6 +1,9 @@
+import fs from 'fs'
 import path from 'path'
 import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
+
+fs.rmSync('dist', { recursive: true, force: true })
 
 export default defineConfig({
   plugins: [
@@ -10,6 +13,7 @@ export default defineConfig({
         vite: {
           build: {
             outDir: 'dist/electron/main',
+            minify: false,
           },
         },
       },
@@ -23,9 +27,13 @@ export default defineConfig({
             // For debug
             sourcemap: 'inline',
             outDir: 'dist/electron/preload',
+            minify: false,
           },
         },
       },
     }),
   ],
+  build: {
+    minify: false,
+  },
 })
