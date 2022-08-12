@@ -17,7 +17,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "vite": "^3.0.2"
+    "vite": "^3.0.6"
   },
   "files": [
     "plugins"
