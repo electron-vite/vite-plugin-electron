@@ -71,6 +71,9 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
   return mergeConfig(defaultConfig, config[proc]?.vite || {}) as InlineConfig
 }
 
+/**
+ * `dependencies` of package.json will be inserted into `build.rollupOptions.external`
+ */
 export function createWithExternal(runtime: Runtime) {
   const { proc, config, viteConfig } = runtime
   const { builtins, dependencies } = resolveModules(viteConfig.root, config[proc])
