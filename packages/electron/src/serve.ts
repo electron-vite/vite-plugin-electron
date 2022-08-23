@@ -104,7 +104,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
             }
 
             // Start Electron.app
-            process.electronApp = spawn(electronPath, ['.'], { stdio: 'inherit', env: process.env })
+            process.electronApp = spawn(electronPath, ['.', '--no-sandbox'], { stdio: 'inherit', env: process.env })
             // Exit command after Electron.app exits
             process.electronApp.once('exit', process.exit)
           },
