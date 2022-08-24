@@ -46,8 +46,8 @@ function resolveEnv(server: ViteDevServer) {
 
     const path = typeof options.open === 'string' ? options.open : devBase
     const url = path.startsWith('http')
-        ? path
-        : `${protocol}://${host}:${port}${path}`
+      ? path
+      : `${protocol}://${host}:${port}${path}`
 
     return { url, host, port }
   }
@@ -63,7 +63,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
     const preloadConfig = mergeConfig(
       {
         build: {
-          watch: true,
+          watch: {},
         },
         plugins: [{
           name: 'electron-preload-watcher',
@@ -92,7 +92,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
   const mainConfig = mergeConfig(
     {
       build: {
-        watch: true,
+        watch: {},
       },
       plugins: [
         {
