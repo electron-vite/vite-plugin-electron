@@ -1,6 +1,7 @@
 import { spawn } from 'child_process'
 import type { AddressInfo } from 'net'
 import {
+  type Plugin,
   type ViteDevServer,
   type UserConfig,
   type InlineConfig,
@@ -50,6 +51,23 @@ function resolveEnv(server: ViteDevServer) {
       : `${protocol}://${host}:${port}${path}`
 
     return { url, host, port }
+  }
+}
+
+/**
+ * Custom start plugin
+ */
+export function onstart(onstart?: () => void): Plugin {
+  return {
+    name: 'electron-custom-start',
+    configResolved(config) {
+      const index = config.plugins.findIndex(p => p.name === 'electron-main-watcher')
+        // At present, Vite can only modify plugins in configResolved hook.
+        ; (config.plugins as Plugin[]).splice(index, 1)
+    },
+    closeBundle() {
+      onstart?.()
+    },
   }
 }
 
