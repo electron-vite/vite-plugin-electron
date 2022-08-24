@@ -1,3 +1,11 @@
+## 0.9.1 (2022-08-24)
+
+#### vite-plugin-electron
+
+- db61e49 feat(electron): support custom start 🌱 | #57, #58
+
+#### vite-plugin-electron-renderer
+
 ## 0.9.0 (2022-08-12)
 
 🎉 `v0.9.0` is a stable version based on `vite@3.0.6`

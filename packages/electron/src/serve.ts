@@ -1,6 +1,7 @@
 import { spawn } from 'child_process'
 import type { AddressInfo } from 'net'
 import {
+  type Plugin,
   type ViteDevServer,
   type UserConfig,
   type InlineConfig,
@@ -46,10 +47,27 @@ function resolveEnv(server: ViteDevServer) {
 
     const path = typeof options.open === 'string' ? options.open : devBase
     const url = path.startsWith('http')
-        ? path
-        : `${protocol}://${host}:${port}${path}`
+      ? path
+      : `${protocol}://${host}:${port}${path}`
 
     return { url, host, port }
+  }
+}
+
+/**
+ * Custom start plugin
+ */
+export function onstart(onstart?: () => void): Plugin {
+  return {
+    name: 'electron-custom-start',
+    configResolved(config) {
+      const index = config.plugins.findIndex(p => p.name === 'electron-main-watcher')
+        // At present, Vite can only modify plugins in configResolved hook.
+        ; (config.plugins as Plugin[]).splice(index, 1)
+    },
+    closeBundle() {
+      onstart?.()
+    },
   }
 }
 
@@ -63,7 +81,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
     const preloadConfig = mergeConfig(
       {
         build: {
-          watch: true,
+          watch: {},
         },
         plugins: [{
           name: 'electron-preload-watcher',
@@ -92,7 +110,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
   const mainConfig = mergeConfig(
     {
       build: {
-        watch: true,
+        watch: {},
       },
       plugins: [
         {
@@ -104,7 +122,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
             }
 
             // Start Electron.app
-            process.electronApp = spawn(electronPath, ['.'], { stdio: 'inherit', env: process.env })
+            process.electronApp = spawn(electronPath, ['.', '--no-sandbox'], { stdio: 'inherit' })
             // Exit command after Electron.app exits
             process.electronApp.once('exit', process.exit)
           },
