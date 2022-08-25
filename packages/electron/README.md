@@ -94,6 +94,9 @@ export interface Configuration {
 
 The plugin is just the encapsulation of the built-in scripts of [electron-vite-boilerplate/scripts](https://github.com/electron-vite/electron-vite-boilerplate/tree/main/scripts)
 
+## Custom start Electron
+You can see 👉 [import { onstart } from 'vite-plugin-electron'](https://github.com/electron-vite/vite-plugin-electron/blob/b0f2c9664530c1aa431ab2694fc01526d6dd5498/playground/usecase-in-main/vite.config.ts#L21-L32)
+
 ## Recommend structure
 
 Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-vanilla-ts) created based on `create vite` as an example
