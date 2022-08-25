@@ -18,6 +18,7 @@ export default defineConfig({
             minify: false,
           },
           plugins: [
+            // Custom start Electron
             onstart(() => {
               if (process.electronApp) {
                 process.electronApp.removeAllListeners()
