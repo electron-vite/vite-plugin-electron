@@ -1,5 +1,4 @@
 import { spawn } from 'child_process'
-import type { AddressInfo } from 'net'
 import {
   type Plugin,
   type ViteDevServer,
@@ -14,45 +13,8 @@ import {
   resolveRuntime,
   resolveBuildConfig,
   checkPkgMain,
+  resolveEnv,
 } from './config'
-
-export const loopbackHosts = new Set([
-  'localhost',
-  '127.0.0.1',
-  '::1',
-  '0000:0000:0000:0000:0000:0000:0000:0001'
-])
-
-export const wildcardHosts = new Set([
-  '0.0.0.0',
-  '::',
-  '0000:0000:0000:0000:0000:0000:0000:0000'
-])
-
-function resolveHostname(hostname: string) {
-  return loopbackHosts.has(hostname) || wildcardHosts.has(hostname) ? 'localhost' : hostname
-}
-
-function resolveEnv(server: ViteDevServer) {
-  const addressInfo = server.httpServer.address()
-  const isAddressInfo = (x: any): x is AddressInfo => x?.address
-
-  if (isAddressInfo(addressInfo)) {
-    const { address, port } = addressInfo
-    const host = resolveHostname(address)
-
-    const options = server.config.server
-    const protocol = options.https ? 'https' : 'http'
-    const devBase = server.config.base
-
-    const path = typeof options.open === 'string' ? options.open : devBase
-    const url = path.startsWith('http')
-      ? path
-      : `${protocol}://${host}:${port}${path}`
-
-    return { url, host, port }
-  }
-}
 
 /**
  * Custom start plugin
