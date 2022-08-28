@@ -18,8 +18,8 @@ PR: #51
 1. feat: add `VITE_DEV_SERVER_URL` to electron
 process env, so that it is easier to use
 
-2. fix(🐞): VITE_DEV_SERVER_HOST cannot be used directly when
-VITE_DEV_SERVER_HOST is a ipv6 address or
+2. fix(🐞): VITE_DEV_SERVER_HOSTNAME cannot be used directly when
+VITE_DEV_SERVER_HOSTNAME is a ipv6 address or
 vite config `server.host` is true
 
 3. fix(🐞): use vite config `mode` as default build

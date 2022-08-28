@@ -178,7 +178,7 @@ export function resolveEnv(server: ViteDevServer) {
 
   if (isAddressInfo(addressInfo)) {
     const { address, port } = addressInfo
-    const host = resolveHostname(address)
+    const hostname = resolveHostname(address)
 
     const options = server.config.server
     const protocol = options.https ? 'https' : 'http'
@@ -187,8 +187,8 @@ export function resolveEnv(server: ViteDevServer) {
     const path = typeof options.open === 'string' ? options.open : devBase
     const url = path.startsWith('http')
       ? path
-      : `${protocol}://${host}:${port}${path}`
+      : `${protocol}://${hostname}:${port}${path}`
 
-    return { url, host, port }
+    return { url, hostname, port }
   }
 }
