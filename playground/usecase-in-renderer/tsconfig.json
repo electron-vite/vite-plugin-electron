@@ -14,7 +14,9 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
-    "skipLibCheck": true
-  },
-  "include": ["src", "electron-env.d.ts", "vite.config.ts"]
+    "skipLibCheck": true,
+    "types": [
+      "vite-plugin-electron/electron-env"
+    ]
+  }
 }

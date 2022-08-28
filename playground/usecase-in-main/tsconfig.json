@@ -16,5 +16,7 @@
     "noImplicitReturns": true,
     "skipLibCheck": true
   },
-  "include": ["src", "electron-env.d.ts", "vite.config.ts"]
+  "types": [
+    "vite-plugin-electron/electron-env"
+  ]
 }
