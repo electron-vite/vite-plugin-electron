@@ -63,7 +63,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
   if (env) {
     Object.assign(process.env, {
       VITE_DEV_SERVER_URL: env.url,
-      VITE_DEV_SERVER_HOST: env.host,
+      VITE_DEV_SERVER_HOSTNAME: env.hostname,
       VITE_DEV_SERVER_PORT: env.port,
     })
   }
