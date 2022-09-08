@@ -114,7 +114,7 @@ export {
 }
 `.trim()
 
-export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin {
+export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
   let env: ConfigEnv
   const builtins: string[] = []
   const dependencies: string[] = []
@@ -125,11 +125,19 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin {
   // When `electron` files or folders exist in the root directory, it will cause Vite to incorrectly splicing the `/@fs/` prefix.
   // Here, use `\0` prefix avoid this behavior
   const prefix = '\0'
-
-  return {
-    name: 'vite-plugin-electron-renderer:use-node.js',
+  const pluginResolveId: Plugin = {
+    name: 'vite-plugin-electron-renderer:use-node.js[resolveId]',
     // Bypassing Vite's builtin 'vite:resolve' plugin
     enforce: 'pre',
+    resolveId(source) {
+      if (env.command === 'serve') {
+        if (ESM_deps.includes(source)) return // by vite-plugin-esmodule
+        if (CJS_modules.includes(source)) return prefix + source
+      }
+    },
+  }
+  const plugin: Plugin = {
+    name: 'vite-plugin-electron-renderer:use-node.js',
     // 🚧 Must be use config hook
     config(config, _env) {
       env = _env
@@ -212,12 +220,6 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin {
       }
 
     },
-    resolveId(source) {
-      if (env.command === 'serve') {
-        if (ESM_deps.includes(source)) return // by vite-plugin-esmodule
-        if (CJS_modules.includes(source)) return prefix + source
-      }
-    },
     load(id) {
       if (env.command === 'serve') {
         /** 
@@ -275,6 +277,11 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin {
 
     },
   }
+
+  return [
+    pluginResolveId,
+    plugin,
+  ]
 }
 
 export function resolveModules(root: string, options: UseNodeJsOptions = {}) {
