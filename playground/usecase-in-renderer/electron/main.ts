@@ -19,8 +19,10 @@ const indexHtml = path.join(ROOT_PATH.dist, 'index.html')
 function createWindow() {
   win = new BrowserWindow({
     webPreferences: {
+      nodeIntegrationInWorker: true,
       contextIsolation: false,
       nodeIntegration: true,
+      webSecurity: false,
       preload,
     },
   })
@@ -29,6 +31,7 @@ function createWindow() {
     win.loadFile(indexHtml)
   } else {
     win.loadURL(url)
+    win.webContents.openDevTools()
   }
 }
 
