@@ -88,31 +88,57 @@ const electron = `
  * All exports module see https://www.electronjs.org -> API -> Renderer Process Modules
  */
 const electron = require("electron");
-const {
-  clipboard,
-  nativeImage,
-  shell,
-  contextBridge,
-  crashReporter,
-  ipcRenderer,
-  webFrame,
-  desktopCapturer,
-  deprecate,
-} = electron;
 
-export {
-  electron as default,
-  clipboard,
-  nativeImage,
-  shell,
-  contextBridge,
-  crashReporter,
-  ipcRenderer,
-  webFrame,
-  desktopCapturer,
-  deprecate,
+// Proxy in Worker
+let _ipcRenderer;
+if (typeof document === 'undefined') {
+  _ipcRenderer = {};
+  const keys = [
+    'invoke',
+    'postMessage',
+    'send',
+    'sendSync',
+    'sendTo',
+    'sendToHost',
+    // propertype
+    'addListener',
+    'emit',
+    'eventNames',
+    'getMaxListeners',
+    'listenerCount',
+    'listeners',
+    'off',
+    'on',
+    'once',
+    'prependListener',
+    'prependOnceListener',
+    'rawListeners',
+    'removeAllListeners',
+    'removeListener',
+    'setMaxListeners',
+  ];
+  for (const key of keys) {
+    _ipcRenderer[key] = () => {
+      throw new Error(
+        '"ipcRenderer" does not work in "Worker"\\n' +
+        'You can see https://github.com/electron-vite/vite-plugin-electron/issues/69'
+      );
+    };
+  }
+} else {
+  _ipcRenderer = electron.ipcRenderer;
 }
-`.trim()
+
+export { electron as default };
+export const clipboard = electron.clipboard;
+export const contextBridge = electron.contextBridge;
+export const crashReporter = electron.crashReporter;
+export const ipcRenderer = _ipcRenderer;
+export const nativeImage = electron.nativeImage;
+export const shell = electron.shell;
+export const webFrame = electron.webFrame;
+export const deprecate = electron.deprecate;
+`
 
 export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
   let env: ConfigEnv
