@@ -291,10 +291,10 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
             .filter(n => !keywords.includes(n))
             .map(attr => `export const ${attr} = _M_.${attr};`).join('\n')
           const nodeModuleCodeSnippet = `
-  ${requireModule}
-  ${exportDefault}
-  ${exportMembers}
-  `.trim()
+${requireModule}
+${exportDefault}
+${exportMembers}
+`
 
           moduleCache.set(id, nodeModuleCodeSnippet)
           return nodeModuleCodeSnippet
