@@ -149,10 +149,21 @@ const { ipcRenderer } = require('electron')
 
 #### Node.js ESM packages
 
+<!--
+2022-09-12
 In general, Node.js ESM packages only need to be converted if they are used in Electron-Renderer, but not in Electron-Main.
 
 1. Install [vite-plugin-esmodule](https://github.com/vite-plugin/vite-plugin-esmodule) to load ESM packages
 2. It is recommended to put the ESM packages in the `devDependencies`
+-->
+
+```diff
+export default {
++ optimizeDeps: {
++   exclude: ['es-module']
++ }
+}
+```
 
 #### Why is it recommended to put properly buildable packages in `devDependencies`?
 
