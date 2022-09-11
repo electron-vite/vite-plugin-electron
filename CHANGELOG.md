@@ -4,7 +4,7 @@
 
 *vite-plugin-electron-renderer*
 
-- 191afb8 feat: proxy `ipcRenderer` in `Worker` | [vite-plugin-electron/issues/69](https://github.com/electron-vite/vite-plugin-electron/issues/69)
+- 191afb8 feat: proxy `ipcRenderer` in `Worker` | #69
 
 ## 0.9.2 (2022-08-29)
 
