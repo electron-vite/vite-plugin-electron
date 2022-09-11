@@ -12,6 +12,6 @@ export default function renderer(options: Options = {}): Plugin[] {
   return [
     buildConfig(),
     polyfillExports(),
-    useNodeJs(options),
+    ...useNodeJs(options),
   ]
 }

@@ -25,3 +25,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
 
 postMessage({ payload: 'removeLoading' }, '*')
+
+document.onclick = () => {
+  new Worker(new URL('./samples/worker.ts', import.meta.url), { type: 'module' })
+}

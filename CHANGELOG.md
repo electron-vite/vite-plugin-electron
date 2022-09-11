@@ -1,3 +1,11 @@
+## 0.9.3 (2022-09-10)
+
+~~*vite-plugin-electron*~~
+
+*vite-plugin-electron-renderer*
+
+- 191afb8 feat: proxy `ipcRenderer` in `Worker` | [vite-plugin-electron/issues/69](https://github.com/electron-vite/vite-plugin-electron/issues/69)
+
 ## 0.9.2 (2022-08-29)
 
 *vite-plugin-electron*
