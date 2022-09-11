@@ -120,7 +120,7 @@ if (typeof document === 'undefined') {
   for (const key of keys) {
     _ipcRenderer[key] = () => {
       throw new Error(
-        '"ipcRenderer" does not work in "Worker"\\n' +
+        'ipcRenderer doesn\'t work in a Web Worker.\\n' +
         'You can see https://github.com/electron-vite/vite-plugin-electron/issues/69'
       );
     };
