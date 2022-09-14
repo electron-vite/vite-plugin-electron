@@ -24,7 +24,7 @@ export default function polyfillExports(): Plugin {
           : formats.includes(output.format as string)
       ) {
         // fix(🐞): exports is not defined
-        const polyfill = `<script>var exports = typeof module !== 'undefined' ? module.exports : {}</script>`
+        const polyfill = `<script>var exports = typeof module !== 'undefined' ? module.exports : {};</script>`
         return html.replace(/(<\/[\s]*?head[\s]*?>)/, polyfill + '\n$1')
       }
     },
