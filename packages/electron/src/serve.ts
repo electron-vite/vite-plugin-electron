@@ -37,6 +37,18 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
   const electronPath = require('electron')
   const { config: viteConfig } = server
 
+  function restartElectronApp() {
+    if (process.electronApp) {
+      process.electronApp.removeAllListeners()
+      process.electronApp.kill()
+    }
+
+    // Start Electron.app
+    process.electronApp = spawn(electronPath, ['.', '--no-sandbox'], { stdio: 'inherit' })
+    // Exit command after Electron.app exits
+    process.electronApp.once('exit', process.exit)
+  }
+
   // ---- Electron-Preload ----
   if (config.preload) {
     const preloadRuntime = resolveRuntime('preload', config, viteConfig)
@@ -78,15 +90,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
         {
           name: 'electron-main-watcher',
           closeBundle() {
-            if (process.electronApp) {
-              process.electronApp.removeAllListeners()
-              process.electronApp.kill()
-            }
-
-            // Start Electron.app
-            process.electronApp = spawn(electronPath, ['.', '--no-sandbox'], { stdio: 'inherit' })
-            // Exit command after Electron.app exits
-            process.electronApp.once('exit', process.exit)
+            restartElectronApp()
           },
         },
         checkPkgMain.buildElectronMainPlugin(mainRuntime),
@@ -96,4 +100,27 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
   ) as InlineConfig
 
   await viteBuild(createWithExternal(mainRuntime)(mainConfig))
+
+  // ---- Electron worker ----
+  if (config.worker) {
+    const workerRuntime = resolveRuntime('worker', config, viteConfig)
+    const workerConfig = mergeConfig(
+      {
+        build: {
+          watch: {},
+        },
+        plugins: [{
+          name: 'electron-worker-watcher',
+          closeBundle() {
+            if (process.electronApp) {
+              restartElectronApp()
+            }
+          },
+        }],
+      } as UserConfig,
+      resolveBuildConfig(workerRuntime),
+    ) as InlineConfig
+
+    await viteBuild(createWithExternal(workerRuntime)(workerConfig))
+  }
 }

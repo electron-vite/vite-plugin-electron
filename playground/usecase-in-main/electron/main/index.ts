@@ -1,6 +1,7 @@
 import path from 'path'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import './samples'
+import { Worker } from 'node:worker_threads'
 
 process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
 
@@ -31,4 +32,19 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  ipcMain.handle('sigma', (e, factor: number) => {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(path.join(__dirname, '../worker/task1.js'))
+      worker.on('message', result => {
+        resolve(result)
+      })
+      worker.on('error', error => {
+        reject(error)
+      })
+      worker.postMessage(factor)
+    })
+  })
+
+  createWindow()
+})

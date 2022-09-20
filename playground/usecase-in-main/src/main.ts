@@ -2,6 +2,7 @@ import './style.css'
 import viteLogo from '/vite.svg'
 import typescriptLogo from './typescript.svg'
 import { setupCounter } from './counter'
+import { setupFactorial } from './factorial'
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
@@ -14,6 +15,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <h1>Vite + TypeScript</h1>
     <div class="card">
       <button id="counter" type="button"></button>
+      <button id="factorial" type="button">1000 of factorial</button>
     </div>
     <p class="read-the-docs">
       Click on the Vite and TypeScript logos to learn more
@@ -22,5 +24,6 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 `
 
 setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+setupFactorial(document.querySelector<HTMLButtonElement>('#factorial')!)
 
 postMessage({ payload: 'removeLoading' }, '*')

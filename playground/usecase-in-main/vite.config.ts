@@ -47,6 +47,20 @@ export default defineConfig({
           },
         },
       },
+      worker: {
+        input: {
+          // You can configure multiple worker here
+          task1: path.join(__dirname, 'electron/worker/task1.ts'),
+        },
+        vite: {
+          build: {
+            // For debug
+            sourcemap: 'inline',
+            outDir: 'dist/electron/worker',
+            minify: false,
+          },
+        },
+      },
     }),
   ],
   build: {

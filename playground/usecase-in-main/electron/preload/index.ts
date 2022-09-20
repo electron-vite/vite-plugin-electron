@@ -1,3 +1,4 @@
+import { contextBridge, ipcRenderer } from 'electron'
 function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']) {
   return new Promise(resolve => {
     if (condition.includes(document.readyState)) {
@@ -88,5 +89,11 @@ domReady().then(appendLoading)
 window.onmessage = ev => {
   ev.data.payload === 'removeLoading' && removeLoading()
 }
+
+console.log('versions', process.versions)
+
+contextBridge.exposeInMainWorld('electronApi', {
+  sigma: (num: number) => ipcRenderer.invoke('sigma', num)
+})
 
 setTimeout(removeLoading, 4999)

@@ -13,13 +13,13 @@ import { resolveModules } from 'vite-plugin-electron-renderer/plugins/use-node.j
 import type { Configuration } from './types'
 
 export interface Runtime {
-  proc: 'main' | 'preload'
+  proc: 'main' | 'preload' | 'worker'
   config: Configuration
   viteConfig: ResolvedConfig
 }
 
 export function resolveRuntime(
-  proc: 'main' | 'preload',
+  proc: 'main' | 'preload' | 'worker',
   config: Configuration,
   viteConfig: ResolvedConfig,
 ): Runtime {
@@ -43,6 +43,21 @@ export function resolveBuildConfig(runtime: Runtime): InlineConfig {
   // In practice, there may be multiple Electron-Preload, but only one Electron-Main
 
   if (proc === 'preload') {
+    // Electron-Preload
+    defaultConfig.build.rollupOptions = {
+      ...defaultConfig.build.rollupOptions,
+      input: config[proc].input,
+      output: {
+        format: 'cjs',
+        // Only one file will be bundled, which is consistent with the behavior of `build.lib`
+        manualChunks: {},
+        // https://github.com/vitejs/vite/blob/09c4fc01a83b84f77b7292abcfe7500f0e948db6/packages/vite/src/node/build.ts#L467
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+        assetFileNames: '[name].[ext]',
+      },
+    }
+  } else if (proc === 'worker') {
     // Electron-Preload
     defaultConfig.build.rollupOptions = {
       ...defaultConfig.build.rollupOptions,

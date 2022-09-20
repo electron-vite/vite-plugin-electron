@@ -82,6 +82,9 @@ export interface Configuration {
      */
     input: InputOption
   }
+  worker?: CommonConfiguration & {
+    input: InputOption
+  }
   /**
    * Support use Node.js API in Electron-Renderer
    * @see https://github.com/electron-vite/vite-plugin-electron/tree/main/packages/electron-renderer

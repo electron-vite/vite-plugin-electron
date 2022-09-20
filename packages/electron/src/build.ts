@@ -20,6 +20,16 @@ export async function build(config: Configuration, viteConfig: ResolvedConfig) {
     )
   }
 
+  if (config.worker) {
+    const workerRuntime = resolveRuntime('worker', config, viteConfig)
+    await viteBuild(
+      createWithExternal(workerRuntime)(
+        resolveBuildConfig(workerRuntime)
+      )
+    )
+  }
+  
+
   const mainRuntime = resolveRuntime('main', config, viteConfig)
   const ILCG = createWithExternal(mainRuntime)(resolveBuildConfig(mainRuntime))
   if (!ILCG.plugins) ILCG.plugins = []
