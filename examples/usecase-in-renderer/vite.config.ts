@@ -34,9 +34,15 @@ export default defineConfig({
         ],
       },
     }),
+    // If an npm package is a pure ESM format package, 
+    // and the packages it depends on are also in ESM format, 
+    // then put it in `optimizeDeps.exclude` and it will work normally.
     esmodule(['execa', 'got', 'node-fetch']),
   ],
   build: {
     minify: false,
+  },
+  optimizeDeps: {
+    // exclude: ['pure-esmodule-package'],
   },
 })
