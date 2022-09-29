@@ -1,9 +1,7 @@
 import fs from 'fs'
 import path from 'path'
-import { spawn } from 'child_process'
 import { defineConfig } from 'vite'
-import electron, { onstart } from 'vite-plugin-electron'
-import electronPath from 'electron'
+import electron from 'vite-plugin-electron'
 
 fs.rmSync('dist', { recursive: true, force: true })
 
@@ -17,20 +15,6 @@ export default defineConfig({
             outDir: 'dist/electron/main',
             minify: false,
           },
-          plugins: [
-            // Custom start Electron
-            onstart(() => {
-              if (process.electronApp) {
-                process.electronApp.removeAllListeners()
-                process.electronApp.kill()
-              }
-  
-              // Start Electron.app
-              process.electronApp = spawn(electronPath, ['.', '--no-sandbox'], { stdio: 'inherit' })
-              // Exit command after Electron.app exits
-              process.electronApp.once('exit', process.exit)
-            }),
-          ],
         },
       },
       preload: {
