@@ -10,6 +10,64 @@ importers:
       '@types/node': 18.0.6
       typescript: 4.7.4
 
+  examples/usecase-in-main:
+    specifiers:
+      '@types/sqlite3': ^3.1.8
+      electron: ^19.0.8
+      electron-builder: ^23.1.0
+      electron-store: ^8.0.2
+      execa: ^6.1.0
+      got: ^12.1.0
+      node-fetch: ^3.2.8
+      serialport: ^10.4.0
+      sqlite3: ^5.0.9
+      vite: ^3.0.6
+      vite-plugin-electron: workspace:*
+      vite-plugin-esmodule: ^1.4.1
+    dependencies:
+      serialport: 10.4.0
+      sqlite3: 5.0.9
+    devDependencies:
+      '@types/sqlite3': 3.1.8
+      electron: 19.0.8
+      electron-builder: 23.1.0
+      electron-store: 8.0.2
+      execa: 6.1.0
+      got: 12.1.0
+      node-fetch: 3.2.8
+      vite: 3.0.6
+      vite-plugin-electron: link:../../packages/electron
+      vite-plugin-esmodule: 1.4.1
+
+  examples/usecase-in-renderer:
+    specifiers:
+      '@types/sqlite3': ^3.1.8
+      electron: ^19.0.8
+      electron-builder: ^23.1.0
+      electron-store: ^8.0.2
+      execa: ^6.1.0
+      got: ^12.1.0
+      node-fetch: ^3.2.8
+      serialport: ^10.4.0
+      sqlite3: ^5.0.9
+      vite: ^3.0.6
+      vite-plugin-electron: workspace:*
+      vite-plugin-esmodule: ^1.4.1
+    dependencies:
+      serialport: 10.4.0
+      sqlite3: 5.0.9
+    devDependencies:
+      '@types/sqlite3': 3.1.8
+      electron: 19.0.8
+      electron-builder: 23.1.0
+      electron-store: 8.0.2
+      execa: 6.1.0
+      got: 12.1.0
+      node-fetch: 3.2.8
+      vite: 3.0.6
+      vite-plugin-electron: link:../../packages/electron
+      vite-plugin-esmodule: 1.4.1
+
   packages/electron:
     specifiers:
       rollup: ^2.77.0
@@ -26,80 +84,6 @@ importers:
       vite: ^3.0.6
     devDependencies:
       vite: 3.0.6
-
-  playground/usecase-in-main:
-    specifiers:
-      '@types/sqlite3': ^3.1.8
-      electron: ^19.0.8
-      electron-builder: ^23.1.0
-      electron-store: ^8.0.2
-      execa: ^6.1.0
-      got: ^12.1.0
-      node-fetch: ^3.2.8
-      serialport: ^10.4.0
-      sqlite3: ^5.0.9
-      vite: ^3.0.6
-      vite-plugin-electron: workspace:*
-      vite-plugin-esmodule: ^1.4.1
-    dependencies:
-      serialport: 10.4.0
-      sqlite3: 5.0.9
-    devDependencies:
-      '@types/sqlite3': 3.1.8
-      electron: 19.0.8
-      electron-builder: 23.1.0
-      electron-store: 8.0.2
-      execa: 6.1.0
-      got: 12.1.0
-      node-fetch: 3.2.8
-      vite: 3.0.6
-      vite-plugin-electron: link:../../packages/electron
-      vite-plugin-esmodule: 1.4.1
-
-  playground/usecase-in-main/release/0.0.0/mac/YourAppName.app/Contents/Resources/app:
-    specifiers:
-      serialport: ^10.4.0
-      sqlite3: ^5.0.9
-    dependencies:
-      serialport: 10.4.0
-      sqlite3: 5.0.9
-
-  playground/usecase-in-renderer:
-    specifiers:
-      '@types/sqlite3': ^3.1.8
-      electron: ^19.0.8
-      electron-builder: ^23.1.0
-      electron-store: ^8.0.2
-      execa: ^6.1.0
-      got: ^12.1.0
-      node-fetch: ^3.2.8
-      serialport: ^10.4.0
-      sqlite3: ^5.0.9
-      vite: ^3.0.6
-      vite-plugin-electron: workspace:*
-      vite-plugin-esmodule: ^1.4.1
-    dependencies:
-      serialport: 10.4.0
-      sqlite3: 5.0.9
-    devDependencies:
-      '@types/sqlite3': 3.1.8
-      electron: 19.0.8
-      electron-builder: 23.1.0
-      electron-store: 8.0.2
-      execa: 6.1.0
-      got: 12.1.0
-      node-fetch: 3.2.8
-      vite: 3.0.6
-      vite-plugin-electron: link:../../packages/electron
-      vite-plugin-esmodule: 1.4.1
-
-  playground/usecase-in-renderer/release/0.0.0/mac/YourAppName.app/Contents/Resources/app:
-    specifiers:
-      serialport: ^10.4.0
-      sqlite3: ^5.0.9
-    dependencies:
-      serialport: 10.4.0
-      sqlite3: 5.0.9
 
 packages:
 
@@ -380,7 +364,7 @@ packages:
     dependencies:
       '@types/http-cache-semantics': 4.0.1
       '@types/keyv': 3.1.4
-      '@types/node': 18.0.5
+      '@types/node': 18.0.6
       '@types/responselike': 1.0.0
     dev: true
 
@@ -411,7 +395,7 @@ packages:
   /@types/fs-extra/9.0.13:
     resolution: {integrity: sha512-nEnwB++1u5lVDM2UI4c1+5R+FYaKfaAzS4OococimjVm3nQw3TuzH5UNsocrcTBbhnerblyHj4A49qXbIiZdpA==}
     dependencies:
-      '@types/node': 18.0.5
+      '@types/node': 18.0.6
     dev: true
 
   /@types/glob/7.2.0:
@@ -419,7 +403,7 @@ packages:
     requiresBuild: true
     dependencies:
       '@types/minimatch': 3.0.5
-      '@types/node': 18.0.5
+      '@types/node': 18.0.6
     dev: true
     optional: true
 
@@ -438,7 +422,7 @@ packages:
   /@types/keyv/3.1.4:
     resolution: {integrity: sha512-BQ5aZNSCpj7D6K2ksrRCTmKRLEpnPvWDiLPfoGyhZ++8YtiK9d/3DBKPJgry359X/P1PfruyYwvnvwFjuEiEIg==}
     dependencies:
-      '@types/node': 18.0.5
+      '@types/node': 18.0.6
     dev: true
 
   /@types/minimatch/3.0.5:
@@ -454,10 +438,6 @@ packages:
     resolution: {integrity: sha512-3rKg/L5x0rofKuuUt5zlXzOnKyIHXmIu5R8A0TuNDMF2062/AOIDBciFIjToLEJ/9F9DzkHNot+BpNsMI1OLdQ==}
     dev: true
 
-  /@types/node/18.0.5:
-    resolution: {integrity: sha512-En7tneq+j0qAiVwysBD79y86MT3ModuoIJbe7JXp+sb5UAjInSShmK3nXXMioBzfF7rXC12hv12d4IyCVwN4dA==}
-    dev: true
-
   /@types/node/18.0.6:
     resolution: {integrity: sha512-/xUq6H2aQm261exT6iZTMifUySEt4GR5KX8eYyY+C4MSNPqSh9oNIP7tz2GLKTlFaiBbgZNxffoR3CVRG+cljw==}
     dev: true
@@ -465,7 +445,7 @@ packages:
   /@types/plist/3.0.2:
     resolution: {integrity: sha512-ULqvZNGMv0zRFvqn8/4LSPtnmN4MfhlPNtJCTpKuIIxGVGZ2rYWzFXrvEBoh9CVyqSE7D6YFRJ1hydLHI6kbWw==}
     dependencies:
-      '@types/node': 18.0.5
+      '@types/node': 18.0.6
       xmlbuilder: 15.1.1
     dev: true
     optional: true
@@ -473,13 +453,13 @@ packages:
   /@types/responselike/1.0.0:
     resolution: {integrity: sha512-85Y2BjiufFzaMIlvJDvTTB8Fxl2xfLo4HgmHzVBz08w4wDePCTjYw66PdrolO0kzli3yam/YCgRufyo1DdQVTA==}
     dependencies:
-      '@types/node': 18.0.5
+      '@types/node': 18.0.6
     dev: true
 
   /@types/sqlite3/3.1.8:
     resolution: {integrity: sha512-sQMt/qnyUWnqiTcJXm5ZfNPIBeJ/DVvJDwxw+0tAxPJvadzfiP1QhryO1JOR6t1yfb8NpzQb/Rud06mob5laIA==}
     dependencies:
-      '@types/node': 18.0.5
+      '@types/node': 18.0.6
     dev: true
 
   /@types/verror/1.10.5:
@@ -1418,6 +1398,7 @@ packages:
   /electron-osx-sign/0.6.0:
     resolution: {integrity: sha512-+hiIEb2Xxk6eDKJ2FFlpofCnemCbjbT5jz+BKGpVBrRNT3kWTGs4DfNX6IzGwgi33hUcXF+kFs9JW+r6Wc1LRg==}
     engines: {node: '>=4.0.0'}
+    deprecated: Please use @electron/osx-sign moving forward. Be aware the API is slightly different
     hasBin: true
     dependencies:
       bluebird: 3.7.2
@@ -2330,7 +2311,7 @@ packages:
     resolution: {integrity: sha512-7vuh85V5cdDofPyxn58nrPjBktZo0u9x1g8WtjQol+jZDaE+fhN+cIvTj11GndBnMnyfrUOG1sZQxCdjKh+DKg==}
     engines: {node: '>= 10.13.0'}
     dependencies:
-      '@types/node': 18.0.5
+      '@types/node': 18.0.6
       merge-stream: 2.0.0
       supports-color: 8.1.1
     dev: true
