@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { builtinModules } from 'module'
+import { builtinModules, createRequire } from 'module'
 import {
   type Plugin,
   type ConfigEnv,
@@ -246,7 +246,7 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
       }
 
     },
-    load(id) {
+    async load(id) {
       if (env.command === 'serve') {
         /** 
          * ```
@@ -282,7 +282,7 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
           const cache = moduleCache.get(id)
           if (cache) return cache
 
-          const nodeModule = require(id)
+          const nodeModule = await import(id)
           const requireModule = `const _M_ = require("${id}");`
           const exportDefault = `const _D_ = _M_.default || _M_;\nexport { _D_ as default };`
           const exportMembers = Object
@@ -311,6 +311,7 @@ ${exportMembers}
 }
 
 export function resolveModules(root: string, options: UseNodeJsOptions = {}) {
+  const cjs_require = createRequire(import.meta.url)
   const cwd = process.cwd()
   const builtins = builtinModules.filter(e => !e.startsWith('_')); builtins.push('electron', ...builtins.map(m => `node:${m}`))
   // dependencies of package.json
@@ -321,14 +322,14 @@ export function resolveModules(root: string, options: UseNodeJsOptions = {}) {
   // Resolve package.json dependencies
   const pkgId = lookupFile('package.json', [root, cwd])
   if (pkgId) {
-    const pkg = require(pkgId)
+    const pkg = cjs_require(pkgId)
     for (const npmPkg of Object.keys(pkg.dependencies || {})) {
       const _pkgId = lookupFile(
         'package.json',
         [root, cwd].map(r => `${r}/node_modules/${npmPkg}`),
       )
       if (_pkgId) {
-        const _pkg = require(_pkgId)
+        const _pkg = cjs_require(_pkgId)
         if (_pkg.type === 'module') {
           ESM_deps.push(npmPkg)
           continue

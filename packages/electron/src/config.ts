@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { createRequire } from 'module'
 import type { AddressInfo } from 'net'
 import {
   type InlineConfig,
@@ -127,7 +128,7 @@ export function checkPkgMain(runtime: Runtime, electronMainBuildResolvedConfig: 
     + '.js')
 
   let message: string
-  const pkg = require(pkgId)
+  const pkg = createRequire(import.meta.url)(pkgId)
   if (!(pkg.main && distfile.endsWith(pkg.main))) {
     message = `
 [${new Date().toLocaleString()}]
