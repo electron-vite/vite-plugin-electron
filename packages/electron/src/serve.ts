@@ -1,4 +1,3 @@
-import { spawn } from 'child_process'
 import {
   type Plugin,
   type ViteDevServer,
@@ -7,6 +6,7 @@ import {
   build as viteBuild,
   mergeConfig,
 } from 'vite'
+import type { PluginContext } from 'rollup'
 import type { Configuration } from './types'
 import {
   createWithExternal,
@@ -19,7 +19,7 @@ import {
 /**
  * Custom start plugin
  */
-export function onstart(onstart?: () => void): Plugin {
+export function onstart(onstart?: (this: PluginContext, startup_fn: typeof startup) => void): Plugin {
   return {
     name: 'electron-custom-start',
     configResolved(config) {
@@ -28,13 +28,29 @@ export function onstart(onstart?: () => void): Plugin {
         ; (config.plugins as Plugin[]).splice(index, 1)
     },
     closeBundle() {
-      onstart?.()
+      onstart?.call(this, startup)
     },
   }
 }
 
+/** Electron App startup function */
+export async function startup(args = ['.', '--no-sandbox']) {
+  const { spawn } = await import('child_process')
+  // @ts-ignore
+  const electronPath = (await import('electron')).default as string
+
+  if (process.electronApp) {
+    process.electronApp.removeAllListeners()
+    process.electronApp.kill()
+  }
+
+  // Start Electron.app
+  process.electronApp = spawn(electronPath, args, { stdio: 'inherit' })
+  // Exit command after Electron.app exits
+  process.electronApp.once('exit', process.exit)
+}
+
 export async function bootstrap(config: Configuration, server: ViteDevServer) {
-  const electronPath = require('electron')
   const { config: viteConfig } = server
 
   // ---- Electron-Preload ----
@@ -63,8 +79,6 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
   if (env) {
     Object.assign(process.env, {
       VITE_DEV_SERVER_URL: env.url,
-      VITE_DEV_SERVER_HOSTNAME: env.hostname,
-      VITE_DEV_SERVER_PORT: env.port,
     })
   }
 
@@ -78,15 +92,7 @@ export async function bootstrap(config: Configuration, server: ViteDevServer) {
         {
           name: 'electron-main-watcher',
           closeBundle() {
-            if (process.electronApp) {
-              process.electronApp.removeAllListeners()
-              process.electronApp.kill()
-            }
-
-            // Start Electron.app
-            process.electronApp = spawn(electronPath, ['.', '--no-sandbox'], { stdio: 'inherit' })
-            // Exit command after Electron.app exits
-            process.electronApp.once('exit', process.exit)
+            startup()
           },
         },
         checkPkgMain.buildElectronMainPlugin(mainRuntime),

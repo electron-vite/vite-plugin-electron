@@ -1,6 +1,10 @@
 import type { Configuration } from './types'
 import type { Plugin, ResolvedConfig } from 'vite'
-import { bootstrap, onstart } from './serve'
+import {
+  bootstrap,
+  onstart,
+  startup,
+} from './serve'
 import { build } from './build'
 import renderer from 'vite-plugin-electron-renderer'
 import buildConfig from 'vite-plugin-electron-renderer/plugins/build-config'
@@ -9,6 +13,7 @@ import buildConfig from 'vite-plugin-electron-renderer/plugins/build-config'
 export {
   type Configuration,
   onstart,
+  startup,
 }
 export function defineConfig(config: Configuration) {
   return config
