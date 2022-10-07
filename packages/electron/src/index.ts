@@ -21,6 +21,9 @@ export default function electron(config: Configuration | Configuration[]): Plugi
   const name = 'vite-plugin-electron'
   const configBuild: Partial<Plugin> = {
     config(config) {
+      // make sure that Electron can be loaded into the local file using `loadFile` after packaging
+      config.base ??= './'
+
       config.build ??= {}
       // prevent accidental clearing of `dist/electron/main`, `dist/electron/preload`
       config.build.emptyOutDir ??= false
