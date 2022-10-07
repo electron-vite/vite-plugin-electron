@@ -13,7 +13,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build && electron-builder"
+    "build": "tsc && vite build && electron-builder"
   },
   "dependencies": {},
   "devDependencies": {
