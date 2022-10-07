@@ -1,11 +1,7 @@
-import fs from 'fs'
-import path from 'path'
-import { createRequire } from 'module'
 import type { AddressInfo } from 'net'
 import {
   type InlineConfig,
   type ResolvedConfig,
-  type Plugin,
   type ViteDevServer,
   mergeConfig,
   normalizePath,
@@ -13,73 +9,39 @@ import {
 import { resolveModules } from 'vite-plugin-electron-renderer/plugins/use-node.js'
 import type { Configuration } from './types'
 
-export interface Runtime {
-  proc: 'main' | 'preload'
-  config: Configuration
-  viteConfig: ResolvedConfig
-}
-
-export function resolveRuntime(
-  proc: 'main' | 'preload',
-  config: Configuration,
-  viteConfig: ResolvedConfig,
-): Runtime {
-  return { proc, config, viteConfig }
-}
-
-export function resolveBuildConfig(runtime: Runtime): InlineConfig {
-  const { proc, config, viteConfig } = runtime
+export function resolveBuildConfig(option: Configuration, resolved: ResolvedConfig): InlineConfig {
   const defaultConfig: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
     configFile: false,
     publicDir: false,
-    mode: viteConfig.mode,
+    mode: resolved.mode,
 
     build: {
+      // @ts-ignore
+      lib: option.entry && {
+        entry: option.entry,
+        // At present, Electron(20) can only support CommonJs
+        formats: ['cjs'],
+        fileName: () => '[name].js',
+      },
       emptyOutDir: false,
-      minify: process.env./* from mode option */NODE_ENV === 'production',
+      // dist/electron
+      outDir: normalizePath(`${resolved.build.outDir}/electron`),
+      minify: resolved.command === 'build', // 🤔 process.env./* from mode option */NODE_ENV === 'production',
     },
   }
 
-  // In practice, there may be multiple Electron-Preload, but only one Electron-Main
-
-  if (proc === 'preload') {
-    // Electron-Preload
-    defaultConfig.build.rollupOptions = {
-      ...defaultConfig.build.rollupOptions,
-      input: config[proc].input,
-      output: {
-        format: 'cjs',
-        // Only one file will be bundled, which is consistent with the behavior of `build.lib`
-        manualChunks: {},
-        // https://github.com/vitejs/vite/blob/09c4fc01a83b84f77b7292abcfe7500f0e948db6/packages/vite/src/node/build.ts#L467
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js',
-        assetFileNames: '[name].[ext]',
-      },
-    }
-  } else {
-    // Electron-Main
-    // TODO: consider also support `build.rollupOptions`
-    defaultConfig.build.lib = {
-      entry: config[proc].entry,
-      formats: ['cjs'],
-      fileName: () => '[name].js',
-    }
-  }
-
-  // Assign default dir
-  defaultConfig.build.outDir = normalizePath(`${viteConfig.build.outDir}/electron`)
-
-  return mergeConfig(defaultConfig, config[proc]?.vite || {}) as InlineConfig
+  return mergeConfig(defaultConfig, option?.vite || {}) as InlineConfig
 }
 
 /**
  * `dependencies` of package.json will be inserted into `build.rollupOptions.external`
  */
-export function createWithExternal(runtime: Runtime) {
-  const { proc, config, viteConfig } = runtime
-  const { builtins, dependencies } = resolveModules(viteConfig.root, config[proc])
+export function createWithExternal(option: Configuration, resolved: ResolvedConfig) {
+  const { builtins, dependencies } = resolveModules(resolved.root, {
+    // Explicitly include/exclude some CJS modules
+    resolve: option.resolve,
+  })
   const modules = builtins.concat(dependencies)
 
   return function withExternal(ILCG: InlineConfig) {
@@ -111,49 +73,6 @@ export function createWithExternal(runtime: Runtime) {
   }
 }
 
-export function checkPkgMain(runtime: Runtime, electronMainBuildResolvedConfig: ResolvedConfig) {
-  const mainConfig = electronMainBuildResolvedConfig
-  const { config, viteConfig } = runtime
-
-  const cwd = process.cwd()
-  const pkgId = path.join(cwd, 'package.json')
-  if (!fs.existsSync(pkgId)) return
-
-  const distfile = normalizePath(path.resolve(
-    mainConfig.root,
-    mainConfig.build.outDir,
-    path.parse(config.main.entry).name,
-  )
-    // https://github.com/electron-vite/vite-plugin-electron/blob/5cd2c2ce68bb76b2a1770d50aa4164a59ab8110c/packages/electron/src/config.ts#L57
-    + '.js')
-
-  let message: string
-  const pkg = createRequire(import.meta.url)(pkgId)
-  if (!(pkg.main && distfile.endsWith(pkg.main))) {
-    message = `
-[${new Date().toLocaleString()}]
-  Command: "vite ${viteConfig.command}".
-  The main field in package.json may be incorrect, which causes the App to fail to start.
-  File build path: "${distfile}".
-  Recommended main value: "${distfile.replace(cwd + '/', '')}".
-`
-  }
-
-  if (message) {
-    fs.appendFileSync(path.join(cwd, 'vite-plugin-electron.log'), message)
-    return message
-  }
-}
-
-checkPkgMain.buildElectronMainPlugin = function buildElectronMainPlugin(runtime: Runtime): Plugin {
-  return {
-    name: 'vite-plugin-electron:check-package.json-main',
-    configResolved(config) {
-      checkPkgMain(runtime, config)
-    },
-  }
-}
-
 /**
  * @see https://github.com/vitejs/vite/blob/c3f6731bafeadd310efa4325cb8dcc639636fe48/packages/vite/src/node/constants.ts#L131-L141
  */
@@ -174,7 +93,7 @@ export function resolveHostname(hostname: string) {
 }
 
 export function resolveEnv(server: ViteDevServer) {
-  const addressInfo = server.httpServer.address()
+  const addressInfo = server.httpServer!.address()
   const isAddressInfo = (x: any): x is AddressInfo => x?.address
 
   if (isAddressInfo(addressInfo)) {

@@ -22,10 +22,9 @@
     "build": "vite build",
     "prepublishOnly": "node ../../scripts/check-command.js && npm run build"
   },
-  "dependencies": {
-    "vite-plugin-electron-renderer": "workspace:*"
-  },
+  "dependencies": {},
   "devDependencies": {
+    "vite-plugin-electron-renderer": "workspace:*",
     "vite": "^3.2.0-beta.0",
     "rollup": "^2.77.0"
   },

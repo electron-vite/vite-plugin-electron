@@ -6,8 +6,6 @@ import {
   startup,
 } from './serve'
 import { build } from './build'
-import renderer from 'vite-plugin-electron-renderer'
-import buildConfig from 'vite-plugin-electron-renderer/plugins/build-config'
 
 // public export
 export {
@@ -19,22 +17,25 @@ export function defineConfig(config: Configuration) {
   return config
 }
 
-export default function electron(config: Configuration): Plugin[] {
+export default function electron(config: Configuration | Configuration[]): Plugin[] {
   const name = 'vite-plugin-electron'
+  const configBuild: Partial<Plugin> = {
+    config(config) {
+      config.build ??= {}
+      // prevent accidental clearing of `dist/electron/main`, `dist/electron/preload`
+      config.build.emptyOutDir ??= false
+    },
+  }
+  const configArray = ([].concat(config as any) as Configuration[])
 
   return [
-    ...(config.renderer
-      // Enable use Electron, Node.js API in Renderer-process
-      ? renderer(config.renderer)
-      // There is also `buildConfig()` in `renderer()`
-      : [buildConfig()]
-    ),
     {
       name: `${name}:serve`,
       apply: 'serve',
+      ...configBuild,
       configureServer(server) {
-        server.httpServer.on('listening', () => {
-          bootstrap(config, server)
+        server.httpServer!.on('listening', () => {
+          bootstrap(configArray, server)
         })
       },
     },
@@ -44,13 +45,16 @@ export default function electron(config: Configuration): Plugin[] {
       return {
         name: `${name}:build`,
         apply: 'build',
+        ...configBuild,
         configResolved(config) {
           viteConfig = config
         },
         async closeBundle() {
-          await build(config, viteConfig)
+          for (const _config of configArray) {
+            await build(_config, viteConfig)
+          }
         }
       }
-    })()
+    })(),
   ]
 }

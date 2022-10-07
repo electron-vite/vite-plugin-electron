@@ -20,7 +20,7 @@ export default defineConfig({
         ...builtinModules,
         ...builtinModules.map(m => `node:${m}`),
         ...Object.keys(pkg.dependencies),
-        /vite-plugin-electron-renderer/,
+        // /vite-plugin-electron-renderer/,
       ],
     },
   },

@@ -6,7 +6,7 @@ declare namespace NodeJS {
   }
 
   interface Process {
-    electronApp: import('child_process').ChildProcessWithoutNullStreams
+    electronApp: import('child_process').ChildProcess
   }
 }
 
