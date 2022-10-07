@@ -2,12 +2,12 @@
   "name": "vite-plugin-electron",
   "version": "0.9.3",
   "description": "Integrate Vite and Electron",
-  "main": "index.js",
+  "main": "index.mjs",
   "types": "src",
   "exports": {
     ".": {
-      "import": "./index.js",
-      "require": "./index.cjs"
+      "import": "./index.mjs",
+      "require": "./index.js"
     }
   },
   "repository": {
@@ -31,8 +31,8 @@
   },
   "files": [
     "src",
+    "index.mjs",
     "index.js",
-    "index.cjs",
     "electron-env.d.ts"
   ],
   "keywords": [

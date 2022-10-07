@@ -2,16 +2,16 @@
   "name": "vite-plugin-electron-renderer",
   "version": "0.9.3",
   "description": "Support use Node.js API in Electron-Renderer",
-  "main": "plugins/index.js",
+  "main": "plugins/index.mjs",
   "types": "src",
   "exports": {
     ".": {
-      "import": "./plugins/index.js",
-      "require": "./plugins/index.cjs"
+      "import": "./plugins/index.mjs",
+      "require": "./plugins/index.js"
     },
     "./plugins/*": {
-      "import": "./plugins/*.js",
-      "require": "./plugins/*.cjs"
+      "import": "./plugins/*.mjs",
+      "require": "./plugins/*.js"
     }
   },
   "repository": {

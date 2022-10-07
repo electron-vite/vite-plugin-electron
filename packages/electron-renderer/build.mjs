@@ -62,7 +62,7 @@ async function transpile(options, files = entries) {
 
     const distname = file
       .replace(PATHNAME.src, PATHNAME.dist)
-      .replace('.ts', options.format === 'cjs' ? '.cjs' : '.js');
+      .replace('.ts', options.format === 'esm' ? '.mjs' : '.js');
     fs.writeFileSync(ensureDir(distname), result.code);
 
     console.log(
@@ -73,7 +73,7 @@ async function transpile(options, files = entries) {
   }
 }
 
-function requireCjs(filename = path.join(CJS.__dirname, 'plugins/index.cjs')) {
+function requireCjs(filename = path.join(CJS.__dirname, 'plugins/index.js')) {
   const requireRE = /require\(("(?:[^"\\]|\\.)+"|'(?:[^'\\]|\\.)+')\)/g;
   const startOffset = 'require('.length;
   /** @type {{ start: number; end: number; raw: string; }[]} */
@@ -89,9 +89,37 @@ function requireCjs(filename = path.join(CJS.__dirname, 'plugins/index.cjs')) {
   for (const node of nodes) {
     const { start, end, raw } = node;
     const id = raw.slice(1, -1);
-    const idcjs = id + '.cjs';
-    if (!fs.existsSync(path.join(path.dirname(filename), idcjs))) continue;
-    code = code.slice(0, start) + raw.replace(id, idcjs) + code.slice(end);
+    const idWithExt = id + '.js';
+    if (!fs.existsSync(path.join(path.dirname(filename), idWithExt))) continue;
+    code = code.slice(0, start) + raw.replace(id, idWithExt) + code.slice(end);
+  }
+  fs.writeFileSync(filename, code);
+  console.log(
+    colours.yellow('[rewrite]'),
+    colours.gary(new Date().toLocaleTimeString()),
+    filename.replace(CJS.__dirname, ''),
+  );
+}
+
+function importEsm(filename = path.join(CJS.__dirname, 'plugins/index.mjs')) {
+  const importRE = /import[\s\S]*?from\s*?(".+")/g;
+  const startOffset = 'require('.length;
+  /** @type {{ start: number; end: number; raw: string; }[]} */
+  const nodes = [];
+  let match;
+  let code = fs.readFileSync(filename, 'utf8');
+  while (match = importRE.exec(code)) {
+    const [statement, rawId] = match;
+    const start = match.index + statement.replace(rawId, '').length;
+    const end = start + rawId.length;
+    nodes.unshift({ start, end, raw: rawId });
+  }
+  for (const node of nodes) {
+    const { start, end, raw } = node;
+    const id = raw.slice(1, -1);
+    const idWithExt = id + '.mjs';
+    if (!fs.existsSync(path.join(path.dirname(filename), idWithExt))) continue;
+    code = code.slice(0, start) + raw.replace(id, idWithExt) + code.slice(end);
   }
   fs.writeFileSync(filename, code);
   console.log(
@@ -104,7 +132,7 @@ function requireCjs(filename = path.join(CJS.__dirname, 'plugins/index.cjs')) {
 fs.rmSync(path.join(CJS.__dirname, PATHNAME.dist), { recursive: true, force: true });
 await transpile({ format: 'cjs' });
 await transpile({ format: 'esm' });
-requireCjs();
+importEsm();
 
 if (iswatch) {
   for (const [, entry] of entries.entries()) {
@@ -113,7 +141,7 @@ if (iswatch) {
       const file = entries.find(e => e.includes(filename));
       await transpile({ format: 'cjs' }, file);
       await transpile({ format: 'esm' }, file);
-      requireCjs();
+      importEsm();
     });
   }
   console.log(colours.yellow('[watch]'), 'waiting for file changes');
