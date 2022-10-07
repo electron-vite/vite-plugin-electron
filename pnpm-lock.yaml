@@ -15,13 +15,13 @@ importers:
       electron: ^21.0.1
       electron-builder: ^23.1.0
       typescript: ^4.7.4
-      vite: ^3.1.4
+      vite: ^3.2.0-beta.0
       vite-plugin-electron: workspace:*
     devDependencies:
       electron: 21.0.1
       electron-builder: 23.1.0
       typescript: 4.7.4
-      vite: 3.1.4
+      vite: 3.2.0-beta.0
       vite-plugin-electron: link:../../packages/electron
 
   examples/quick-start:
@@ -29,13 +29,13 @@ importers:
       electron: ^21.0.1
       electron-builder: ^23.1.0
       typescript: ^4.7.4
-      vite: ^3.1.4
+      vite: ^3.2.0-beta.0
       vite-plugin-electron: workspace:*
     devDependencies:
       electron: 21.0.1
       electron-builder: 23.1.0
       typescript: 4.7.4
-      vite: 3.1.4
+      vite: 3.2.0-beta.0
       vite-plugin-electron: link:../../packages/electron
 
   examples/usecase-in-main:
@@ -49,7 +49,7 @@ importers:
       node-fetch: ^3.2.8
       serialport: ^10.4.0
       sqlite3: ^5.1.1
-      vite: ^3.1.4
+      vite: ^3.2.0-beta.0
       vite-plugin-electron: workspace:*
       vite-plugin-esmodule: ^1.4.1
     dependencies:
@@ -63,7 +63,7 @@ importers:
       execa: 6.1.0
       got: 12.1.0
       node-fetch: 3.2.8
-      vite: 3.1.4
+      vite: 3.2.0-beta.0
       vite-plugin-electron: link:../../packages/electron
       vite-plugin-esmodule: 1.4.1
 
@@ -78,7 +78,7 @@ importers:
       node-fetch: ^3.2.8
       serialport: ^10.4.0
       sqlite3: ^5.0.9
-      vite: ^3.1.4
+      vite: ^3.2.0-beta.0
       vite-plugin-electron: workspace:*
       vite-plugin-esmodule: ^1.4.1
     dependencies:
@@ -92,28 +92,28 @@ importers:
       execa: 6.1.0
       got: 12.1.0
       node-fetch: 3.2.8
-      vite: 3.1.4
+      vite: 3.2.0-beta.0
       vite-plugin-electron: link:../../packages/electron
       vite-plugin-esmodule: 1.4.1
 
   packages/electron:
     specifiers:
       rollup: ^2.77.0
-      vite: ^3.1.4
+      vite: ^3.2.0-beta.0
       vite-plugin-electron-renderer: workspace:*
     dependencies:
       vite-plugin-electron-renderer: link:../electron-renderer
     devDependencies:
       rollup: 2.77.0
-      vite: 3.1.4
+      vite: 3.2.0-beta.0
 
   packages/electron-renderer:
     specifiers:
       esbuild: ^0.15.10
-      vite: ^3.1.4
+      vite: ^3.2.0-beta.0
     devDependencies:
       esbuild: 0.15.10
-      vite: 3.1.4
+      vite: 3.2.0-beta.0
 
 packages:
 
@@ -2924,8 +2924,8 @@ packages:
       xmlbuilder: 15.1.1
     dev: true
 
-  /postcss/8.4.16:
-    resolution: {integrity: sha512-ipHE1XBvKzm5xI7hiHCZJCSugxvsdq2mPnsq5+UF+VHCjiBvtDrlxJfMBToWaP9D5XlgNmcFGqoHmUn0EYEaRQ==}
+  /postcss/8.4.17:
+    resolution: {integrity: sha512-UNxNOLQydcOFi41yHNMcKRZ39NeXlr8AxGuZJsdub8vIb12fHzcq37DTU/QtbI6WLxNg2gF9Z+8qtRwTj1UI1Q==}
     engines: {node: ^10 || ^12 || >=14}
     dependencies:
       nanoid: 3.3.4
@@ -3109,8 +3109,8 @@ packages:
       fsevents: 2.3.2
     dev: true
 
-  /rollup/2.78.1:
-    resolution: {integrity: sha512-VeeCgtGi4P+o9hIg+xz4qQpRl6R401LWEXBmxYKOV4zlF82lyhgh2hTZnheFUbANE8l2A41F458iwj2vEYaXJg==}
+  /rollup/2.79.1:
+    resolution: {integrity: sha512-uKxbd0IhMZOhjAiD5oAFp7BqvkA4Dv47qpOCtaNvng4HBwdbWtdOh8f5nZNuk2rp51PMGk3bzfWu5oayNEuYnw==}
     engines: {node: '>=10.0.0'}
     hasBin: true
     optionalDependencies:
@@ -3614,14 +3614,15 @@ packages:
     resolution: {integrity: sha512-hTY1pdtSmN/BNOnjvmcmK+2fW1Ac9wD0gFBy67i5IsKwhr1fS1/GGmssdCaik2SpnplHjoDrmCgVsgBv20HzrA==}
     dev: true
 
-  /vite/3.1.4:
-    resolution: {integrity: sha512-JoQI08aBjY9lycL7jcEq4p9o1xUjq5aRvdH4KWaXtkSx7e7RpAh9D3IjzDWRD4Fg44LS3oDAIOG/Kq1L+82psA==}
+  /vite/3.2.0-beta.0:
+    resolution: {integrity: sha512-sIqxi9gLVl+ysDfioIpZjDN8PxF5ary2zRoHVWspqWteKuoCul4ExyXBK7+hkRHHJEJbbJABY2+vWAb/2sYmPg==}
     engines: {node: ^14.18.0 || >=16.0.0}
     hasBin: true
     peerDependencies:
       less: '*'
       sass: '*'
       stylus: '*'
+      sugarss: '*'
       terser: ^5.4.0
     peerDependenciesMeta:
       less:
@@ -3630,13 +3631,15 @@ packages:
         optional: true
       stylus:
         optional: true
+      sugarss:
+        optional: true
       terser:
         optional: true
     dependencies:
       esbuild: 0.15.10
-      postcss: 8.4.16
+      postcss: 8.4.17
       resolve: 1.22.1
-      rollup: 2.78.1
+      rollup: 2.79.1
     optionalDependencies:
       fsevents: 2.3.2
     dev: true
