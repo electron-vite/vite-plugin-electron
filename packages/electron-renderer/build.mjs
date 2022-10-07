@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { transform } from 'esbuild';
@@ -129,10 +130,18 @@ function importEsm(filename = path.join(CJS.__dirname, 'plugins/index.mjs')) {
   );
 }
 
+function generateTypes() {
+  return spawn( 
+    process.platform === 'win32' ? 'npm.cmd' : 'npm',
+    ['run', 'types'],
+  );
+}
+
 fs.rmSync(path.join(CJS.__dirname, PATHNAME.dist), { recursive: true, force: true });
 await transpile({ format: 'cjs' });
 await transpile({ format: 'esm' });
 importEsm();
+generateTypes();
 
 if (iswatch) {
   for (const [, entry] of entries.entries()) {
@@ -142,6 +151,7 @@ if (iswatch) {
       await transpile({ format: 'cjs' }, file);
       await transpile({ format: 'esm' }, file);
       importEsm();
+      generateTypes();
     });
   }
   console.log(colours.yellow('[watch]'), 'waiting for file changes');

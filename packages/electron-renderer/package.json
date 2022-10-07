@@ -3,7 +3,7 @@
   "version": "0.9.3",
   "description": "Support use Node.js API in Electron-Renderer",
   "main": "plugins/index.mjs",
-  "types": "src",
+  "types": "plugins",
   "exports": {
     ".": {
       "import": "./plugins/index.mjs",
@@ -24,6 +24,7 @@
   "scripts": {
     "dev": "node build.mjs --watch",
     "build": "node build.mjs",
+    "types": "tsc --emitDeclarationOnly",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {},
