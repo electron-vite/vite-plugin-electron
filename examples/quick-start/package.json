@@ -1,7 +1,6 @@
 {
   "name": "vite-plugin-electron-quick-start",
   "version": "0.0.0",
-  "description": "vite-plugin-electron-quick-start",
   "main": "dist/electron/main.js",
   "repository": {
     "type": "git",
