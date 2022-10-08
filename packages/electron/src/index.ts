@@ -1,16 +1,11 @@
 import type { Configuration } from './types'
 import type { Plugin, ResolvedConfig } from 'vite'
-import {
-  bootstrap,
-  onstart,
-  startup,
-} from './serve'
+import { bootstrap, startup } from './serve'
 import { build } from './build'
 
 // public export
 export {
   type Configuration,
-  onstart,
   startup,
 }
 export function defineConfig(config: Configuration) {

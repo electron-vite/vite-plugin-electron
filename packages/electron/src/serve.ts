@@ -1,34 +1,15 @@
 import {
-  type Plugin,
   type ViteDevServer,
   type UserConfig,
   build as viteBuild,
   mergeConfig,
 } from 'vite'
-import type { PluginContext } from 'rollup'
 import type { Configuration } from './types'
 import {
   createWithExternal,
   resolveBuildConfig,
   resolveEnv,
 } from './config'
-
-/**
- * Custom start plugin
- */
-export function onstart(onstart?: (this: PluginContext, startup_fn: typeof startup) => void): Plugin {
-  return {
-    name: ':onstart',
-    configResolved(config) {
-      const index = config.plugins.findIndex(p => p.name === ':startup')
-        // At present, Vite can only modify plugins in configResolved hook.
-        ; (config.plugins as Plugin[]).splice(index, 1)
-    },
-    closeBundle() {
-      onstart?.call(this, startup)
-    },
-  }
-}
 
 /** Electron App startup function */
 export async function startup(args = ['.', '--no-sandbox']) {
@@ -64,16 +45,20 @@ export async function bootstrap(configArray: Configuration[], server: ViteDevSer
         plugins: [{
           name: ':startup',
           closeBundle() {
-            if (false) {
-              // TODO: 2022-10-07
-              // Bundle filename that end with `reload` will trigger the Electron-Renderer process to reload, 
-              // instead of restarting the entire Electron App.
-              // e.g.
-              //   dist/electron/preload.js
-              //   dist/electron/foo.reload.js
-              server.ws.send({ type: 'full-reload' })
+            if (config.onstart) {
+              config.onstart.call(this, startup)
             } else {
-              startup()
+              if (false) {
+                // TODO: 2022-10-07
+                // Bundle filename that end with `reload` will trigger the Electron-Renderer process to reload, 
+                // instead of restarting the entire Electron App.
+                // e.g.
+                //   dist/electron/preload.js
+                //   dist/electron/foo.reload.js
+                server.ws.send({ type: 'full-reload' })
+              } else {
+                startup()
+              }
             }
           },
         }],
