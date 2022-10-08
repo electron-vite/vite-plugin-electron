@@ -6,9 +6,9 @@ import {
   default as useNodeJs,
 } from './use-node.js'
 
-export interface Options extends UseNodeJsOptions { }
-
-export default function renderer(options: Options = {}): Plugin[] {
+export default function renderer(
+  options: Omit<UseNodeJsOptions, 'nodeIntegrationInWorker'> = {}
+): Plugin[] {
   return [
     buildConfig(),
     polyfillExports(),

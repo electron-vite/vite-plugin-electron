@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { builtinModules, createRequire } from 'module'
+import type { ExternalOption, RollupOptions } from 'rollup'
 import {
   type Plugin,
   type ConfigEnv,
@@ -13,6 +14,10 @@ export interface UseNodeJsOptions {
    * `modules` includes `dependencies` of package.json  
    */
   resolve?: (modules: string[]) => string[] | void
+  /**
+   * Whether node integration is enabled. Default is `false`.
+   */
+  nodeIntegration?: boolean
 }
 
 // https://www.w3schools.com/js/js_reserved.asp
@@ -203,13 +208,17 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
       }
 
       if (env.command === 'build') {
-        // Rollup ---- init ----
-        if (!config.build) config.build = {}
-        if (!config.build.rollupOptions) config.build.rollupOptions = {}
-        if (!config.build.rollupOptions.output) config.build.rollupOptions.output = {}
+        if (options.nodeIntegration) {
+          config.build ??= {}
+          config.build.rollupOptions ??= {}
+          config.build.rollupOptions.external = withExternal(config.build.rollupOptions.external)
+          setOutputFormat(config.build.rollupOptions)
+        }
 
-        // Rollup ---- external ----
-        let external = config.build.rollupOptions.external
+        return config
+      }
+
+      function withExternal(external?: ExternalOption) {
         if (
           Array.isArray(external) ||
           typeof external === 'string' ||
@@ -228,21 +237,19 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
         } else {
           external = CJS_modules
         }
-        config.build.rollupOptions.external = external
+        return external
+      }
 
-        // Rollup ---- output.format ----
-        const output = config.build.rollupOptions.output
-        if (Array.isArray(output)) {
-          for (const o of output) {
+      // At present, Electron(20) can only support CommonJs
+      function setOutputFormat(rollupOptions: RollupOptions) {
+        rollupOptions.output ??= {}
+        if (Array.isArray(rollupOptions.output)) {
+          for (const o of rollupOptions.output) {
             if (o.format === undefined) o.format = 'cjs'
           }
         } else {
-          // external modules such as `electron`, `fs`
-          // they can only be loaded normally on CommonJs
-          if (output.format === undefined) output.format = 'cjs'
+          if (rollupOptions.output.format === undefined) rollupOptions.output.format = 'cjs'
         }
-
-        return config
       }
 
     },
