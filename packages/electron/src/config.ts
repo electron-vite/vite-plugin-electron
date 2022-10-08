@@ -37,8 +37,8 @@ export function resolveBuildConfig(option: Configuration, resolved: ResolvedConf
 /**
  * `dependencies` of package.json will be inserted into `build.rollupOptions.external`
  */
-export function createWithExternal(option: Configuration, resolved: ResolvedConfig) {
-  const { builtins, dependencies } = resolveModules(resolved.root)
+export function createWithExternal(root: string) {
+  const { builtins, dependencies } = resolveModules(root)
   const modules = builtins.concat(dependencies)
 
   return function withExternal(ILCG: InlineConfig) {
@@ -89,7 +89,7 @@ export function resolveHostname(hostname: string) {
   return loopbackHosts.has(hostname) || wildcardHosts.has(hostname) ? 'localhost' : hostname
 }
 
-export function resolveEnv(server: ViteDevServer) {
+export function resolveServerUrl(server: ViteDevServer): string | void {
   const addressInfo = server.httpServer!.address()
   const isAddressInfo = (x: any): x is AddressInfo => x?.address
 
@@ -106,6 +106,6 @@ export function resolveEnv(server: ViteDevServer) {
       ? path
       : `${protocol}://${hostname}:${port}${path}`
 
-    return { url, hostname, port }
+    return url
   }
 }

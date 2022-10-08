@@ -8,7 +8,7 @@ import type { Configuration } from './types'
 import {
   createWithExternal,
   resolveBuildConfig,
-  resolveEnv,
+  resolveServerUrl,
 } from './config'
 
 /** Electron App startup function */
@@ -30,12 +30,12 @@ export async function startup(args = ['.', '--no-sandbox']) {
 
 export async function bootstrap(configArray: Configuration[], server: ViteDevServer) {
   Object.assign(process.env, {
-    VITE_DEV_SERVER_URL: resolveEnv(server)?.url
+    VITE_DEV_SERVER_URL: resolveServerUrl(server)
   })
   const { config: resolved } = server
 
   for (const config of configArray) {
-    const withExternal = createWithExternal(config, resolved)
+    const withExternal = createWithExternal(resolved.root)
     const inlineConfig = withExternal(resolveBuildConfig(config, resolved))
     await viteBuild(mergeConfig(
       {
