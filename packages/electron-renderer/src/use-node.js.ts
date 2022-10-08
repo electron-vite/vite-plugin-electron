@@ -18,6 +18,11 @@ export interface UseNodeJsOptions {
    * Whether node integration is enabled. Default is `false`.
    */
   nodeIntegration?: boolean
+  /**
+   * Whether node integration is enabled in web workers. Default is `false`. More
+   * about this can be found in Multithreading.
+   */
+  nodeIntegrationInWorker?: boolean
 }
 
 // https://www.w3schools.com/js/js_reserved.asp
@@ -161,7 +166,7 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
     // Bypassing Vite's builtin 'vite:resolve' plugin
     enforce: 'pre',
     resolveId(source) {
-      if (env.command === 'serve') {
+      if (env.command === 'serve' || /* 🚧-① */pluginResolveId.api?.isWorker) {
         if (ESM_deps.includes(source)) return // by vite-plugin-esmodule
         if (CJS_modules.includes(source)) return prefix + source
       }
@@ -215,6 +220,19 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
           setOutputFormat(config.build.rollupOptions)
         }
 
+        if (plugin.api?.isWorker && options.nodeIntegrationInWorker) {
+          /**
+           * 🚧-①: 🤔 Not works (2022-10-08)
+           * Worker build behavior is different from Web, `external` cannot be converted to `require("external-module")`.
+           * So, it sitll necessary to correctly return the external-snippets in the `resolveId`, `load` hooks.
+           */
+
+          // config.worker ??= {}
+          // config.worker.rollupOptions ??= {}
+          // config.worker.rollupOptions.external = withExternal(config.worker.rollupOptions.external)
+          // setOutputFormat(config.worker.rollupOptions)
+        }
+
         return config
       }
 
@@ -254,7 +272,7 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
 
     },
     async load(id) {
-      if (env.command === 'serve') {
+      if (env.command === 'serve' || /* 🚧-① */plugin.api?.isWorker) {
         /** 
          * ```
          * 🎯 Using Node.js packages(CJS) in Electron-Renderer(vite serve)
@@ -289,14 +307,18 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
           const cache = moduleCache.get(id)
           if (cache) return cache
 
+          const workerCount = getWorkerIncrementCount()
+          const _M_ = typeof workerCount === 'number' ? `_M_$${workerCount}` : '_M_'
+          const _D_ = typeof workerCount === 'number' ? `_D_$${workerCount}` : '_D_'
+
           const nodeModule = await import(id)
-          const requireModule = `const _M_ = require("${id}");`
-          const exportDefault = `const _D_ = _M_.default || _M_;\nexport { _D_ as default };`
+          const requireModule = `const ${_M_} = require("${id}");`
+          const exportDefault = `const ${_D_} = ${_M_}.default || ${_M_};\nexport { ${_D_} as default };`
           const exportMembers = Object
             .keys(nodeModule)
             // https://github.com/electron-vite/electron-vite-react/issues/48
             .filter(n => !keywords.includes(n))
-            .map(attr => `export const ${attr} = _M_.${attr};`).join('\n')
+            .map(attr => `export const ${attr} = ${_M_}.${attr};`).join('\n')
           const nodeModuleCodeSnippet = `
 ${requireModule}
 ${exportDefault}
@@ -309,6 +331,14 @@ ${exportMembers}
       }
 
     },
+  }
+
+  function getWorkerIncrementCount() {
+    // 🚧-②: The worker file will build the role dependencies into one file, which may cause naming conflicts
+    if (env.command === 'build' && plugin.api?.isWorker) {
+      plugin.api.count ??= 0
+      return plugin.api.count++
+    }
   }
 
   return [

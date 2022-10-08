@@ -6,6 +6,8 @@ import {
   default as useNodeJs,
 } from './use-node.js'
 
+export { default as worker } from './worker'
+
 export default function renderer(
   options: Omit<UseNodeJsOptions, 'nodeIntegrationInWorker'> = {}
 ): Plugin[] {

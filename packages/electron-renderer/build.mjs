@@ -16,6 +16,7 @@ const entries = [
   'src/index.ts',
   'src/polyfill-exports.ts',
   'src/use-node.js.ts',
+  'src/worker.ts',
 ].map(file => path.join(CJS.__dirname, file));
 const PATHNAME = {
   src: 'src',
@@ -104,7 +105,6 @@ function requireCjs(filename = path.join(CJS.__dirname, 'plugins/index.js')) {
 
 function importEsm(filename = path.join(CJS.__dirname, 'plugins/index.mjs')) {
   const importRE = /import[\s\S]*?from\s*?(".+")/g;
-  const startOffset = 'require('.length;
   /** @type {{ start: number; end: number; raw: string; }[]} */
   const nodes = [];
   let match;
