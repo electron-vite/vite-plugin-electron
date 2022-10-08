@@ -1,12 +1,11 @@
 {
-  "name": "vite-plugin-electron-quick-start",
+  "name": "vite-plugin-electron-custom-start-electron-app",
   "version": "0.0.0",
-  "description": "vite-plugin-electron-quick-start",
   "main": "dist/electron/main.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/electron-vite/vite-plugin-electron.git",
-    "directory": "examples/quick-start"
+    "directory": "examples/custom-start-electron-app"
   },
   "author": "草鞋没号 <308487730@qq.com>",
   "license": "MIT",
