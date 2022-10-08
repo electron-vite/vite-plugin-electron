@@ -96,6 +96,22 @@ importers:
       vite-plugin-electron: link:../../packages/electron
       vite-plugin-esmodule: 1.4.1
 
+  examples/web-worker:
+    specifiers:
+      electron: ^21.0.1
+      electron-builder: ^23.1.0
+      typescript: ^4.7.4
+      vite: ^3.2.0-beta.0
+      vite-plugin-electron: workspace:*
+      vite-plugin-electron-renderer: workspace:*
+    devDependencies:
+      electron: 21.0.1
+      electron-builder: 23.1.0
+      typescript: 4.7.4
+      vite: 3.2.0-beta.0
+      vite-plugin-electron: link:../../packages/electron
+      vite-plugin-electron-renderer: link:../../packages/electron-renderer
+
   packages/electron:
     specifiers:
       rollup: ^2.77.0
@@ -109,9 +125,11 @@ importers:
   packages/electron-renderer:
     specifiers:
       esbuild: ^0.15.10
+      rollup: ^2.77.0
       vite: ^3.2.0-beta.0
     devDependencies:
       esbuild: 0.15.10
+      rollup: 2.79.1
       vite: 3.2.0-beta.0
 
 packages:
