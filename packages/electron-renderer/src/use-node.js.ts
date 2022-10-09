@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
-import { builtinModules } from 'module'
+import { builtinModules, createRequire } from 'module'
+import type { ExternalOption, RollupOptions } from 'rollup'
 import {
   type Plugin,
   type ConfigEnv,
@@ -13,6 +14,15 @@ export interface UseNodeJsOptions {
    * `modules` includes `dependencies` of package.json  
    */
   resolve?: (modules: string[]) => string[] | void
+  /**
+   * Whether node integration is enabled. Default is `false`.
+   */
+  nodeIntegration?: boolean
+  /**
+   * Whether node integration is enabled in web workers. Default is `false`. More
+   * about this can be found in Multithreading.
+   */
+  nodeIntegrationInWorker?: boolean
 }
 
 // https://www.w3schools.com/js/js_reserved.asp
@@ -156,7 +166,7 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
     // Bypassing Vite's builtin 'vite:resolve' plugin
     enforce: 'pre',
     resolveId(source) {
-      if (env.command === 'serve') {
+      if (env.command === 'serve' || /* 🚧-① */pluginResolveId.api?.isWorker) {
         if (ESM_deps.includes(source)) return // by vite-plugin-esmodule
         if (CJS_modules.includes(source)) return prefix + source
       }
@@ -203,13 +213,30 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
       }
 
       if (env.command === 'build') {
-        // Rollup ---- init ----
-        if (!config.build) config.build = {}
-        if (!config.build.rollupOptions) config.build.rollupOptions = {}
-        if (!config.build.rollupOptions.output) config.build.rollupOptions.output = {}
+        if (options.nodeIntegration) {
+          config.build ??= {}
+          config.build.rollupOptions ??= {}
+          config.build.rollupOptions.external = withExternal(config.build.rollupOptions.external)
+          setOutputFormat(config.build.rollupOptions)
+        }
 
-        // Rollup ---- external ----
-        let external = config.build.rollupOptions.external
+        if (plugin.api?.isWorker && options.nodeIntegrationInWorker) {
+          /**
+           * 🚧-①: 🤔 Not works (2022-10-08)
+           * Worker build behavior is different from Web, `external` cannot be converted to `require("external-module")`.
+           * So, it sitll necessary to correctly return the external-snippets in the `resolveId`, `load` hooks.
+           */
+
+          // config.worker ??= {}
+          // config.worker.rollupOptions ??= {}
+          // config.worker.rollupOptions.external = withExternal(config.worker.rollupOptions.external)
+          // setOutputFormat(config.worker.rollupOptions)
+        }
+
+        return config
+      }
+
+      function withExternal(external?: ExternalOption) {
         if (
           Array.isArray(external) ||
           typeof external === 'string' ||
@@ -228,26 +255,24 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
         } else {
           external = CJS_modules
         }
-        config.build.rollupOptions.external = external
+        return external
+      }
 
-        // Rollup ---- output.format ----
-        const output = config.build.rollupOptions.output
-        if (Array.isArray(output)) {
-          for (const o of output) {
+      // At present, Electron(20) can only support CommonJs
+      function setOutputFormat(rollupOptions: RollupOptions) {
+        rollupOptions.output ??= {}
+        if (Array.isArray(rollupOptions.output)) {
+          for (const o of rollupOptions.output) {
             if (o.format === undefined) o.format = 'cjs'
           }
         } else {
-          // external modules such as `electron`, `fs`
-          // they can only be loaded normally on CommonJs
-          if (output.format === undefined) output.format = 'cjs'
+          if (rollupOptions.output.format === undefined) rollupOptions.output.format = 'cjs'
         }
-
-        return config
       }
 
     },
-    load(id) {
-      if (env.command === 'serve') {
+    async load(id) {
+      if (env.command === 'serve' || /* 🚧-① */plugin.api?.isWorker) {
         /** 
          * ```
          * 🎯 Using Node.js packages(CJS) in Electron-Renderer(vite serve)
@@ -282,14 +307,18 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
           const cache = moduleCache.get(id)
           if (cache) return cache
 
-          const nodeModule = require(id)
-          const requireModule = `const _M_ = require("${id}");`
-          const exportDefault = `const _D_ = _M_.default || _M_;\nexport { _D_ as default };`
+          const workerCount = getWorkerIncrementCount()
+          const _M_ = typeof workerCount === 'number' ? `_M_$${workerCount}` : '_M_'
+          const _D_ = typeof workerCount === 'number' ? `_D_$${workerCount}` : '_D_'
+
+          const nodeModule = await import(id)
+          const requireModule = `const ${_M_} = require("${id}");`
+          const exportDefault = `const ${_D_} = ${_M_}.default || ${_M_};\nexport { ${_D_} as default };`
           const exportMembers = Object
             .keys(nodeModule)
             // https://github.com/electron-vite/electron-vite-react/issues/48
             .filter(n => !keywords.includes(n))
-            .map(attr => `export const ${attr} = _M_.${attr};`).join('\n')
+            .map(attr => `export const ${attr} = ${_M_}.${attr};`).join('\n')
           const nodeModuleCodeSnippet = `
 ${requireModule}
 ${exportDefault}
@@ -304,6 +333,14 @@ ${exportMembers}
     },
   }
 
+  function getWorkerIncrementCount() {
+    // 🚧-②: The worker file will build the role dependencies into one file, which may cause naming conflicts
+    if (env.command === 'build' && plugin.api?.isWorker) {
+      plugin.api.count ??= 0
+      return plugin.api.count++
+    }
+  }
+
   return [
     pluginResolveId,
     plugin,
@@ -311,6 +348,7 @@ ${exportMembers}
 }
 
 export function resolveModules(root: string, options: UseNodeJsOptions = {}) {
+  const cjs_require = createRequire(import.meta.url)
   const cwd = process.cwd()
   const builtins = builtinModules.filter(e => !e.startsWith('_')); builtins.push('electron', ...builtins.map(m => `node:${m}`))
   // dependencies of package.json
@@ -321,14 +359,14 @@ export function resolveModules(root: string, options: UseNodeJsOptions = {}) {
   // Resolve package.json dependencies
   const pkgId = lookupFile('package.json', [root, cwd])
   if (pkgId) {
-    const pkg = require(pkgId)
+    const pkg = cjs_require(pkgId)
     for (const npmPkg of Object.keys(pkg.dependencies || {})) {
       const _pkgId = lookupFile(
         'package.json',
         [root, cwd].map(r => `${r}/node_modules/${npmPkg}`),
       )
       if (_pkgId) {
-        const _pkg = require(_pkgId)
+        const _pkg = cjs_require(_pkgId)
         if (_pkg.type === 'module') {
           ESM_deps.push(npmPkg)
           continue

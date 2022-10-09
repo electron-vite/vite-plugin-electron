@@ -110,4 +110,3 @@ package-lock.json
 yarn.lock
 
 release
-packages/electron-renderer/plugins

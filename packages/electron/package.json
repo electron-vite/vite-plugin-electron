@@ -2,7 +2,14 @@
   "name": "vite-plugin-electron",
   "version": "0.9.3",
   "description": "Integrate Vite and Electron",
-  "main": "dist/index.js",
+  "main": "index.mjs",
+  "types": "src",
+  "exports": {
+    ".": {
+      "import": "./index.mjs",
+      "require": "./index.js"
+    }
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/electron-vite/vite-plugin-electron.git",
@@ -11,19 +18,24 @@
   "author": "草鞋没号 <308487730@qq.com>",
   "license": "MIT",
   "scripts": {
-    "dev": "rm -rf dist && tsc --watch",
-    "build": "rm -rf dist && tsc",
+    "dev": "vite build --watch",
+    "build": "tsc --noEmit && vite build",
     "prepublishOnly": "node ../../scripts/check-command.js && npm run build"
   },
-  "dependencies": {
-    "vite-plugin-electron-renderer": "workspace:*"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "vite": "^3.0.6",
+    "typescript": "^4.7.4",
+    "vite-plugin-electron-renderer": "workspace:*",
+    "vite": "^3.2.0-beta.0",
     "rollup": "^2.77.0"
   },
+  "peerDependencies": {
+    "vite": ">=3.2.0"
+  },
   "files": [
-    "dist",
+    "src",
+    "index.mjs",
+    "index.js",
     "electron-env.d.ts"
   ],
   "keywords": [

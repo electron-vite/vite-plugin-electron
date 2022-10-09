@@ -1,35 +1,49 @@
-import type { Configuration } from './types'
 import type { Plugin, ResolvedConfig } from 'vite'
-import { bootstrap, onstart } from './serve'
+import { bootstrap, startup } from './serve'
 import { build } from './build'
-import renderer from 'vite-plugin-electron-renderer'
-import buildConfig from 'vite-plugin-electron-renderer/plugins/build-config'
 
-// public export
-export {
-  type Configuration,
-  onstart,
-}
+export { startup }
+
 export function defineConfig(config: Configuration) {
   return config
 }
 
-export default function electron(config: Configuration): Plugin[] {
+export type Configuration = {
+  /**
+   * Shortcut of `build.lib.entry`
+   */
+  entry?: import('vite').LibraryOptions['entry']
+  /**
+   * Triggered when Vite is built.  
+   * If passed this parameter will not automatically start Electron App.  
+   * You can start Electron App through the `startup` function passed through the callback function.  
+   */
+  onstart?: (this: import('rollup').PluginContext, startup: (args?: string[]) => Promise<void>) => void
+  vite?: import('vite').InlineConfig
+}
+
+export default function electron(config: Configuration | Configuration[]): Plugin[] {
   const name = 'vite-plugin-electron'
+  const configBuild: Partial<Plugin> = {
+    config(config) {
+      // make sure that Electron can be loaded into the local file using `loadFile` after packaging
+      config.base ??= './'
+
+      config.build ??= {}
+      // prevent accidental clearing of `dist/electron/main`, `dist/electron/preload`
+      config.build.emptyOutDir ??= false
+    },
+  }
+  const configArray = ([].concat(config as any) as Configuration[])
 
   return [
-    ...(config.renderer
-      // Enable use Electron, Node.js API in Renderer-process
-      ? renderer(config.renderer)
-      // There is also `buildConfig()` in `renderer()`
-      : [buildConfig()]
-    ),
     {
       name: `${name}:serve`,
       apply: 'serve',
+      ...configBuild,
       configureServer(server) {
-        server.httpServer.on('listening', () => {
-          bootstrap(config, server)
+        server.httpServer!.on('listening', () => {
+          bootstrap(configArray, server)
         })
       },
     },
@@ -39,13 +53,16 @@ export default function electron(config: Configuration): Plugin[] {
       return {
         name: `${name}:build`,
         apply: 'build',
+        ...configBuild,
         configResolved(config) {
           viteConfig = config
         },
         async closeBundle() {
-          await build(config, viteConfig)
+          for (const _config of configArray) {
+            await build(_config, viteConfig)
+          }
         }
       }
-    })()
+    })(),
   ]
 }

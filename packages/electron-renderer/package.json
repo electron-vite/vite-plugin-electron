@@ -2,7 +2,18 @@
   "name": "vite-plugin-electron-renderer",
   "version": "0.9.3",
   "description": "Support use Node.js API in Electron-Renderer",
-  "main": "plugins/index.js",
+  "main": "plugins/index.mjs",
+  "types": "plugins",
+  "exports": {
+    ".": {
+      "import": "./plugins/index.mjs",
+      "require": "./plugins/index.js"
+    },
+    "./plugins/*": {
+      "import": "./plugins/*.mjs",
+      "require": "./plugins/*.js"
+    }
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/electron-vite/vite-plugin-electron.git",
@@ -11,16 +22,21 @@
   "author": "草鞋没号 <308487730@qq.com>",
   "license": "MIT",
   "scripts": {
-    "dev": "rm -rf plugins && tsc --watch",
-    "build": "rm -rf plugins && tsc",
+    "dev": "node build.mjs --watch",
+    "build": "tsc --noEmit && node build.mjs",
+    "types": "tsc --emitDeclarationOnly",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {},
   "devDependencies": {
-    "vite": "^3.0.6"
+    "esbuild": "^0.15.10",
+    "typescript": "^4.7.4",
+    "vite": "^3.2.0-beta.0",
+    "rollup": "^2.77.0"
   },
   "files": [
-    "plugins"
+    "plugins",
+    "src"
   ],
   "keywords": [
     "vite",

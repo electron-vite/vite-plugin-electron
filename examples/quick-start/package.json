@@ -1,0 +1,25 @@
+{
+  "name": "vite-plugin-electron-quick-start",
+  "version": "0.0.0",
+  "main": "dist/electron/main.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/electron-vite/vite-plugin-electron.git",
+    "directory": "examples/quick-start"
+  },
+  "author": "草鞋没号 <308487730@qq.com>",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && electron-builder"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^21.0.1",
+    "electron-builder": "^23.1.0",
+    "typescript": "^4.7.4",
+    "vite-plugin-electron": "workspace:*",
+    "vite": "^3.2.0-beta.0"
+  }
+}
