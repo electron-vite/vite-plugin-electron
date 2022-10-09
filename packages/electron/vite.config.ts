@@ -22,6 +22,9 @@ export default defineConfig({
         ...Object.keys(pkg.dependencies),
         // /vite-plugin-electron-renderer/,
       ],
+      output: {
+        exports: 'named',
+      },
     },
   },
 })
