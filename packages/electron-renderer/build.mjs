@@ -14,7 +14,7 @@ const CJS = {
 const entries = [
   'src/build-config.ts',
   'src/index.ts',
-  'src/polyfill-exports.ts',
+  'src/cjs-shim.ts',
   'src/use-node.js.ts',
   'src/worker.ts',
 ].map(file => path.join(CJS.__dirname, file));
