@@ -1,3 +1,133 @@
+## 0.10.0 (2022-10-09)
+
+#### Break!
+
+This is a redesigned version of the API<sub><sup>(Only 3 APIs)</sub></sup>. Not compatible with previous versions!
+
+```ts
+export type Configuration = {
+  /**
+   * Shortcut of `build.lib.entry`
+   */
+  entry?: import('vite').LibraryOptions['entry']
+  /**
+   * Triggered when Vite is built.  
+   * If passed this parameter will not automatically start Electron App.  
+   * You can start Electron App through the `startup` function passed through the callback function.  
+   */
+  onstart?: (this: import('rollup').PluginContext, startup: (args?: string[]) => Promise<void>) => void
+  vite?: import('vite').InlineConfig
+}
+```
+
+In the past few weeks, some issues have been mentioned in many issues that cannot be solved amicably. So I refactored the API to avoid design flaws. But despite this, the new version will only be easier rather than harder.
+
+For example, some common problems in the following issues.
+
+#### Multiple entry files is not support #86
+
+  Thanks to Vite@3.2.0's `lib.entry` supports multiple entries, which makes the configuration of the new version very simple. **So the `vite-plugin-electron@0.10.0` requires Vite at least `v3.2.0`**.
+
+  **e.g.**
+
+  ```ts
+  import electron from 'vite-plugin-electron'
+
+  // In plugins option
+  electron({
+    entry: [
+      'electron/entry-1.ts',
+      'electron/entry-2.ts',
+    ],
+  })
+
+  // Or use configuration array
+  electron([
+    {
+      entry: [
+        'electron/entry-1.ts',
+        'electron/entry-2.ts',
+      ],
+    },
+    {
+      entry: 'foo/bar.ts',
+    },
+  ])
+  ```
+
+#### require is not defined #48, #87
+
+  `vite-plugin-electron-renderer` will change `output.format` to `cjs` format by default<sub><sup>(This is because currently Electron@21 only supports CommonJs)</sub></sup>, which will cause the built code to use `require` to import modules, if the user `nodeIntegration` is not enabled in the Electron-Main process which causes the error `require is not defined` to be thrown.
+
+  `vite-plugin-electron-renderer@0.10.0` provides the `nodeIntegration` option. It is up to the user to decide whether to use Node.js(CommonJs).
+
+  **e.g.**
+
+  ```ts
+  import renderer from 'vite-plugin-electron-renderer'
+
+  // In plugins option
+  renderer({
+    nodeIntegration: true,
+  })
+  ```
+
+#### Use `Worker` in Electron-Main or Electron-Renderer #77, #81
+
+> You can see 👉 [examples/worker](https://github.com/caoxiemeihao/vite-plugin-electron/tree/main/examples/worker)
+
+- Use Worker in Electron-Main
+
+  **e.g.** <sub><sup>This looks the same as multiple entry</sub></sup>
+
+  ```ts
+  import electron from 'vite-plugin-electron'
+
+  // In plugins option
+  electron({
+    entry: [
+      'electron/main.ts',
+      'electron/worker.ts',
+    ],
+  })
+
+  // In electron/main.ts
+  new Worker(path.join(__dirname, './worker.js'))
+  ```
+
+- Use Worker in Electron-Renderer
+
+  **e.g.**
+
+  ```ts
+  import renderer, { worker } from 'vite-plugin-electron-renderer'
+
+  export default {
+    plugins: [
+      renderer({
+        // If you need use Node.js in Electron-Renderer process
+        nodeIntegration: true,
+      }),
+    ],
+    worker: {
+      plugins: [
+        worker({
+          // If you need use Node.js in Worker
+          nodeIntegrationInWorker: true,
+        }),
+      ],
+    },
+  }
+  ```
+
+#### TODO
+
+- [ ] There is no way to differentiate between Preload-Scripts, which will cause the entire Electron App to restart after the preload update, not the Electron-Renderer reload.
+
+#### PR
+
+https://github.com/electron-vite/vite-plugin-electron/pull/89
+
 ## 0.9.3 (2022-09-10)
 
 ~~*vite-plugin-electron*~~
