@@ -1,15 +1,25 @@
-import type { Configuration } from './types'
 import type { Plugin, ResolvedConfig } from 'vite'
 import { bootstrap, startup } from './serve'
 import { build } from './build'
 
-// public export
-export {
-  type Configuration,
-  startup,
-}
+export { startup }
+
 export function defineConfig(config: Configuration) {
   return config
+}
+
+export type Configuration = {
+  /**
+   * Shortcut of `build.lib.entry`
+   */
+  entry?: import('vite').LibraryOptions['entry']
+  /**
+   * Triggered when Vite is built.  
+   * If passed this parameter will not automatically start Electron App.  
+   * You can start Electron App through the `startup` function passed through the callback function.  
+   */
+  onstart?: (this: import('rollup').PluginContext, startup: (args?: string[]) => Promise<void>) => void
+  vite?: import('vite').InlineConfig
 }
 
 export default function electron(config: Configuration | Configuration[]): Plugin[] {

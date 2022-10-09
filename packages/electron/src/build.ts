@@ -3,7 +3,7 @@ import {
   build as viteBuild,
 } from 'vite'
 import { createWithExternal, resolveBuildConfig } from './config'
-import type { Configuration } from './types'
+import type { Configuration } from '.'
 
 export async function build(config: Configuration, resolved: ResolvedConfig) {
   const withExternal = createWithExternal(resolved.root)

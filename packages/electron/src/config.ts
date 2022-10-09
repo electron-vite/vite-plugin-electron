@@ -7,7 +7,7 @@ import {
   normalizePath,
 } from 'vite'
 import { resolveModules } from 'vite-plugin-electron-renderer/plugins/use-node.js'
-import type { Configuration } from './types'
+import type { Configuration } from '.'
 
 export function resolveBuildConfig(option: Configuration, resolved: ResolvedConfig): InlineConfig {
   const defaultConfig: InlineConfig = {

@@ -4,7 +4,7 @@ import {
   build as viteBuild,
   mergeConfig,
 } from 'vite'
-import type { Configuration } from './types'
+import type { Configuration } from '.'
 import {
   createWithExternal,
   resolveBuildConfig,
