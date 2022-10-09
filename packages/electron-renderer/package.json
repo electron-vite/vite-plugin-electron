@@ -23,13 +23,14 @@
   "license": "MIT",
   "scripts": {
     "dev": "node build.mjs --watch",
-    "build": "node build.mjs",
+    "build": "tsc --noEmit && node build.mjs",
     "types": "tsc --emitDeclarationOnly",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {},
   "devDependencies": {
     "esbuild": "^0.15.10",
+    "typescript": "^4.7.4",
     "vite": "^3.2.0-beta.0",
     "rollup": "^2.77.0"
   },

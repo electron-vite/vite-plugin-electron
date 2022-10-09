@@ -88,10 +88,12 @@ importers:
   packages/electron:
     specifiers:
       rollup: ^2.77.0
+      typescript: ^4.7.4
       vite: ^3.2.0-beta.0
       vite-plugin-electron-renderer: workspace:*
     devDependencies:
       rollup: 2.77.0
+      typescript: 4.7.4
       vite: 3.2.0-beta.0
       vite-plugin-electron-renderer: link:../electron-renderer
 
@@ -99,10 +101,12 @@ importers:
     specifiers:
       esbuild: ^0.15.10
       rollup: ^2.77.0
+      typescript: ^4.7.4
       vite: ^3.2.0-beta.0
     devDependencies:
       esbuild: 0.15.10
       rollup: 2.79.1
+      typescript: 4.7.4
       vite: 3.2.0-beta.0
 
 packages:

@@ -19,11 +19,12 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vite build",
+    "build": "tsc --noEmit && vite build",
     "prepublishOnly": "node ../../scripts/check-command.js && npm run build"
   },
   "dependencies": {},
   "devDependencies": {
+    "typescript": "^4.7.4",
     "vite-plugin-electron-renderer": "workspace:*",
     "vite": "^3.2.0-beta.0",
     "rollup": "^2.77.0"

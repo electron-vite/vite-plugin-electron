@@ -131,17 +131,23 @@ function importEsm(filename = path.join(CJS.__dirname, 'plugins/index.mjs')) {
 }
 
 function generateTypes() {
-  return spawn( 
-    process.platform === 'win32' ? 'npm.cmd' : 'npm',
-    ['run', 'types'],
-  );
+  return new Promise(resolve => {
+    const cp = spawn(
+      process.platform === 'win32' ? 'npm.cmd' : 'npm',
+      ['run', 'types'],
+    );
+    cp.on('exit', code => {
+      console.log(colours.cyan('[types]'), 'generated');
+      resolve(code);
+    });
+  });
 }
 
 fs.rmSync(path.join(CJS.__dirname, PATHNAME.dist), { recursive: true, force: true });
 await transpile({ format: 'cjs' });
 await transpile({ format: 'esm' });
 importEsm();
-generateTypes();
+await generateTypes();
 
 if (iswatch) {
   for (const [, entry] of entries.entries()) {
@@ -151,7 +157,7 @@ if (iswatch) {
       await transpile({ format: 'cjs' }, file);
       await transpile({ format: 'esm' }, file);
       importEsm();
-      generateTypes();
+      await generateTypes();
     });
   }
   console.log(colours.yellow('[watch]'), 'waiting for file changes');
