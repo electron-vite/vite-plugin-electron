@@ -15,7 +15,7 @@ export default function buildConfig(): Plugin {
 
       // ensure that static resources are loaded normally
       // TODO: Automatic splicing `build.assetsDir`
-      config.build.assetsDir ??= ''
+      // config.build.assetsDir ??= ''
 
       // https://github.com/electron-vite/electron-vite-vue/issues/107
       config.build.cssCodeSplit ??= false

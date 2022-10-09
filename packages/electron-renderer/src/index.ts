@@ -1,6 +1,6 @@
-import type { Plugin } from 'vite'
+import type { PluginOption } from 'vite'
 import buildConfig from './build-config'
-import polyfillExports from './polyfill-exports'
+import cjsShim from './cjs-shim'
 import {
   type UseNodeJsOptions,
   default as useNodeJs,
@@ -10,10 +10,10 @@ export { default as worker } from './worker'
 
 export default function renderer(
   options: Omit<UseNodeJsOptions, 'nodeIntegrationInWorker'> = {}
-): Plugin[] {
+): PluginOption {
   return [
     buildConfig(),
-    polyfillExports(),
-    ...useNodeJs(options),
+    options.nodeIntegration && cjsShim(),
+    useNodeJs(options),
   ]
 }
