@@ -7,6 +7,9 @@ Integrate Vite and Electron
 
 English | [简体中文](https://github.com/electron-vite/vite-plugin-electron/tree/main/packages/electron/README.zh-CN.md)
 
+- 🐣 Few APIs, easy to use
+- 🚀 Fully compatible with Vite configuration
+
 ![vite-plugin-electron.gif](https://github.com/caoxiemeihao/blog/blob/main/vite/vite-plugin-electron.gif?raw=true)
 
 ## Install
@@ -15,9 +18,14 @@ English | [简体中文](https://github.com/electron-vite/vite-plugin-electron/t
 npm i vite-plugin-electron -D
 ```
 
-## Usage
+## Examples
 
-> Example 👉 [vite-plugin-electron-quick-start](https://github.com/caoxiemeihao/vite-plugin-electron-quick-start)
+- [quick-start](https://github.com/caoxiemeihao/vite-plugin-electron/tree/main/examples/quick-start)
+- [custom-start-electron-app](https://github.com/caoxiemeihao/vite-plugin-electron/tree/main/examples/custom-start-electron-app)
+- [nodeIntegration](https://github.com/caoxiemeihao/vite-plugin-electron/tree/main/examples/nodeIntegration)
+- [worker](https://github.com/caoxiemeihao/vite-plugin-electron/tree/main/examples/worker)
+
+## Usage
 
 vite.config.ts
 
@@ -27,15 +35,13 @@ import electron from 'vite-plugin-electron'
 export default {
   plugins: [
     electron({
-      main: {
-        entry: 'electron/main.ts',
-      },
+      entry: 'electron/main.ts',
     }),
   ],
 }
 ```
 
-you can use `process.env.VITE_DEV_SERVER_URL` when the vite command is called 'serve'
+You can use `process.env.VITE_DEV_SERVER_URL` when the vite command is called 'serve'
 
 ```js
 // electron main.js
@@ -51,51 +57,29 @@ if (process.env.VITE_DEV_SERVER_URL) {
 }
 ```
 
-## API
+## API <sub><sup>(Define)</sup></sub>
 
-`electron(config: Configuration)`
+`electron(config: Configuration | Configuration[])`
 
 ```ts
-import type { InlineConfig, LibraryOptions } from 'vite'
-import type { InputOption } from 'rollup'
-import { Options } from 'vite-plugin-electron-renderer'
-
-export interface CommonConfiguration {
+export type Configuration = {
+  /**
+   * Shortcut of `build.lib.entry`
+   */
+  entry?: LibraryOptions['entry']
+  /**
+   * Triggered when Vite is built.  
+   * If passed this parameter will not automatically start Electron App.  
+   * You can start Electron App through the `startup` function passed through the callback function.  
+   */
+  onstart?: (this: PluginContext, startup: (args?: string[]) => Promise<void>) => void
   vite?: InlineConfig
-  /**
-   * Explicitly include/exclude some CJS modules  
-   * `modules` includes `dependencies` of package.json, Node.js's `builtinModules` and `electron`  
-   */
-  resolve?: (modules: string[]) => typeof modules | undefined
-}
-
-export interface Configuration {
-  main: CommonConfiguration & {
-    /**
-     * Shortcut of `build.lib.entry`
-     */
-    entry: LibraryOptions['entry']
-  }
-  preload?: CommonConfiguration & {
-    /**
-     * Shortcut of `build.rollupOptions.input`
-     */
-    input: InputOption
-  }
-  /**
-   * Support use Node.js API in Electron-Renderer
-   * @see https://github.com/electron-vite/vite-plugin-electron/tree/main/packages/electron-renderer
-   */
-  renderer?: Options
 }
 ```
 
 ## How to work
 
 The plugin is just the encapsulation of the built-in scripts of [electron-vite-boilerplate/scripts](https://github.com/electron-vite/electron-vite-boilerplate/tree/main/scripts)
-
-## Custom start Electron
-You can see 👉 [import { onstart } from 'vite-plugin-electron'](https://github.com/electron-vite/vite-plugin-electron/blob/b0f2c9664530c1aa431ab2694fc01526d6dd5498/playground/usecase-in-main/vite.config.ts#L21-L32)
 
 ## Recommend structure
 
@@ -125,7 +109,7 @@ Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree
 
 In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages. So, put your Node.js package in `dependencies`. Unless you know how to properly build them with Vite.
 
-By default, `vite-plugin-electron` treats packages in `dependencies` as `external` modules. If you don't want this, you can control this behavior with `options.resolve()`.
+By default, `vite-plugin-electron` treats packages in `dependencies` as `external` modules.
 
 ##### Electron-Renderer
 
