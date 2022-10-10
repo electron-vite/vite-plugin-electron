@@ -100,8 +100,8 @@ Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree
 + └── vite.config.ts
 ```
 
-*🚨 By default, the files in `electron` folder will be built into the `dist/electron`*
-*🚨 Currently, `"type": "module"` is not supported in Electron*
+- *🚨 By default, the files in `electron` folder will be built into the `dist/electron`*
+- *🚨 Currently, `"type": "module"` is not supported in Electron*
 
 ## Put Node.js packages in dependencies
 

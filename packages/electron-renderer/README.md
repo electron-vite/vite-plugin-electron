@@ -13,6 +13,11 @@ English | [简体中文](https://github.com/electron-vite/vite-plugin-electron/b
 npm i vite-plugin-electron-renderer -D
 ```
 
+## Examples
+
+- [nodeIntegration](https://github.com/caoxiemeihao/vite-plugin-electron/tree/main/examples/nodeIntegration)
+- [worker](https://github.com/caoxiemeihao/vite-plugin-electron/tree/main/examples/worker)
+
 ## Usage
 
 vite.config.ts
@@ -37,17 +42,56 @@ readFile(/* something code... */)
 ipcRenderer.on('event-name', () => {/* something code... */})
 ```
 
-## API
+API *(Define)*
 
-`renderer(options: Options)`
+`renderer(options: RendererOptions)`
 
 ```ts
-export interface Options {
+export interface RendererOptions {
   /**
    * Explicitly include/exclude some CJS modules  
    * `modules` includes `dependencies` of package.json  
    */
-  resolve?: (modules: string[]) => typeof modules | undefined
+  resolve?: (modules: string[]) => string[] | void
+  /**
+   * Whether node integration is enabled. Default is `false`.
+   */
+  nodeIntegration?: boolean
+}
+```
+
+## Worker
+
+vite.config.ts
+
+```js
+import { worker } from 'vite-plugin-electron-renderer'
+
+export default {
+  worker: {
+    plugins: [
+      worker(/* options */),
+    ],
+  },
+}
+```
+
+API *(Define)*
+
+`renderer(options: WorkerOptions)`
+
+```ts
+export interface WorkerOptions {
+  /**
+   * Explicitly include/exclude some CJS modules  
+   * `modules` includes `dependencies` of package.json  
+   */
+  resolve?: (modules: string[]) => string[] | void
+  /**
+   * Whether node integration is enabled in web workers. Default is `false`. More
+   * about this can be found in Multithreading.
+   */
+  nodeIntegrationInWorker?: boolean
 }
 ```
 
@@ -179,7 +223,7 @@ If you do not configure the following options, the plugin will modify their defa
 
 - `base = './'`
 - `build.emptyOutDir = false`
-- `build.cssCodeSplit = false` -> *TODO*
-- `build.rollupOptions.output.format = 'cjs'`
+- `build.cssCodeSplit = false` (*TODO*)
+- `build.rollupOptions.output.format = 'cjs'` (nodeIntegration: true)
 - `resolve.conditions = ['node']`
 - `optimizeDeps.exclude = ['electron']` - always
