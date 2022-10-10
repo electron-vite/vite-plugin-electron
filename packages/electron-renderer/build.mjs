@@ -16,7 +16,6 @@ const entries = [
   'src/index.ts',
   'src/cjs-shim.ts',
   'src/use-node.js.ts',
-  'src/worker.ts',
 ].map(file => path.join(CJS.__dirname, file));
 const PATHNAME = {
   src: 'src',
