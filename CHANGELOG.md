@@ -1,3 +1,8 @@
+## 0.10.1 (2022-10-12)
+
+- 59a24df fix(electron-renderer): use `createRequire()` instead of `import()` 🐞
+- 11cd4c3 feat(electron): `onstart` provides `reload()`
+
 ## 0.10.0 (2022-10-09)
 
 #### Break!
