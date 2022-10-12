@@ -18,7 +18,15 @@ export type Configuration = {
    * If passed this parameter will not automatically start Electron App.  
    * You can start Electron App through the `startup` function passed through the callback function.  
    */
-  onstart?: (this: import('rollup').PluginContext, startup: (args?: string[]) => Promise<void>) => void
+  onstart?: (
+    this: import('rollup').PluginContext,
+    options: {
+      /** Electron App startup function */
+      startup: (args?: string[]) => Promise<void>
+      /** Reload Electron-Renderer */
+      reload: () => void
+    },
+  ) => void
   vite?: import('vite').InlineConfig
 }
 
