@@ -13,7 +13,7 @@ export interface UseNodeJsOptions {
    * Explicitly include/exclude some CJS modules  
    * `modules` includes `dependencies` of package.json  
    */
-  resolve?: (modules: string[]) => string[] | void
+  resolve?: (dependencies: string[]) => string[] | void
   /**
    * Whether node integration is enabled. Default is `false`.
    */
