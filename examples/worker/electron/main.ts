@@ -1,3 +1,5 @@
+process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'
+
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { Worker } from 'worker_threads'

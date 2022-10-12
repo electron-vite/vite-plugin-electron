@@ -13,7 +13,7 @@ export interface UseNodeJsOptions {
    * Explicitly include/exclude some CJS modules  
    * `modules` includes `dependencies` of package.json  
    */
-  resolve?: (modules: string[]) => string[] | void
+  resolve?: (dependencies: string[]) => string[] | void
   /**
    * Whether node integration is enabled. Default is `false`.
    */
@@ -271,7 +271,7 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
       }
 
     },
-    async load(id) {
+    load(id) {
       if (env.command === 'serve' || /* 🚧-① */plugin.api?.isWorker) {
         /** 
          * ```
@@ -311,7 +311,12 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
           const _M_ = typeof workerCount === 'number' ? `_M_$${workerCount}` : '_M_'
           const _D_ = typeof workerCount === 'number' ? `_D_$${workerCount}` : '_D_'
 
-          const nodeModule = await import(id)
+          /**
+           * 🤔
+           * Object.keys(require('fs-extra')).length      === 146
+           * Object.keys(await import('fs-extra')).length === 32
+           */
+          const nodeModule = createRequire(import.meta.url)(id)
           const requireModule = `const ${_M_} = require("${id}");`
           const exportDefault = `const ${_D_} = ${_M_}.default || ${_M_};\nexport { ${_D_} as default };`
           const exportMembers = Object

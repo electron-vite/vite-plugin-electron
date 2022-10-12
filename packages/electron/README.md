@@ -62,18 +62,27 @@ if (process.env.VITE_DEV_SERVER_URL) {
 `electron(config: Configuration | Configuration[])`
 
 ```ts
-export type Configuration = {
+export interface Configuration {
   /**
    * Shortcut of `build.lib.entry`
    */
-  entry?: LibraryOptions['entry']
+  entry?: import('vite').LibraryOptions['entry']
+  vite?: import('vite').InlineConfig
   /**
-   * Triggered when Vite is built.  
-   * If passed this parameter will not automatically start Electron App.  
-   * You can start Electron App through the `startup` function passed through the callback function.  
+   * Triggered when Vite is built every time.
+   * 
+   * If this `onstart` is passed, Electron App will not start automatically.  
+   * However, you can start Electroo App via `startup` function.  
    */
-  onstart?: (this: PluginContext, startup: (args?: string[]) => Promise<void>) => void
-  vite?: InlineConfig
+  onstart?: (
+    this: import('rollup').PluginContext,
+    options: {
+      /** Electron App startup function */
+      startup: (args?: string[]) => Promise<void>
+      /** Reload Electron-Renderer */
+      reload: () => void
+    },
+  ) => void
 }
 ```
 
@@ -100,8 +109,8 @@ Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree
 + └── vite.config.ts
 ```
 
-*🚨 By default, the files in `electron` folder will be built into the `dist/electron`*
-*🚨 Currently, `"type": "module"` is not supported in Electron*
+- *🚨 By default, the files in `electron` folder will be built into the `dist/electron`*
+- *🚨 Currently, `"type": "module"` is not supported in Electron*
 
 ## Put Node.js packages in dependencies
 

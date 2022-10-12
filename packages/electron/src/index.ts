@@ -8,18 +8,27 @@ export function defineConfig(config: Configuration) {
   return config
 }
 
-export type Configuration = {
+export interface Configuration {
   /**
    * Shortcut of `build.lib.entry`
    */
   entry?: import('vite').LibraryOptions['entry']
-  /**
-   * Triggered when Vite is built.  
-   * If passed this parameter will not automatically start Electron App.  
-   * You can start Electron App through the `startup` function passed through the callback function.  
-   */
-  onstart?: (this: import('rollup').PluginContext, startup: (args?: string[]) => Promise<void>) => void
   vite?: import('vite').InlineConfig
+  /**
+   * Triggered when Vite is built every time.
+   * 
+   * If this `onstart` is passed, Electron App will not start automatically.  
+   * However, you can start Electroo App via `startup` function.  
+   */
+  onstart?: (
+    this: import('rollup').PluginContext,
+    options: {
+      /** Electron App startup function */
+      startup: (args?: string[]) => Promise<void>
+      /** Reload Electron-Renderer */
+      reload: () => void
+    },
+  ) => void
 }
 
 export default function electron(config: Configuration | Configuration[]): Plugin[] {

@@ -46,14 +46,19 @@ export async function bootstrap(configArray: Configuration[], server: ViteDevSer
           name: ':startup',
           closeBundle() {
             if (config.onstart) {
-              config.onstart.call(this, startup)
+              config.onstart.call(this, {
+                startup,
+                reload() {
+                  server.ws.send({ type: 'full-reload' })
+                },
+              })
             } else {
-              if (false) {
-                // TODO: 2022-10-07
-                // Bundle filename that end with `reload` will trigger the Electron-Renderer process to reload, 
+              // TODO: 2022-10-12 Rollup can't accurately distinguish a file with multiple entries
+              if (false/* path.parse(filename).name.endsWith('reload') */) {
+                // Bundle filename that ends with `reload` will trigger the Electron-Renderer process to reload, 
                 // instead of restarting the entire Electron App.
                 // e.g.
-                //   dist/electron/preload.js
+                //   dist/electron/preload.ts
                 //   dist/electron/foo.reload.js
                 server.ws.send({ type: 'full-reload' })
               } else {
