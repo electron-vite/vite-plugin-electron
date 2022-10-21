@@ -15,12 +15,10 @@ export default defineConfig({
     rollupOptions: {
       external: [
         'electron',
-        'esbuild',
         'vite',
         ...builtinModules,
         ...builtinModules.map(m => `node:${m}`),
         ...Object.keys(pkg.dependencies),
-        // /vite-plugin-electron-renderer/,
       ],
       output: {
         exports: 'named',
