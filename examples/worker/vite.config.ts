@@ -11,6 +11,7 @@ export default defineConfig({
   },
   plugins: [
     electron({
+      // Multiple entry needed Vite >= 3.2.0
       entry: [
         'electron/main.ts',
         'electron/worker.ts',
