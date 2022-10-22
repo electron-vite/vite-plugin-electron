@@ -1,6 +1,6 @@
-import fs from 'fs'
-import path from 'path'
-import { builtinModules, createRequire } from 'module'
+import fs from 'node:fs'
+import path from 'node:path'
+import { builtinModules, createRequire } from 'node:module'
 import type { ExternalOption, RollupOptions } from 'rollup'
 import {
   type Plugin,
