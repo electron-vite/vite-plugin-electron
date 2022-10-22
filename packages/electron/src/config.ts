@@ -1,10 +1,10 @@
+import path from 'node:path'
 import type { AddressInfo } from 'node:net'
 import {
   type InlineConfig,
   type ResolvedConfig,
   type ViteDevServer,
   mergeConfig,
-  normalizePath,
 } from 'vite'
 import { resolveModules } from 'vite-plugin-electron-renderer/plugins/use-node.js'
 import type { Configuration } from '.'
@@ -25,8 +25,8 @@ export function resolveBuildConfig(option: Configuration, resolved: ResolvedConf
         fileName: () => '[name].js',
       },
       emptyOutDir: false,
-      // dist/electron
-      outDir: normalizePath(`${resolved.build.outDir}/electron`),
+      // dist-electron
+      outDir: path.join(`${resolved.root}/dist-electron`),
       minify: resolved.command === 'build', // 🤔 process.env./* from mode option */NODE_ENV === 'production',
     },
   }
