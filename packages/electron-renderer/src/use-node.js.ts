@@ -7,13 +7,9 @@ import {
   type ConfigEnv,
   normalizePath,
 } from 'vite'
+import libEsm from 'lib-esm'
 
 export interface UseNodeJsOptions {
-  /**
-   * Explicitly include/exclude some CJS modules  
-   * `modules` includes `dependencies` of package.json  
-   */
-  resolve?: (dependencies: string[]) => string[] | void
   /**
    * Whether node integration is enabled. Default is `false`.
    */
@@ -24,74 +20,6 @@ export interface UseNodeJsOptions {
    */
   nodeIntegrationInWorker?: boolean
 }
-
-// https://www.w3schools.com/js/js_reserved.asp
-const keywords = [
-  'abstract',
-  'arguments',
-  'await',
-  'boolean',
-  'break',
-  'byte',
-  'case',
-  'catch',
-  'char',
-  'class',
-  'const',
-  'continue',
-  'debugger',
-  'default',
-  'delete',
-  'do',
-  'double',
-  'else',
-  'enum',
-  'eval',
-  'export',
-  'extends',
-  'false',
-  'final',
-  'finally',
-  'float',
-  'for',
-  'function',
-  'goto',
-  'if',
-  'implements',
-  'import',
-  'in',
-  'instanceof',
-  'int',
-  'interface',
-  'let',
-  'long',
-  'native',
-  'new',
-  'null',
-  'package',
-  'private',
-  'protected',
-  'public',
-  'return',
-  'short',
-  'static',
-  'super',
-  'switch',
-  'synchronized',
-  'this',
-  'throw',
-  'throws',
-  'transient',
-  'true',
-  'try',
-  'typeof',
-  'var',
-  'void',
-  'volatile',
-  'while',
-  'with',
-  'yield',
-]
 
 const electron = `
 /**
@@ -190,12 +118,16 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
       // Because `dependencies(NodeJs_pkgs)` may contain Web packages. e.g. `vue`, `react`.
       // Opinionated treat Web packages as external modules, which will cause errors.
       let NodeJs_pkgs: string[] = []
+      /**
+       * 2022-10-18 remove (v0.10.2)
+       * This option is a bit confusing. Consider using `vite-plugin-resolve` instead. 🤔
       if (options.resolve) {
         const pkgs = options.resolve(dependencies)
         if (pkgs) {
           NodeJs_pkgs = pkgs
         }
       }
+      */
 
       CJS_modules.push(...builtins.concat(NodeJs_pkgs))
 
@@ -308,8 +240,7 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
           if (cache) return cache
 
           const workerCount = getWorkerIncrementCount()
-          const _M_ = typeof workerCount === 'number' ? `_M_$${workerCount}` : '_M_'
-          const _D_ = typeof workerCount === 'number' ? `_D_$${workerCount}` : '_D_'
+          const _M_ID = typeof workerCount === 'number' ? `$${workerCount}` : ''
 
           /**
            * 🤔
@@ -317,21 +248,14 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
            * Object.keys(await import('fs-extra')).length === 32
            */
           const nodeModule = createRequire(import.meta.url)(id)
-          const requireModule = `const ${_M_} = require("${id}");`
-          const exportDefault = `const ${_D_} = ${_M_}.default || ${_M_};\nexport { ${_D_} as default };`
-          const exportMembers = Object
-            .keys(nodeModule)
-            // https://github.com/electron-vite/electron-vite-react/issues/48
-            .filter(n => !keywords.includes(n))
-            .map(attr => `export const ${attr} = ${_M_}.${attr};`).join('\n')
-          const nodeModuleCodeSnippet = `
-${requireModule}
-${exportDefault}
-${exportMembers}
-`
+          const result = libEsm({ exports: Object.keys(nodeModule), conflict: _M_ID })
+          const nodeModuleSnippet = `
+const _M_${_M_ID} = require("${id}");
+${result.exports}
+`.trim()
 
-          moduleCache.set(id, nodeModuleCodeSnippet)
-          return nodeModuleCodeSnippet
+          moduleCache.set(id, nodeModuleSnippet)
+          return nodeModuleSnippet
         }
       }
 
@@ -352,13 +276,13 @@ ${exportMembers}
   ]
 }
 
-export function resolveModules(root: string, options: UseNodeJsOptions = {}) {
+export function resolveModules(root: string) {
   const cjs_require = createRequire(import.meta.url)
   const cwd = process.cwd()
   const builtins = builtinModules.filter(e => !e.startsWith('_')); builtins.push('electron', ...builtins.map(m => `node:${m}`))
   // dependencies of package.json
-  let dependencies: string[] = []
-  // dependencies(ESM) of package.json
+  const dependencies: string[] = []
+  // dependencies({ "type": "module" }) of package.json
   const ESM_deps: string[] = []
 
   // Resolve package.json dependencies
@@ -377,15 +301,8 @@ export function resolveModules(root: string, options: UseNodeJsOptions = {}) {
           continue
         }
       }
-
-      // TODO: Nested package name, but you can explicity include it by `options.resolve`
       dependencies.push(npmPkg)
     }
-  }
-
-  if (options.resolve) {
-    const tmp = options.resolve(dependencies)
-    if (tmp) dependencies = tmp
   }
 
   return {
