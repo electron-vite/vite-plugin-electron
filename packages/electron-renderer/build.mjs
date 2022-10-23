@@ -17,6 +17,7 @@ const entries = [
   'src/index.ts',
   'src/cjs-shim.ts',
   'src/use-node.js.ts',
+  'src/optimizer.ts',
 ].map(file => path.join(CJS.__dirname, file));
 const PATHNAME = {
   src: 'src',
@@ -64,7 +65,7 @@ async function transpile(options, files = entries) {
 }
 
 // For cjs
-function requireCjs(filename = path.join(CJS.__dirname, 'plugins/index.js')) {
+function requireCjs(filename) {
   const requireRE = /require\(("(?:[^"\\]|\\.)+"|'(?:[^'\\]|\\.)+')\)/g;
   const startOffset = 'require('.length;
   /** @type {{ start: number; end: number; raw: string; }[]} */
@@ -81,6 +82,7 @@ function requireCjs(filename = path.join(CJS.__dirname, 'plugins/index.js')) {
     const { start, end, raw } = node;
     const id = raw.slice(1, -1);
     const idWithExt = id + '.js';
+    if (!id.startsWith('.')) continue; // Only relative path
     if (!fs.existsSync(path.join(path.dirname(filename), idWithExt))) continue;
     code = code.slice(0, start) + raw.replace(id, idWithExt) + code.slice(end);
   }
@@ -93,7 +95,7 @@ function requireCjs(filename = path.join(CJS.__dirname, 'plugins/index.js')) {
 }
 
 // For mjs
-function importEsm(filename = path.join(CJS.__dirname, 'plugins/index.mjs')) {
+function importEsm(filename) {
   const importRE = /import[\s\S]*?from\s*?(".+")/g;
   /** @type {{ start: number; end: number; raw: string; }[]} */
   const nodes = [];
@@ -109,6 +111,7 @@ function importEsm(filename = path.join(CJS.__dirname, 'plugins/index.mjs')) {
     const { start, end, raw } = node;
     const id = raw.slice(1, -1);
     const idWithExt = id + '.mjs';
+    if (!id.startsWith('.')) continue; // Only relative path
     if (!fs.existsSync(path.join(path.dirname(filename), idWithExt))) continue;
     code = code.slice(0, start) + raw.replace(id, idWithExt) + code.slice(end);
   }
@@ -118,6 +121,16 @@ function importEsm(filename = path.join(CJS.__dirname, 'plugins/index.mjs')) {
     COLOURS.gary(new Date().toLocaleTimeString()),
     filename.replace(CJS.__dirname, ''),
   );
+}
+
+function rewriteExtension() {
+  const names = ['index']
+  for (const name of names) {
+    const cjs = path.join(CJS.__dirname, 'plugins', `${name}.js`);
+    const esm = path.join(CJS.__dirname, 'plugins', `${name}.mjs`);
+    requireCjs(cjs);
+    importEsm(esm);
+  }
 }
 
 function generateTypes() {
@@ -136,8 +149,7 @@ function generateTypes() {
 fs.rmSync(path.join(CJS.__dirname, PATHNAME.dist), { recursive: true, force: true });
 await transpile({ format: 'cjs' });
 await transpile({ format: 'esm' });
-requireCjs();
-importEsm();
+rewriteExtension();
 await generateTypes();
 
 if (iswatch) {
@@ -147,8 +159,7 @@ if (iswatch) {
       const file = entries.find(e => e.includes(filename));
       await transpile({ format: 'cjs' }, file);
       await transpile({ format: 'esm' }, file);
-      requireCjs();
-      importEsm();
+      rewriteExtension();
       await generateTypes();
     });
   }
