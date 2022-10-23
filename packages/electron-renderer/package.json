@@ -27,7 +27,9 @@
     "types": "tsc --emitDeclarationOnly",
     "prepublishOnly": "npm run build"
   },
-  "dependencies": {},
+  "dependencies": {
+    "lib-esm": "~0.3.0"
+  },
   "devDependencies": {
     "esbuild": "^0.15.10",
     "rollup": "~2.78.0",
