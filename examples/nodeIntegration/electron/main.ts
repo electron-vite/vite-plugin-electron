@@ -16,7 +16,7 @@ app.whenReady().then(() => {
   })
 
   if (app.isPackaged) {
-    win.loadFile(path.join(__dirname, '../index.html'))
+    win.loadFile(path.join(__dirname, '../dist/index.html'))
   } else {
     win.loadURL(process.env.VITE_DEV_SERVER_URL)
     win.webContents.openDevTools()

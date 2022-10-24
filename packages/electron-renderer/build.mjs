@@ -4,6 +4,7 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { transform } from 'esbuild';
+import { COLOURS } from 'vite-plugin-utils/function';
 
 const iswatch = process.argv.slice(2).includes('--watch');
 const CJS = {
@@ -16,22 +17,11 @@ const entries = [
   'src/index.ts',
   'src/cjs-shim.ts',
   'src/use-node.js.ts',
+  'src/optimizer.ts',
 ].map(file => path.join(CJS.__dirname, file));
 const PATHNAME = {
   src: 'src',
   dist: 'plugins',
-};
-/**
- * @see https://stackoverflow.com/questions/9781218/how-to-change-node-jss-console-font-color
- * @see https://en.wikipedia.org/wiki/ANSI_escape_code#Colors
- */
-const colours = {
-  $_$: c => str => `\x1b[${c}m` + str + '\x1b[0m',
-  gary: str => colours.$_$(90)(str),
-  cyan: str => colours.$_$(36)(str),
-  yellow: str => colours.$_$(33)(str),
-  green: str => colours.$_$(32)(str),
-  red: str => colours.$_$(31)(str),
 };
 
 function ensureDir(filename) {
@@ -67,14 +57,15 @@ async function transpile(options, files = entries) {
     fs.writeFileSync(ensureDir(distname), result.code);
 
     console.log(
-      colours.cyan('[write]'),
-      colours.gary(new Date().toLocaleTimeString()),
+      COLOURS.cyan('[write]'),
+      COLOURS.gary(new Date().toLocaleTimeString()),
       `${distname.replace(CJS.__dirname, '')}`,
     );
   }
 }
 
-function requireCjs(filename = path.join(CJS.__dirname, 'plugins/index.js')) {
+// For cjs
+function requireCjs(filename) {
   const requireRE = /require\(("(?:[^"\\]|\\.)+"|'(?:[^'\\]|\\.)+')\)/g;
   const startOffset = 'require('.length;
   /** @type {{ start: number; end: number; raw: string; }[]} */
@@ -91,18 +82,20 @@ function requireCjs(filename = path.join(CJS.__dirname, 'plugins/index.js')) {
     const { start, end, raw } = node;
     const id = raw.slice(1, -1);
     const idWithExt = id + '.js';
+    if (!id.startsWith('.')) continue; // Only relative path
     if (!fs.existsSync(path.join(path.dirname(filename), idWithExt))) continue;
     code = code.slice(0, start) + raw.replace(id, idWithExt) + code.slice(end);
   }
   fs.writeFileSync(filename, code);
   console.log(
-    colours.yellow('[rewrite]'),
-    colours.gary(new Date().toLocaleTimeString()),
+    COLOURS.yellow('[rewrite]'),
+    COLOURS.gary(new Date().toLocaleTimeString()),
     filename.replace(CJS.__dirname, ''),
   );
 }
 
-function importEsm(filename = path.join(CJS.__dirname, 'plugins/index.mjs')) {
+// For mjs
+function importEsm(filename) {
   const importRE = /import[\s\S]*?from\s*?(".+")/g;
   /** @type {{ start: number; end: number; raw: string; }[]} */
   const nodes = [];
@@ -118,15 +111,26 @@ function importEsm(filename = path.join(CJS.__dirname, 'plugins/index.mjs')) {
     const { start, end, raw } = node;
     const id = raw.slice(1, -1);
     const idWithExt = id + '.mjs';
+    if (!id.startsWith('.')) continue; // Only relative path
     if (!fs.existsSync(path.join(path.dirname(filename), idWithExt))) continue;
     code = code.slice(0, start) + raw.replace(id, idWithExt) + code.slice(end);
   }
   fs.writeFileSync(filename, code);
   console.log(
-    colours.yellow('[rewrite]'),
-    colours.gary(new Date().toLocaleTimeString()),
+    COLOURS.yellow('[rewrite]'),
+    COLOURS.gary(new Date().toLocaleTimeString()),
     filename.replace(CJS.__dirname, ''),
   );
+}
+
+function rewriteExtension() {
+  const names = ['index']
+  for (const name of names) {
+    const cjs = path.join(CJS.__dirname, 'plugins', `${name}.js`);
+    const esm = path.join(CJS.__dirname, 'plugins', `${name}.mjs`);
+    requireCjs(cjs);
+    importEsm(esm);
+  }
 }
 
 function generateTypes() {
@@ -136,7 +140,7 @@ function generateTypes() {
       ['run', 'types'],
     );
     cp.on('exit', code => {
-      console.log(colours.cyan('[types]'), 'generated');
+      console.log(COLOURS.cyan('[types]'), 'declaration generated');
       resolve(code);
     });
   });
@@ -145,7 +149,7 @@ function generateTypes() {
 fs.rmSync(path.join(CJS.__dirname, PATHNAME.dist), { recursive: true, force: true });
 await transpile({ format: 'cjs' });
 await transpile({ format: 'esm' });
-importEsm();
+rewriteExtension();
 await generateTypes();
 
 if (iswatch) {
@@ -155,11 +159,11 @@ if (iswatch) {
       const file = entries.find(e => e.includes(filename));
       await transpile({ format: 'cjs' }, file);
       await transpile({ format: 'esm' }, file);
-      importEsm();
+      rewriteExtension();
       await generateTypes();
     });
   }
-  console.log(colours.yellow('[watch]'), 'waiting for file changes');
+  console.log(COLOURS.yellow('[watch]'), 'waiting for file changes');
 } else {
-  console.log(colours.green('[build]'), 'success');
+  console.log(COLOURS.green('[build]'), 'success');
 }
