@@ -13,6 +13,7 @@ import {
 export default function renderer(
   options: Omit<UseNodeJsOptions, 'nodeIntegrationInWorker'> & {
     /**
+     * If the npm-package you are using is a Node.js package, then you need to Pre Bundling it.
      * @see https://vitejs.dev/guide/dep-pre-bundling.html
      */
     optimizeDeps?: DepOptimizationConfig
