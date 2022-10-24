@@ -81,7 +81,7 @@ export const deprecate = electron.deprecate;
 export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
   let env: ConfigEnv
   const builtins: string[] = []
-  const dependencies: string[] = []
+  const CJS_deps: string[] = []
   const ESM_deps: string[] = []
   const CJS_modules: string[] = [] // builtins + dependencies
   const moduleCache = new Map([['electron', electron]])
@@ -111,7 +111,7 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
       const resolved = resolveModules(root)
 
       builtins.push(...resolved.builtins)
-      dependencies.push(...resolved.dependencies)
+      CJS_deps.push(...resolved.CJS_deps)
       ESM_deps.push(...resolved.ESM_deps)
 
       // Since `vite-plugin-electron-renderer@0.5.10` `dependencies(NodeJs_pkgs)` fully controlled by the user.
@@ -122,7 +122,7 @@ export default function useNodeJs(options: UseNodeJsOptions = {}): Plugin[] {
        * 2022-10-18 remove (v0.10.2)
        * This option is a bit confusing. Consider using `vite-plugin-resolve` instead. 🤔
       if (options.resolve) {
-        const pkgs = options.resolve(dependencies)
+        const pkgs = options.resolve(CJS_deps)
         if (pkgs) {
           NodeJs_pkgs = pkgs
         }
@@ -281,7 +281,7 @@ export function resolveModules(root: string) {
   const cwd = process.cwd()
   const builtins = builtinModules.filter(e => !e.startsWith('_')); builtins.push('electron', ...builtins.map(m => `node:${m}`))
   // dependencies of package.json
-  const dependencies: string[] = []
+  const CJS_deps: string[] = []
   // dependencies({ "type": "module" }) of package.json
   const ESM_deps: string[] = []
 
@@ -290,24 +290,24 @@ export function resolveModules(root: string) {
   if (pkgId) {
     const pkg = cjs_require(pkgId)
     for (const npmPkg of Object.keys(pkg.dependencies || {})) {
-      const _pkgId = lookupFile(
+      const pkgId2 = lookupFile(
         'package.json',
         [root, cwd].map(r => `${r}/node_modules/${npmPkg}`),
       )
-      if (_pkgId) {
-        const _pkg = cjs_require(_pkgId)
-        if (_pkg.type === 'module') {
+      if (pkgId2) {
+        const pkg2 = cjs_require(pkgId2)
+        if (pkg2.type === 'module') {
           ESM_deps.push(npmPkg)
           continue
         }
       }
-      dependencies.push(npmPkg)
+      CJS_deps.push(npmPkg)
     }
   }
 
   return {
     builtins,
-    dependencies,
+    CJS_deps,
     ESM_deps,
   }
 }
