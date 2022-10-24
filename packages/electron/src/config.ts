@@ -38,8 +38,8 @@ export function resolveBuildConfig(option: Configuration, resolved: ResolvedConf
  * `dependencies` of package.json will be inserted into `build.rollupOptions.external`
  */
 export function createWithExternal(root: string) {
-  const { builtins, dependencies } = resolveModules(root)
-  const modules = builtins.concat(dependencies)
+  const { builtins, CJS_deps } = resolveModules(root)
+  const modules = builtins.concat(CJS_deps)
 
   return function withExternal(ILCG: InlineConfig) {
 
