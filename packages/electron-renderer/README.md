@@ -49,14 +49,23 @@ API *(Define)*
 ```ts
 export interface RendererOptions {
   /**
-   * Explicitly include/exclude some CJS modules  
-   * `modules` includes `dependencies` of package.json  
-   */
-  resolve?: (modules: string[]) => string[] | void
-  /**
    * Whether node integration is enabled. Default is `false`.
    */
   nodeIntegration?: boolean
+  /**
+   * If the npm-package you are using is a Node.js package, then you need to Pre Bundling it.
+   * @see https://vitejs.dev/guide/dep-pre-bundling.html
+   */
+  optimizeDeps?: {
+    include?: (string | {
+      name: string
+      /**
+       * Explicitly specify the module type
+       */
+      type?: "commonjs" | "module"
+    })[]
+    buildOptions?: import('esbuild').BuildOptions
+  }
 }
 ```
 
@@ -83,11 +92,6 @@ API *(Define)*
 ```ts
 export interface WorkerOptions {
   /**
-   * Explicitly include/exclude some CJS modules  
-   * `modules` includes `dependencies` of package.json  
-   */
-  resolve?: (modules: string[]) => string[] | void
-  /**
    * Whether node integration is enabled in web workers. Default is `false`. More
    * about this can be found in Multithreading.
    */
@@ -95,9 +99,67 @@ export interface WorkerOptions {
 }
 ```
 
-## `dependencies` vs `devDependencies`
+## How to work
 
-> In general, Vite may not correctly build Node.js packages, especially Node.js C/C++ native modules, but Vite can load them as external packages. **Unless you know how to properly build them with Vite.**
+> Load Electron and Node.js cjs-packages/builtin-modules (Schematic)
+
+###### Electron-Renderer(vite serve)
+
+```
+┏————————————————————————————————————————┓                    ┏—————————————————┓
+│ import { ipcRenderer } from 'electron' │                    │ Vite dev server │
+┗————————————————————————————————————————┛                    ┗—————————————————┛
+                   │                                                   │
+                   │ 1. HTTP(Request): electron module                 │
+                   │ ————————————————————————————————————————————————> │
+                   │                                                   │
+                   │                                                   │
+                   │ 2. Intercept in load-hook(Plugin)                 │
+                   │ 3. Generate a virtual ESM module(electron)        │
+                   │    ↓                                              │
+                   │    const { ipcRenderer } = require('electron')    │
+                   │    export { ipcRenderer }                         │
+                   │                                                   │
+                   │                                                   │
+                   │ 4. HTTP(Response): electron module                │
+                   │ <———————————————————————————————————————————————— │
+                   │                                                   │
+┏————————————————————————————————————————┓                    ┏—————————————————┓
+│ import { ipcRenderer } from 'electron' │                    │ Vite dev server │
+┗————————————————————————————————————————┛                    ┗—————————————————┛
+```
+
+###### Electron-Renderer(vite build)
+
+```js
+import { ipcRenderer } from 'electron'
+↓
+const { ipcRenderer } = require('electron')
+```
+
+## Dependency Pre-Bundling
+
+When you run vite for the first time, you may notice this message:
+
+```log
+$ vite
+Pre-bundling: serialport
+Pre-bundling: electron-store
+Pre-bundling: execa
+Pre-bundling: node-fetch
+Pre-bundling: got
+```
+
+#### The Why
+
+**In general**, Vite may not correctly build Node.js packages, especially Node.js C/C++ native modules, but Vite can load them as external packages.  
+Unless you know how to properly build them with Vite.  
+[See example]()
+
+**By the way**. If an npm package is a pure ESM format package, and the packages it depends on are also in ESM format, then put it in `optimizeDeps.exclude` and it will work normally.  
+[See an explanation of it]().
+
+## `dependencies` vs `devDependencies`
 
 <table>
   <thead>
@@ -134,91 +196,9 @@ export interface WorkerOptions {
   </tbody>
 </table>
 
-First, put the Node.js(CJS) packages into `dependencies`.
-
-Second, you need to explicitly specify which packages are Node.js(CJS) packages for `vite-plugin-electron-renderer` by `options.resolve()`. This way they will be treated as `external` modules and loaded correctly. Thereby avoiding the problems caused by the Pre-Bundling of Vite.
-
-It's essentially works principle is to generate a virtual module in ESM format by `load-hook` during `vite serve` to ensure that it can work normally. It's inserted into `rollupOptions.external` during `vite build` time.
-
-#### Load Node.js C/C++ native modules
-
-```js
-renderer({
-  resolve() {
-    // explicitly specify which packages are Node.js(CJS) packages
-    return [
-      // C/C++ native modules
-      'serialport',
-      'sqlite3',
-    ]
-  }
-})
-```
-
-#### Load Node.js CJS packages/builtin-modules/electron (Schematic)
-
-###### Electron-Renderer(vite build)
-
-```js
-import { ipcRenderer } from 'electron'
-↓
-const { ipcRenderer } = require('electron')
-```
-
-###### Electron-Renderer(vite serve)
-
-```
-┏————————————————————————————————————————┓                    ┏—————————————————┓
-│ import { ipcRenderer } from 'electron' │                    │ Vite dev server │
-┗————————————————————————————————————————┛                    ┗—————————————————┛
-                   │                                                   │
-                   │ 1. HTTP(Request): electron module                 │
-                   │ ————————————————————————————————————————————————> │
-                   │                                                   │
-                   │                                                   │
-                   │ 2. Intercept in load-hook(Plugin)                 │
-                   │ 3. Generate a virtual ESM module(electron)        │
-                   │    ↓                                              │
-                   │    const { ipcRenderer } = require('electron')    │
-                   │    export { ipcRenderer }                         │
-                   │                                                   │
-                   │                                                   │
-                   │ 4. HTTP(Response): electron module                │
-                   │ <———————————————————————————————————————————————— │
-                   │                                                   │
-┏————————————————————————————————————————┓                    ┏—————————————————┓
-│ import { ipcRenderer } from 'electron' │                    │ Vite dev server │
-┗————————————————————————————————————————┛                    ┗—————————————————┛
-```
-
-#### Node.js ESM packages
-
-###### The first way
-
-In general, Node.js ESM packages only need to be converted if they are used in Electron-Renderer. But not in Electron-Main.
-
-1. Install [vite-plugin-esmodule](https://github.com/vite-plugin/vite-plugin-esmodule) to load ESM packages
-2. It is recommended to put the ESM packages in the `devDependencies`
-
-> [See an explanation of it](https://github.com/electron-vite/vite-plugin-electron/blob/b4d616a8d0e25f01f5e589b4a6ef69220866ce5d/examples/nodeIntegration/vite.config.ts#L21-L24)
-
-###### The second way
-
-```diff
-export default {
-+ optimizeDeps: {
-+   exclude: ['only-support-pure-esmodule-package']
-+ }
-}
-```
-
 #### Why is it recommended to put properly buildable packages in `devDependencies`?
 
 Doing so will reduce the size of the packaged APP by [electron-builder](https://github.com/electron-userland/electron-builder).
-
-## How to work
-
-The plugin is just the encapsulation of the built-in plugins of [electron-vite-boilerplate/packages/renderer/plugins](https://github.com/electron-vite/electron-vite-boilerplate/tree/main/packages/renderer/plugins).
 
 ## Config presets (Opinionated)
 
