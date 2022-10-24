@@ -1,7 +1,7 @@
 {
   "name": "vite-plugin-electron-node-integration",
   "version": "0.0.0",
-  "main": "dist/electron/main.js",
+  "main": "dist-electron/main.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/electron-vite/vite-plugin-electron.git",
@@ -26,9 +26,8 @@
     "execa": "^6.1.0",
     "got": "^12.1.0",
     "node-fetch": "^3.2.8",
+    "vite": "^3.1.8",
     "vite-plugin-electron": "workspace:*",
-    "vite-plugin-electron-renderer": "workspace:*",
-    "vite-plugin-esmodule": "^1.4.1",
-    "vite": "^3.1.8"
+    "vite-plugin-electron-renderer": "workspace:*"
   }
 }
