@@ -26,6 +26,8 @@ const CACHE_DIR = '.vite-electron-renderer'
 export default function optimizer(options: DepOptimizationConfig): Plugin {
   return {
     name: 'vite-plugin-electron-renderer:optimizer',
+    // At "build" phase, Node.js npm-package will be resolve by './use-node.js.ts'
+    apply: 'serve',
     async config(config) {
       root = config.root ? path.resolve(config.root) : process.cwd()
       node_modules_path = node_modules(root)
