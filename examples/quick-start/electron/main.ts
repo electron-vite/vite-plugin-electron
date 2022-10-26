@@ -7,7 +7,7 @@
 // │ ├── index.html
 // │ ├── ...other-static-files-from-public
 // │
-process.env.DIST = join(__dirname, '..')
+process.env.DIST = join(__dirname, '../dist')
 process.env.PUBLIC = app.isPackaged ? process.env.DIST : join(process.env.DIST, '../public')
 
 import { join } from 'path'
