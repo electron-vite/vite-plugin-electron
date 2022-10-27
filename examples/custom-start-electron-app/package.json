@@ -1,7 +1,7 @@
 {
   "name": "vite-plugin-electron-custom-start-electron-app",
   "version": "0.0.0",
-  "main": "dist/electron/main.js",
+  "main": "dist-electron/main.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/electron-vite/vite-plugin-electron.git",
