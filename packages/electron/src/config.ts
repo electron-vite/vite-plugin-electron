@@ -26,7 +26,7 @@ export function resolveBuildConfig(option: Configuration, resolved: ResolvedConf
       },
       resolve: {
         // Since we're building for electron (which uses nodejs), we don't want to use the "browser" field in the packages.
-        // It corrupts bundling for packages like `ws` and `isomorphic-ws`, for example.
+        // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.
         browserField: false,
         mainFields: ["module", "jsnext:main", "jsnext"],
       },
