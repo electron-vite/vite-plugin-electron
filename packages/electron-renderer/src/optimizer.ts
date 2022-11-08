@@ -151,6 +151,7 @@ async function esmBundling(args: {
     target: 'node14',
     format: 'cjs',
     bundle: true,
+    sourcemap: true,
     external: [
       ...builtinModules,
       ...builtinModules.map(mod => `node:${mod}`),
