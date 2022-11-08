@@ -29,7 +29,7 @@ const electron = require("electron");
 
 // Proxy in Worker
 let _ipcRenderer;
-if (typeof document === 'undefined') {
+if (typeof WorkerGlobalScope !== 'undefined') {
   _ipcRenderer = {};
   const keys = [
     'invoke',
