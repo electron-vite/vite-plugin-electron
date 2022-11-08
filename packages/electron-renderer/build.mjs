@@ -46,8 +46,8 @@ async function transpile(options, files = entries) {
     if (options.format === 'cjs') {
       // https://github.com/evanw/esbuild/issues/2441
       result.code = result.code.replace(
-        'const import_meta = {};',
-        'const import_meta = { url: "file:" + __filename };',
+        'const import_meta = {}',
+        'const import_meta = { url: "file:" + __filename }',
       );
     }
 
