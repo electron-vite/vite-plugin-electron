@@ -3,7 +3,7 @@
   "version": "0.10.2",
   "description": "Integrate Vite and Electron",
   "main": "index.mjs",
-  "types": "src",
+  "types": "types",
   "exports": {
     ".": {
       "import": "./index.mjs",
@@ -19,7 +19,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite build --watch",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc -p tsconfig.build.json && vite build",
     "prepublishOnly": "node ../../scripts/check-command.js && npm run build"
   },
   "dependencies": {},
@@ -30,7 +30,7 @@
     "rollup": "^2.77.0"
   },
   "files": [
-    "src",
+    "types",
     "index.mjs",
     "index.js",
     "electron-env.d.ts"
