@@ -34,10 +34,10 @@ function createWindow() {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())
   })
 
-  if (app.isPackaged) {
-    win.loadFile(join(process.env.DIST, 'index.html'))
-  } else {
+  if (url) {
     win.loadURL(url)
+  } else {
+    win.loadFile(join(process.env.DIST, 'index.html'))
   }
 }
 
