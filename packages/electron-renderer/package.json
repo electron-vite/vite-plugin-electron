@@ -34,7 +34,7 @@
     "esbuild": "^0.15.10",
     "rollup": "~2.78.0",
     "typescript": "^4.7.4",
-    "vite": "^3.1.8",
+    "vite": "^3.2.3",
     "vite-plugin-utils": "^0.3.6"
   },
   "files": [
