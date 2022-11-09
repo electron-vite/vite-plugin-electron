@@ -1,10 +1,7 @@
-import fs from 'fs'
 import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
 import pkg from './package.json'
-
-fs.rmSync('dist', { recursive: true, force: true })
 
 export default defineConfig({
   plugins: [
