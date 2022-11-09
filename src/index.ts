@@ -20,14 +20,15 @@ export interface Configuration {
    * If this `onstart` is passed, Electron App will not start automatically.  
    * However, you can start Electroo App via `startup` function.  
    */
-  onstart?: (
-    this: import('rollup').PluginContext,
-    options: {
-      /** Electron App startup function */
-      startup: (args?: string[]) => Promise<void>
-      /** Reload Electron-Renderer */
-      reload: () => void
-    },
+  onstart?: (this: import('rollup').PluginContext, options: {
+    /**
+     * Electron App startup function
+     * @param argv default value `['.', '--no-sandbox']`
+     */
+    startup: (argv?: string[]) => Promise<void>
+    /** Reload Electron-Renderer */
+    reload: () => void
+  },
   ) => void
 }
 

@@ -11,8 +11,11 @@ import {
   resolveServerUrl,
 } from './config'
 
-/** Electron App startup function */
-export async function startup(args = ['.', '--no-sandbox']) {
+/**
+ * Electron App startup function
+ * @param argv default value `['.', '--no-sandbox']`
+ */
+export async function startup(argv = ['.', '--no-sandbox']) {
   const { spawn } = await import('child_process')
   // @ts-ignore
   const electronPath = (await import('electron')).default as string
@@ -23,7 +26,7 @@ export async function startup(args = ['.', '--no-sandbox']) {
   }
 
   // Start Electron.app
-  process.electronApp = spawn(electronPath, args, { stdio: 'inherit' })
+  process.electronApp = spawn(electronPath, argv, { stdio: 'inherit' })
   // Exit command after Electron.app exits
   process.electronApp.once('exit', process.exit)
 }
