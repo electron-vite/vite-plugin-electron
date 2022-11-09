@@ -1,8 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "outDir": "types",
-    "emitDeclarationOnly": true
-  },
-  "include": ["src", "electron-env.d.ts"]
-}
