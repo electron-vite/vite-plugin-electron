@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2019",
+    "target": "ES2022",
     "module": "ESNext",
     "esModuleInterop": true,
     "moduleResolution": "Node",
@@ -13,6 +13,5 @@
     "outDir": "plugins",
     "strict": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["exclude", "src/build-config.vite-3.0.5.ts"]
+  "include": ["src/**/*.ts"]
 }
