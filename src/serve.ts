@@ -26,6 +26,7 @@ export async function bootstrap(config: Configuration | Configuration[], server:
     const inlineConfig = withExternalBuiltins(resolveViteConfig(config))
     await viteBuild(mergeConfig(
       {
+        mode: 'development',
         build: {
           watch: {},
         },
