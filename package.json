@@ -1,22 +1,42 @@
 {
-  "name": "vite-plugin-electron-monorepo",
-  "private": true,
-  "engines": {
-    "node": "^14.18.0 || >=16.0.0"
+  "name": "vite-plugin-electron",
+  "version": "0.10.3",
+  "description": "Integrate Vite and Electron",
+  "main": "index.mjs",
+  "types": "types",
+  "exports": {
+    ".": {
+      "import": "./index.mjs",
+      "require": "./index.js"
+    }
   },
-  "packageManager": "pnpm@7.0.0",
-  "homepage": "https://github.com/electron-vite/vite-plugin-electron",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/electron-vite/vite-plugin-electron.git"
+  },
+  "author": "草鞋没号 <308487730@qq.com>",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "tsc --emitDeclarationOnly && vite build",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^4.7.4",
+    "vite": "^3.2.3",
+    "rollup": "^2.79.1"
+  },
+  "files": [
+    "types",
+    "index.mjs",
+    "index.js",
+    "electron-env.d.ts"
+  ],
   "keywords": [
     "vite",
     "plugin",
-    "electron"
-  ],
-  "scripts": {
-    "build": "pnpm -r --filter=./packages/* run build",
-    "dev": "pnpm -r --parallel --filter=./packages/* run dev"
-  },
-  "devDependencies": {
-    "@types/node": "^18.0.6",
-    "typescript": "^4.7.4"
-  }
+    "electron",
+    "renderer"
+  ]
 }

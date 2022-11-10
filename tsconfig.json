@@ -1,18 +1,17 @@
 {
   "compilerOptions": {
-    "target": "ES2019",
+    "target": "ES2022",
     "module": "ESNext",
     "esModuleInterop": true,
     "moduleResolution": "Node",
     "resolveJsonModule": true,
+    "strict": true,
     "allowJs": true,
     "declaration": true,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
-    "outDir": "plugins",
-    "strict": true
+    "outDir": "types"
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["exclude", "src/build-config.vite-3.0.5.ts"]
+  "include": ["src/**/*.ts", "electron-env.d.ts"]
 }

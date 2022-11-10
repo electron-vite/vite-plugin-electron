@@ -109,4 +109,7 @@ package-lock.json
 # pnpm-lock.yaml
 yarn.lock
 
-release
+/types
+/index.mjs
+/index.cjs
+/index.js
