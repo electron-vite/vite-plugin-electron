@@ -7,12 +7,10 @@ importers:
       rollup: ^2.79.1
       typescript: ^4.7.4
       vite: ^3.2.3
-      vite-plugin-electron-renderer: ~0.10.3
     devDependencies:
       rollup: 2.79.1
       typescript: 4.7.4
       vite: 3.2.3
-      vite-plugin-electron-renderer: 0.10.3
 
   examples/custom-start-electron-app:
     specifiers:
@@ -1540,10 +1538,6 @@ packages:
     resolution: {integrity: sha512-0/BnGCCfyUMkBpeDgWihanIAF9JmZhHBgUhEqzvf+adhNGLoP6TaiI5oF8oyb3I45P+PcnrqihSf01M0l0G5+Q==}
     dev: true
 
-  /lib-esm/0.3.0:
-    resolution: {integrity: sha512-P7YcG7OnoaGL2h4j46g/m0P2xHMXlYf+0iCDvVrEfzUVxLe+abytgd2VjUhj9puqEgqRGEDbT504YWj75jHacA==}
-    dev: true
-
   /lodash/4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
     dev: true
@@ -2152,12 +2146,6 @@ packages:
       extsprintf: 1.4.1
     dev: true
     optional: true
-
-  /vite-plugin-electron-renderer/0.10.3:
-    resolution: {integrity: sha512-Q+mIxEA16YYUv1XdOjx12zf2rDp+Ki/VcpG3D8p7mSaTXyP06032xLY3FUC+3P/665ZKWwJn9DHJXIOrLE8Wmg==}
-    dependencies:
-      lib-esm: 0.3.0
-    dev: true
 
   /vite/3.2.3:
     resolution: {integrity: sha512-h8jl1TZ76eGs3o2dIBSsvXDLb1m/Ec1iej8ZMdz+PsaFUsftZeWe2CZOI3qogEsMNaywc17gu0q6cQDzh/weCQ==}
