@@ -67,14 +67,15 @@ export interface Configuration {
   entry?: import('vite').LibraryOptions['entry']
   vite?: import('vite').InlineConfig
   /**
-   * Triggered when Vite is built every time.
+   * Triggered when Vite is built every time -- `vite serve` command only.
    * 
    * If this `onstart` is passed, Electron App will not start automatically.  
    * However, you can start Electroo App via `startup` function.  
    */
   onstart?: (this: import('rollup').PluginContext, options: {
     /**
-     * Electron App startup function
+     * Electron App startup function.  
+     * It will mount the Electron App child-process to `process.electronApp`.  
      * @param argv default value `['.', '--no-sandbox']`
      */
     startup: (argv?: string[]) => Promise<void>
@@ -87,7 +88,7 @@ export interface Configuration {
 
 ## How to work
 
-The plugin is just the encapsulation of the built-in scripts of [electron-vite-boilerplate/scripts](https://github.com/electron-vite/electron-vite-boilerplate/tree/main/scripts)
+It just executes the `electron .` command in the Vite build completion hook and then starts or restarts the Electron App.
 
 ## Recommend structure
 
@@ -108,17 +109,26 @@ Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree
 + └── vite.config.ts
 ```
 
-- *🚨 By default, the files in `electron` folder will be built into the `dist/electron`*
-- *🚨 Currently, `"type": "module"` is not supported in Electron*
+## Be aware
 
-## Put Node.js packages in dependencies
+- 🚨 By default, the files in `electron` folder will be built into the `dist-electron`
+- 🚨 Currently, `"type": "module"` is not supported in Electron
+- 🚨 In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages. So, put your Node.js package in `dependencies`. Unless you know how to properly build them with Vite.
+  ```js
+  electron({
+    entry: 'electron/main.ts',
+    vite: {
+      build: {
+        rollupOptions: {
+          // Here are some C/C++ plugins that can't be built properly.
+          external: [
+            'serialport',
+            'sqlite3',
+          ],
+        },
+      },
+    },
+  }),
+  ```
 
-<!-- ##### Electron-Main -->
-
-In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages. So, put your Node.js package in `dependencies`. Unless you know how to properly build them with Vite.
-
-By default, `vite-plugin-electron` treats packages in `dependencies` as `external` modules.
-
-<!-- ##### Electron-Renderer
-
-You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
+<!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
