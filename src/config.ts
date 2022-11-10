@@ -1,20 +1,22 @@
-import path from 'node:path'
 import type { AddressInfo } from 'node:net'
+import { builtinModules } from 'node:module'
 import {
   type InlineConfig,
-  type ResolvedConfig,
   type ViteDevServer,
   mergeConfig,
 } from 'vite'
-import { resolveModules } from 'vite-plugin-electron-renderer/plugins/use-node.js'
 import type { Configuration } from '.'
 
-export function resolveBuildConfig(option: Configuration, resolved: ResolvedConfig): InlineConfig {
+export function defineConfig(config: Configuration) {
+  return config
+}
+
+/** Resolve the default Vite's `InlineConfig` */
+export function resolveViteConfig(option: Configuration): InlineConfig {
   const defaultConfig: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
     configFile: false,
     publicDir: false,
-    mode: resolved.mode,
 
     build: {
       // @ts-ignore
@@ -25,55 +27,46 @@ export function resolveBuildConfig(option: Configuration, resolved: ResolvedConf
         fileName: () => '[name].js',
       },
       resolve: {
-        // Since we're building for electron (which uses nodejs), we don't want to use the "browser" field in the packages.
+        // Since we're building for electron (which uses nodDejs), we don't want to use the "browser" field in the packages.
         // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.
         browserField: false,
         mainFields: ['module', 'jsnext:main', 'jsnext'],
       },
       emptyOutDir: false,
-      // dist-electron
-      outDir: path.join(`${resolved.root}/dist-electron`),
-      minify: resolved.command === 'build', // 🤔 process.env./* from mode option */NODE_ENV === 'production',
+      outDir: 'dist-electron',
     },
   }
 
-  return mergeConfig(defaultConfig, option?.vite || {}) as InlineConfig
+  return mergeConfig(defaultConfig, option?.vite || {})
 }
 
-/**
- * `dependencies` of package.json will be inserted into `build.rollupOptions.external`
- */
-export function createWithExternal(root: string) {
-  const { builtins, CJS_deps } = resolveModules(root)
-  const modules = builtins.concat(CJS_deps)
+export function withExternalBuiltins(config: InlineConfig) {
+  const builtins = builtinModules.filter(e => !e.startsWith('_')); builtins.push('electron', ...builtins.map(m => `node:${m}`))
 
-  return function withExternal(ILCG: InlineConfig) {
+  config.build ??= {}
+  config.build.rollupOptions ??= {}
 
-    if (!ILCG.build) ILCG.build = {}
-    if (!ILCG.build.rollupOptions) ILCG.build.rollupOptions = {}
-
-    let external = ILCG.build.rollupOptions.external
-    if (
-      Array.isArray(external) ||
-      typeof external === 'string' ||
-      external instanceof RegExp
-    ) {
-      external = modules.concat(external as string[])
-    } else if (typeof external === 'function') {
-      const original = external
-      external = function (source, importer, isResolved) {
-        if (modules.includes(source)) {
-          return true
-        }
-        return original(source, importer, isResolved)
+  let external = config.build.rollupOptions.external
+  if (
+    Array.isArray(external) ||
+    typeof external === 'string' ||
+    external instanceof RegExp
+  ) {
+    external = builtins.concat(external as string[])
+  } else if (typeof external === 'function') {
+    const original = external
+    external = function (source, importer, isResolved) {
+      if (builtins.includes(source)) {
+        return true
       }
-    } else {
-      external = modules
+      return original(source, importer, isResolved)
     }
-    ILCG.build.rollupOptions.external = external
-
-    return ILCG
+  } else {
+    external = builtins
   }
+  config.build.rollupOptions.external = external
+
+  return config
 }
 
 /**

@@ -1,12 +1,10 @@
-import type { Plugin, ResolvedConfig } from 'vite'
-import { bootstrap, startup } from './serve'
+import type { Plugin } from 'vite'
+import { bootstrap } from './serve'
 import { build } from './build'
 
-export { startup }
-
-export function defineConfig(config: Configuration) {
-  return config
-}
+// public
+export { defineConfig, resolveViteConfig, withExternalBuiltins } from './config'
+export { build }
 
 export interface Configuration {
   /**
@@ -15,14 +13,15 @@ export interface Configuration {
   entry?: import('vite').LibraryOptions['entry']
   vite?: import('vite').InlineConfig
   /**
-   * Triggered when Vite is built every time.
+   * Triggered when Vite is built every time -- `vite serve` command only.
    * 
    * If this `onstart` is passed, Electron App will not start automatically.  
    * However, you can start Electroo App via `startup` function.  
    */
   onstart?: (this: import('rollup').PluginContext, options: {
     /**
-     * Electron App startup function
+     * Electron App startup function.  
+     * It will mount the Electron App child-process to `process.electronApp`.  
      * @param argv default value `['.', '--no-sandbox']`
      */
     startup: (argv?: string[]) => Promise<void>
@@ -44,7 +43,6 @@ export default function electron(config: Configuration | Configuration[]): Plugi
       config.build.emptyOutDir ??= false
     },
   }
-  const configArray = ([].concat(config as any) as Configuration[])
 
   return [
     {
@@ -52,27 +50,40 @@ export default function electron(config: Configuration | Configuration[]): Plugi
       apply: 'serve',
       ...configBuild,
       configureServer(server) {
-        server.httpServer!.on('listening', () => {
-          bootstrap(configArray, server)
+        server.httpServer?.on('listening', () => {
+          bootstrap(config, server)
         })
       },
     },
-    ((): Plugin => {
-      let viteConfig: ResolvedConfig
-
-      return {
-        name: `${name}:build`,
-        apply: 'build',
-        ...configBuild,
-        configResolved(config) {
-          viteConfig = config
-        },
-        async closeBundle() {
-          for (const _config of configArray) {
-            await build(_config, viteConfig)
-          }
-        }
+    {
+      name: `${name}:build`,
+      apply: 'build',
+      ...configBuild,
+      async closeBundle() {
+        await build(config)
       }
-    })(),
+    },
   ]
+}
+
+/**
+ * Electron App startup function.  
+ * It will mount the Electron App child-process to `process.electronApp`.  
+ * @param argv default value `['.', '--no-sandbox']`
+ */
+export async function startup(argv = ['.', '--no-sandbox']) {
+  const { spawn } = await import('child_process')
+  // @ts-ignore
+  const electron = await import('electron')
+  const electronPath = electron.default ?? electron
+
+  if (process.electronApp) {
+    process.electronApp.removeAllListeners()
+    process.electronApp.kill()
+  }
+
+  // Start Electron.app
+  process.electronApp = spawn(electronPath, argv, { stdio: 'inherit' })
+  // Exit command after Electron.app exits
+  process.electronApp.once('exit', process.exit)
 }

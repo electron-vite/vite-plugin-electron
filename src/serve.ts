@@ -4,42 +4,26 @@ import {
   build as viteBuild,
   mergeConfig,
 } from 'vite'
-import type { Configuration } from '.'
 import {
-  createWithExternal,
-  resolveBuildConfig,
+  type Configuration,
+  startup,
+} from '.'
+import {
   resolveServerUrl,
+  resolveViteConfig,
+  withExternalBuiltins,
 } from './config'
 
-/**
- * Electron App startup function
- * @param argv default value `['.', '--no-sandbox']`
- */
-export async function startup(argv = ['.', '--no-sandbox']) {
-  const { spawn } = await import('child_process')
-  // @ts-ignore
-  const electronPath = (await import('electron')).default as string
-
-  if (process.electronApp) {
-    process.electronApp.removeAllListeners()
-    process.electronApp.kill()
-  }
-
-  // Start Electron.app
-  process.electronApp = spawn(electronPath, argv, { stdio: 'inherit' })
-  // Exit command after Electron.app exits
-  process.electronApp.once('exit', process.exit)
-}
-
-export async function bootstrap(configArray: Configuration[], server: ViteDevServer) {
+/** Work on the `vite serve` command */
+export async function bootstrap(config: Configuration | Configuration[], server: ViteDevServer) {
   Object.assign(process.env, {
     VITE_DEV_SERVER_URL: resolveServerUrl(server)
   })
-  const { config: resolved } = server
+
+  const configArray = Array.isArray(config) ? config : [config]
 
   for (const config of configArray) {
-    const withExternal = createWithExternal(resolved.root)
-    const inlineConfig = withExternal(resolveBuildConfig(config, resolved))
+    const inlineConfig = withExternalBuiltins(resolveViteConfig(config))
     await viteBuild(mergeConfig(
       {
         build: {
