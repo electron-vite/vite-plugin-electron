@@ -1,3 +1,10 @@
+## 0.10.3 (2022-11-10)
+
+- 0b24909 refactor: cleanup, provides some programmable APIs 🌱
+- 58517d8 (github/v0.10.3, main) refactor(proj-struct): remove `vite-plugin-electron-renderer`
+- d2b3c29 Merge pull request #98 from skyrpex/patch-1
+- 1645be2 fix: ignore the browser field when bundling
+
 ## 0.10.2 (2022-10-24)
 
 1. Remove Vite `3.2.0` | #90
