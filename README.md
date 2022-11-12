@@ -81,8 +81,7 @@ export interface Configuration {
     startup: (argv?: string[]) => Promise<void>
     /** Reload Electron-Renderer */
     reload: () => void
-  },
-  ) => void
+  }) => void
 }
 ```
 
