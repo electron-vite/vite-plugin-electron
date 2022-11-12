@@ -2,6 +2,9 @@
 
 [English](https://github.com/electron-vite/vite-plugin-electron/tree/main#readme) | 简体中文
 
+- 感谢 @ggdream 老师提供 `vite-plugin-electron` 的 npm 包名 ❤️
+- 如果这个项目有帮到了你，作者很希望你能请客来一份下午茶 ٩(๑>◡<๑)۶
+
 ## 需要留神
 
 - 🚨 默认情况下, `electron` 文件夹下的文件将会被构建到 `dist-electron`
@@ -23,3 +26,7 @@
     },
   }),
   ```
+
+## 🍵 🍰 🍣 🍟
+
+<img width="270" src="https://github.com/caoxiemeihao/blog/blob/main/assets/$qrcode/$.png?raw=true">
