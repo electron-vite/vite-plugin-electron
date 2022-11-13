@@ -1,3 +1,9 @@
+## 0.10.4 (2022-11-13)
+
+- e4f943f refactor: move `build.resolve` to `resolve`
+- 91fb525 docs(zh-CN): update | @ggdream
+- 41db615 Use mode from source config. | #105, #106
+
 ## 0.10.3 (2022-11-10)
 
 - 0b24909 refactor: cleanup, provides some programmable APIs 🌱
