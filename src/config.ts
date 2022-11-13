@@ -26,14 +26,14 @@ export function resolveViteConfig(option: Configuration): InlineConfig {
         formats: ['cjs'],
         fileName: () => '[name].js',
       },
-      resolve: {
-        // Since we're building for electron (which uses nodDejs), we don't want to use the "browser" field in the packages.
-        // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.
-        browserField: false,
-        mainFields: ['module', 'jsnext:main', 'jsnext'],
-      },
       emptyOutDir: false,
       outDir: 'dist-electron',
+    },
+    resolve: {
+      // #98
+      // Since we're building for electron (which uses Node.js), we don't want to use the "browser" field in the packages.
+      // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.
+      mainFields: ['module', 'jsnext:main', 'jsnext'],
     },
   }
 

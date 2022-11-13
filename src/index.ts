@@ -27,8 +27,7 @@ export interface Configuration {
     startup: (argv?: string[]) => Promise<void>
     /** Reload Electron-Renderer */
     reload: () => void
-  },
-  ) => void
+  }) => void
 }
 
 export default function electron(config: Configuration | Configuration[]): Plugin[] {
