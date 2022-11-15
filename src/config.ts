@@ -26,7 +26,6 @@ export function resolveViteConfig(option: Configuration): InlineConfig {
         formats: ['cjs'],
         fileName: () => '[name].js',
       },
-      emptyOutDir: false,
       outDir: 'dist-electron',
     },
     resolve: {
