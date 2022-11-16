@@ -27,6 +27,8 @@ export function resolveViteConfig(option: Configuration): InlineConfig {
         fileName: () => '[name].js',
       },
       outDir: 'dist-electron',
+      // Avoid multiple entries affecting each other
+      emptyOutDir: false,
     },
     resolve: {
       // #98
