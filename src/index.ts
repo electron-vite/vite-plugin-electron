@@ -36,7 +36,7 @@ export default function electron(config: Configuration | Configuration[]): Plugi
       name: 'vite-plugin-electron',
       apply: 'serve',
       configureServer(server) {
-        server.httpServer?.on('listening', () => {
+        server.httpServer?.once('listening', () => {
           bootstrap(config, server)
         })
       },
