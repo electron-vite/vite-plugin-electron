@@ -13,10 +13,12 @@
 
 ## 0.10.2 (2022-10-24)
 
+By default, the `dist` folder will be automatically removed by Vite. We build Electron related files into `dist-electron` to prevent it from being removed by mistake
+
 1. Remove Vite `3.2.0` | #90
 2. ad9bb3c refactor(electron-renderer)!: remove `options.resolve()`, use 'lib-esm' for resolve Node.js modules and `electron` | vite-plugin-electron-renderer
 3. b500039 feat(electron-renderer): support `optimizeDeps` for Electron-Renderer 🚀
-4. f28e66b faet(outDir)!: `dist/electron` -> `dist/electron` | vite-plugin-electron
+4. f28e66b faet(outDir)!: `dist/electron` -> `dist-electron` | vite-plugin-electron
 
 ## 0.10.1 (2022-10-12)
 
