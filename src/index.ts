@@ -1,6 +1,6 @@
 import type { Plugin } from 'vite'
-import { bootstrap } from './serve'
 import { build } from './build'
+import { bootstrap } from './serve'
 
 // public
 export { defineConfig, resolveViteConfig, withExternalBuiltins } from './config'
@@ -31,23 +31,10 @@ export interface Configuration {
 }
 
 export default function electron(config: Configuration | Configuration[]): Plugin[] {
-  const name = 'vite-plugin-electron'
-  const configBuild: Partial<Plugin> = {
-    config(config) {
-      // make sure that Electron can be loaded into the local file using `loadFile` after packaging
-      config.base ??= './'
-
-      config.build ??= {}
-      // prevent accidental clearing of `dist/electron/main`, `dist/electron/preload`
-      config.build.emptyOutDir ??= false
-    },
-  }
-
   return [
     {
-      name: `${name}:serve`,
+      name: 'vite-plugin-electron',
       apply: 'serve',
-      ...configBuild,
       configureServer(server) {
         server.httpServer?.on('listening', () => {
           bootstrap(config, server)
@@ -55,9 +42,12 @@ export default function electron(config: Configuration | Configuration[]): Plugi
       },
     },
     {
-      name: `${name}:build`,
+      name: 'vite-plugin-electron',
       apply: 'build',
-      ...configBuild,
+      config(config) {
+        // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
+        config.base ??= './'
+      },
       async closeBundle() {
         await build(config)
       }

@@ -11,7 +11,7 @@ export function defineConfig(config: Configuration) {
   return config
 }
 
-/** Resolve the default Vite's `InlineConfig` */
+/** Resolve the default Vite's `InlineConfig` for build Electron-Main */
 export function resolveViteConfig(option: Configuration): InlineConfig {
   const defaultConfig: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
