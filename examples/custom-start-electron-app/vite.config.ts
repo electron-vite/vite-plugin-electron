@@ -6,7 +6,7 @@ export default defineConfig({
     electron({
       entry: 'electron/main.ts',
       onstart: options => {
-        /** Start Electron App */
+        // Start Electron App
         options.startup(['.', '--no-sandbox'])
       },
     }),
