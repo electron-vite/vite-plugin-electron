@@ -1,6 +1,6 @@
 # vite-plugin-electron
 
-Integrate Vite and Electron
+Electron 🔗 Vite
 
 [![NPM version](https://img.shields.io/npm/v/vite-plugin-electron.svg)](https://npmjs.org/package/vite-plugin-electron)
 [![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron.svg)](https://npmjs.org/package/vite-plugin-electron)

@@ -1,7 +1,7 @@
 {
   "name": "vite-plugin-electron",
   "version": "0.10.4",
-  "description": "Integrate Vite and Electron",
+  "description": "Electron 🔗 Vite",
   "main": "index.mjs",
   "types": "types",
   "exports": {
