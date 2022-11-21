@@ -64,7 +64,7 @@ export async function startup(argv = ['.', '--no-sandbox']) {
   const { spawn } = await import('child_process')
   // @ts-ignore
   const electron = await import('electron')
-  const electronPath = electron.default ?? electron
+  const electronPath = <any>(electron.default ?? electron)
 
   if (process.electronApp) {
     process.electronApp.removeAllListeners()
