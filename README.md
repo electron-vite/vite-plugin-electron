@@ -4,11 +4,14 @@ Integrate Vite and Electron
 
 [![NPM version](https://img.shields.io/npm/v/vite-plugin-electron.svg)](https://npmjs.org/package/vite-plugin-electron)
 [![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron.svg)](https://npmjs.org/package/vite-plugin-electron)
+[![GitHub Discord](https://img.shields.io/badge/chat-discord-blue?logo=discord)](https://discord.gg/YfjFuEgVUR)
 
 English | [简体中文](https://github.com/electron-vite/vite-plugin-electron/blob/main/README.zh-CN.md)
 
+- 🚀 Fully compatible with Vite and Vite's ecosystem <sub><sup>(Based on Vite)</sup></sub>
+- 🎭 Flexible configuration
 - 🐣 Few APIs, easy to use
-- 🚀 Fully compatible with Vite and Vite's ecosystem
+- 🔥 Hot restart
 
 ![vite-plugin-electron.gif](https://github.com/caoxiemeihao/blog/blob/main/vite/vite-plugin-electron.gif?raw=true)
 
