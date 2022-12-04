@@ -23,8 +23,8 @@ npm i vite-plugin-electron -D
 
 ## Examples
 
-- [quick-start](https://github.com/caoxiemeihao/vite-plugin-electron/tree/main/examples/quick-start)
-- [custom-start-electron-app](https://github.com/caoxiemeihao/vite-plugin-electron/tree/main/examples/custom-start-electron-app)
+- [quick-start](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/quick-start)
+- [custom-start-electron-app](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/custom-start-electron-app)
 
 ## Usage
 
