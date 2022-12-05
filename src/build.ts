@@ -1,6 +1,9 @@
 import { build as viteBuild } from 'vite'
-import { resolveViteConfig, withExternalBuiltins } from './config'
-import type { Configuration } from '.'
+import {
+  type Configuration,
+  resolveViteConfig,
+  withExternalBuiltins,
+} from './config'
 
 /** Work on the `vite build` command */
 export async function build(config: Configuration | Configuration[]) {

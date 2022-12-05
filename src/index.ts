@@ -1,34 +1,11 @@
 import type { Plugin } from 'vite'
 import { build } from './build'
 import { bootstrap } from './serve'
+import type { Configuration } from './config'
 
 // public
-export { defineConfig, resolveViteConfig, withExternalBuiltins } from './config'
+export { type Configuration, defineConfig, resolveViteConfig, withExternalBuiltins } from './config'
 export { build }
-
-export interface Configuration {
-  /**
-   * Shortcut of `build.lib.entry`
-   */
-  entry?: import('vite').LibraryOptions['entry']
-  vite?: import('vite').InlineConfig
-  /**
-   * Triggered when Vite is built every time -- `vite serve` command only.
-   * 
-   * If this `onstart` is passed, Electron App will not start automatically.  
-   * However, you can start Electroo App via `startup` function.  
-   */
-  onstart?: (this: import('rollup').PluginContext, options: {
-    /**
-     * Electron App startup function.  
-     * It will mount the Electron App child-process to `process.electronApp`.  
-     * @param argv default value `['.', '--no-sandbox']`
-     */
-    startup: (argv?: string[]) => Promise<void>
-    /** Reload Electron-Renderer */
-    reload: () => void
-  }) => void
-}
 
 export default function electron(config: Configuration | Configuration[]): Plugin[] {
   return [

@@ -4,11 +4,9 @@ import {
   build as viteBuild,
   mergeConfig,
 } from 'vite'
+import { startup } from '.'
 import {
   type Configuration,
-  startup,
-} from '.'
-import {
   resolveServerUrl,
   resolveViteConfig,
   withExternalBuiltins,
