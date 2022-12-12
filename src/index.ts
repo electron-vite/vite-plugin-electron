@@ -16,6 +16,12 @@ export default function electron(config: Configuration | Configuration[]): Plugi
         server.httpServer?.once('listening', () => {
           bootstrap(config, server)
         })
+        server.httpServer?.once('close', () => {
+          if (process.electronApp) {
+            process.electronApp.removeAllListeners()
+            process.electronApp.kill()
+          }
+        })
       },
     },
     {
