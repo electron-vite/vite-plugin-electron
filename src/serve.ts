@@ -30,9 +30,9 @@ export async function bootstrap(config: Configuration | Configuration[], server:
         },
         plugins: [{
           name: ':startup',
-          closeBundle() {
+          async closeBundle() {
             if (config.onstart) {
-              config.onstart.call(this, {
+              await config.onstart.call(this, {
                 startup,
                 reload() {
                   server.ws.send({ type: 'full-reload' })
