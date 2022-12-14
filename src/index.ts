@@ -4,17 +4,26 @@ import { bootstrap } from './serve'
 import type { Configuration } from './config'
 
 // public
-export { type Configuration, defineConfig, resolveViteConfig, withExternalBuiltins } from './config'
+export {
+  type Configuration,
+  defineConfig,
+  resolveViteConfig,
+  withExternalBuiltins,
+} from './config'
 export { build }
 
 export default function electron(config: Configuration | Configuration[]): Plugin[] {
+  const configArray = Array.isArray(config) ? config : [config]
+
   return [
     {
       name: 'vite-plugin-electron',
       apply: 'serve',
       configureServer(server) {
         server.httpServer?.once('listening', () => {
-          bootstrap(config, server)
+          for (const config of configArray) {
+            bootstrap(config, server)
+          }
         })
       },
     },
@@ -26,7 +35,9 @@ export default function electron(config: Configuration | Configuration[]): Plugi
         config.base ??= './'
       },
       async closeBundle() {
-        await build(config)
+        for (const config of configArray) {
+          await build(config)
+        }
       }
     },
   ]
