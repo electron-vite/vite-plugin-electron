@@ -14,6 +14,7 @@ export { build }
 
 export default function electron(config: Configuration | Configuration[]): Plugin[] {
   const configArray = Array.isArray(config) ? config : [config]
+  let mode: string
 
   return [
     {
@@ -30,12 +31,15 @@ export default function electron(config: Configuration | Configuration[]): Plugi
     {
       name: 'vite-plugin-electron',
       apply: 'build',
-      config(config) {
+      config(config, env) {
         // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
         config.base ??= './'
+        mode = env.mode
       },
       async closeBundle() {
         for (const config of configArray) {
+          config.vite ??= {}
+          config.vite.mode ??= mode
           await build(config)
         }
       }
