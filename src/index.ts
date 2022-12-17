@@ -14,6 +14,7 @@ export { build }
 
 export default function electron(config: Configuration | Configuration[]): Plugin[] {
   const configArray = Array.isArray(config) ? config : [config]
+  let mode: string
 
   return [
     {
@@ -25,23 +26,20 @@ export default function electron(config: Configuration | Configuration[]): Plugi
             bootstrap(config, server)
           }
         })
-        server.httpServer?.once('close', () => {
-          if (process.electronApp) {
-            process.electronApp.removeAllListeners()
-            process.electronApp.kill()
-          }
-        })
       },
     },
     {
       name: 'vite-plugin-electron',
       apply: 'build',
-      config(config) {
+      config(config, env) {
         // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
         config.base ??= './'
+        mode = env.mode
       },
       async closeBundle() {
         for (const config of configArray) {
+          config.vite ??= {}
+          config.vite.mode ??= mode
           await build(config)
         }
       }
@@ -60,13 +58,21 @@ export async function startup(argv = ['.', '--no-sandbox']) {
   const electron = await import('electron')
   const electronPath = <any>(electron.default ?? electron)
 
-  if (process.electronApp) {
-    process.electronApp.removeAllListeners()
-    process.electronApp.kill()
-  }
-
+  startup.exit()
   // Start Electron.app
   process.electronApp = spawn(electronPath, argv, { stdio: 'inherit' })
   // Exit command after Electron.app exits
   process.electronApp.once('exit', process.exit)
+
+  if (!startup.hookProcessExit) {
+    startup.hookProcessExit = true
+    process.once('exit', startup.exit)
+  }
+}
+startup.hookProcessExit = false
+startup.exit = () => {
+  if (process.electronApp) {
+    process.electronApp.removeAllListeners()
+    process.electronApp.kill()
+  }
 }

@@ -25,6 +25,7 @@ npm i vite-plugin-electron -D
 
 - [quick-start](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/quick-start)
 - [custom-start-electron-app](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/custom-start-electron-app)
+- [bytecode](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/bytecode)
 
 ## Usage
 
@@ -86,6 +87,39 @@ export interface Configuration {
     reload: () => void
   }) => void | Promise<void>
 }
+```
+
+## JavaScript API
+
+`vite-plugin-electron`'s JavaScript APIs are fully typed, and it's recommended to use TypeScript or enable JS type checking in VS Code to leverage the intellisense and validation.
+
+- `Configuration` - type
+- `defineConfig` - function
+- `resolveViteConfig` - function, Resolve the default Vite's `InlineConfig` for build Electron-Main
+- `withExternalBuiltins` - function
+- `build` - function
+
+**Example**
+
+```js
+build(
+  withExternalBuiltins( // external Node.js builtin modules
+    resolveViteConfig( // with default config
+      {
+        entry: 'foo.ts',
+        vite: {
+          mode: 'foo-mode', // for .env file
+          plugins: [{
+            name: 'plugin-build-done',
+            closeBundle() {
+              // Do something...
+            },
+          }],
+        },
+      }
+    )
+  )
+)
 ```
 
 ## How to work
