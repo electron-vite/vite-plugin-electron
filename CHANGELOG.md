@@ -1,3 +1,65 @@
+## 0.11.0 (2022-12-17)
+
+#### Break!
+
+```ts
+// 0.10.0
+function build(config: Configuration | Configuration[]): Promise<void>
+
+// 0.11.0 - Same as Vite's build
+function build(config: Configuration): Promise<RollupOutput | RollupOutput[] | RollupWatcher>
+```
+
+#### Features
+
+**JavaScript API**
+
+`vite-plugin-electron`'s JavaScript APIs are fully typed, and it's recommended to use TypeScript or enable JS type checking in VS Code to leverage the intellisense and validation.
+
+- `Configuration` - type
+- `defineConfig` - function
+- `resolveViteConfig` - function, Resolve the default Vite's `InlineConfig` for build Electron-Main
+- `withExternalBuiltins` - function
+- `build` - function
+
+Example:
+
+```js
+build(
+  withExternalBuiltins( // external Node.js builtin modules
+    resolveViteConfig( // with default config
+      {
+        entry: 'foo.ts',
+        vite: {
+          mode: 'foo-mode', // for .env file
+          plugins: [{
+            name: 'plugin-build-done',
+            closeBundle() {
+              // Do something...
+            },
+          }],
+        },
+      }
+    )
+  )
+)
+```
+
+**V8 Bytecode support** 👉 [bytecode](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/bytecode)
+
+Inspired by:
+
+- [Nihiue/little-byte-demo](https://github.com/Nihiue/little-byte-demo)
+- [通过字节码保护Node.js源码之原理篇 - 知乎](https://zhuanlan.zhihu.com/p/359235114)
+
+#### Commit/PR
+
+- Support Vite4.x | #118, 28d38b6
+- Bytecode example | df170c2
+- JavaScript API docs | 3049169
+- Fix load `.env` | 758695d
+- Refactor `build()` | d9c3343
+
 ## 0.10.4 (2022-11-13)
 
 - e4f943f refactor: move `build.resolve` to `resolve`
