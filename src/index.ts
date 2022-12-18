@@ -73,6 +73,6 @@ startup.hookProcessExit = false
 startup.exit = () => {
   if (process.electronApp) {
     process.electronApp.removeAllListeners()
-    process.electronApp.kill()
+    import('tree-kill').then(kill => kill(process.electronApp.pid))
   }
 }

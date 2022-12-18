@@ -21,11 +21,14 @@
     "build": "tsc --emitDeclarationOnly && vite build",
     "prepublishOnly": "npm run build"
   },
-  "dependencies": {},
+  "dependencies": {
+    "tree-kill": "^1.2.2",
+    "vite-plugin-electron": "link:"
+  },
   "devDependencies": {
+    "rollup": "^3.7.3",
     "typescript": "^4.7.4",
-    "vite": "^4.0.0",
-    "rollup": "^3.7.3"
+    "vite": "^4.0.0"
   },
   "files": [
     "types",

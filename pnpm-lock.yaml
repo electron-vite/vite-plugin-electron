@@ -5,8 +5,13 @@ importers:
   .:
     specifiers:
       rollup: ^3.7.3
+      tree-kill: ^1.2.2
       typescript: ^4.7.4
       vite: ^4.0.0
+      vite-plugin-electron: 'link:'
+    dependencies:
+      tree-kill: 1.2.2
+      vite-plugin-electron: 'link:'
     devDependencies:
       rollup: 3.7.3
       typescript: 4.7.4
@@ -2047,6 +2052,11 @@ packages:
     resolution: {integrity: sha512-Iq25XBt6zD5npPhlLVXGFN3/gyR2/qODcKNNyTMd4vbm39HUaOiAM4PMq0eMVC/Tkxz+Zjdsc55g9yyz+Yq00Q==}
     engines: {node: '>=6'}
     dev: true
+
+  /tree-kill/1.2.2:
+    resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
+    hasBin: true
+    dev: false
 
   /truncate-utf8-bytes/1.0.2:
     resolution: {integrity: sha512-95Pu1QXQvruGEhv62XCMO3Mm90GscOCClvrIUwCM0PYOXK3kaF3l3sIHxx71ThJfcbM2O5Au6SO3AWCSEfW4mQ==}
