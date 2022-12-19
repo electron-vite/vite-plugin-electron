@@ -1,3 +1,8 @@
+## 0.11.1 (2022-12-19)
+
+- 2bf7d0b docs: `startup()`
+- 401a44e refactor: cleanup
+
 ## 0.11.0 (2022-12-17)
 
 #### Break!
@@ -21,6 +26,7 @@ function build(config: Configuration): Promise<RollupOutput | RollupOutput[] | R
 - `resolveViteConfig` - function, Resolve the default Vite's `InlineConfig` for build Electron-Main
 - `withExternalBuiltins` - function
 - `build` - function
+- `startup` - function
 
 Example:
 
@@ -35,7 +41,8 @@ build(
           plugins: [{
             name: 'plugin-build-done',
             closeBundle() {
-              // Do something...
+              // Startup Electron App
+              startup()
             },
           }],
         },

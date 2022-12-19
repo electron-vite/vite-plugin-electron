@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-electron",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "Electron 🔗 Vite",
   "main": "index.mjs",
   "types": "types",
@@ -18,7 +18,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite build --watch",
-    "build": "tsc --emitDeclarationOnly && vite build",
+    "build": "rm -rf types && tsc --emitDeclarationOnly && vite build",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {},
