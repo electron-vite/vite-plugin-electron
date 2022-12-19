@@ -98,6 +98,7 @@ export interface Configuration {
 - `resolveViteConfig` - function, Resolve the default Vite's `InlineConfig` for build Electron-Main
 - `withExternalBuiltins` - function
 - `build` - function
+- `startup` - function
 
 **Example**
 
@@ -112,7 +113,8 @@ build(
           plugins: [{
             name: 'plugin-build-done',
             closeBundle() {
-              // Do something...
+              // Startup Electron App
+              startup()
             },
           }],
         },
