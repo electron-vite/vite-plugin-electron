@@ -1,3 +1,8 @@
+## 0.11.1 (2022-12-19)
+
+- 2bf7d0b docs: `startup()`
+- 401a44e refactor: cleanup
+
 ## 0.11.0 (2022-12-17)
 
 #### Break!
