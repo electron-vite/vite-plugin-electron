@@ -22,8 +22,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "tree-kill": "^1.2.2",
-    "vite-plugin-electron": "link:"
+    "tree-kill": "^1.2.2"
   },
   "devDependencies": {
     "rollup": "^3.7.3",
