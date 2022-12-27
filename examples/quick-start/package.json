@@ -16,10 +16,10 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "electron": "^21.0.1",
-    "electron-builder": "^23.1.0",
-    "typescript": "^4.7.4",
+    "electron": "^22.0.0",
+    "electron-builder": "^23.6.0",
+    "typescript": "^4.9.4",
     "vite-plugin-electron": "workspace:*",
-    "vite": "^4.0.0"
+    "vite": "^4.0.3"
   }
 }
