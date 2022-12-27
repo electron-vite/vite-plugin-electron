@@ -19,12 +19,14 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "rm -rf types && tsc --emitDeclarationOnly && vite build",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run test && npm run build",
+    "test": "vitest run"
   },
   "dependencies": {},
   "devDependencies": {
     "typescript": "^4.9.4",
     "vite": "^4.0.3",
+    "vitest": "^0.26.2",
     "rollup": "^3.8.1"
   },
   "files": [
