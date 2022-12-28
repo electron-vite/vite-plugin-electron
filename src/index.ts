@@ -85,7 +85,7 @@ export default function electron(config: Configuration | Configuration[]): Plugi
  * @param argv default value `['.', '--no-sandbox']`
  */
 export async function startup(argv = ['.', '--no-sandbox']) {
-  const { spawn } = await import('child_process')
+  const { spawn } = await import('node:child_process')
   // @ts-ignore
   const electron = await import('electron')
   const electronPath = <any>(electron.default ?? electron)

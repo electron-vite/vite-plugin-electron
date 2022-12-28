@@ -4,12 +4,14 @@ importers:
 
   .:
     specifiers:
-      rollup: ^3.8.1
+      rimraf: ^3.0.2
+      rollup: ^3.9.0
       typescript: ^4.9.4
       vite: ^4.0.3
       vitest: ^0.26.2
     devDependencies:
-      rollup: 3.8.1
+      rimraf: 3.0.2
+      rollup: 3.9.0
       typescript: 4.9.4
       vite: 4.0.3
       vitest: 0.26.2
@@ -483,10 +485,10 @@ packages:
     resolution: {integrity: sha512-dQYDuqm/rmy8GSCE6Xl/3ShJg6Ab4bZJMT8KaTKGzT436gl1DN4REP3FCWfXoh75qGTJ+u+WsdnnpO9Jl8nyMA==}
     engines: {node: '>=14.0.0'}
     dependencies:
+      7zip-bin: 5.1.1
       '@develar/schema-utils': 2.6.5
       '@electron/universal': 1.2.1
       '@malept/flatpak-bundler': 0.4.0
-      7zip-bin: 5.1.1
       async-exit-hook: 2.0.1
       bluebird-lst: 1.0.9
       builder-util: 23.6.0
@@ -650,9 +652,9 @@ packages:
   /builder-util/23.6.0:
     resolution: {integrity: sha512-QiQHweYsh8o+U/KNCZFSvISRnvRctb8m/2rB2I1JdByzvNKxPeFLlHFRPQRXab6aYeXc18j9LpsDLJ3sGQmWTQ==}
     dependencies:
+      7zip-bin: 5.1.1
       '@types/debug': 4.1.7
       '@types/fs-extra': 9.0.13
-      7zip-bin: 5.1.1
       app-builder-bin: 4.0.0
       bluebird-lst: 1.0.9
       builder-util-runtime: 9.1.1
@@ -791,7 +793,7 @@ packages:
     dev: true
 
   /concat-map/0.0.1:
-    resolution: {integrity: sha1-2Klr13/Wjfd5OnMDajug1UBdR3s=}
+    resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
     dev: true
 
   /core-util-is/1.0.2:
@@ -1734,8 +1736,8 @@ packages:
     dev: true
     optional: true
 
-  /rollup/3.8.1:
-    resolution: {integrity: sha512-4yh9eMW7byOroYcN8DlF9P/2jCpu6txVIHjEqquQVSx7DI0RgyCCN3tjrcy4ra6yVtV336aLBB3v2AarYAxePQ==}
+  /rollup/3.9.0:
+    resolution: {integrity: sha512-nGGylpmblyjTpF4lEUPgmOw6OVxRvnI6Iuuh6Lz4O/X66cVOX1XJSsqP1YamxQ+mPuFE7qJxLFDSCk8rNv5dDw==}
     engines: {node: '>=14.18.0', npm: '>=8.0.0'}
     hasBin: true
     optionalDependencies:
@@ -2044,7 +2046,7 @@ packages:
       esbuild: 0.16.4
       postcss: 8.4.20
       resolve: 1.22.1
-      rollup: 3.8.1
+      rollup: 3.9.0
     optionalDependencies:
       fsevents: 2.3.2
     dev: true
@@ -2078,7 +2080,7 @@ packages:
       esbuild: 0.16.4
       postcss: 8.4.20
       resolve: 1.22.1
-      rollup: 3.8.1
+      rollup: 3.9.0
     optionalDependencies:
       fsevents: 2.3.2
     dev: true
