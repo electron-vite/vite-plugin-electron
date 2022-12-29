@@ -18,12 +18,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite build --watch",
-    "build": "rimraf types && tsc --emitDeclarationOnly && vite build",
+    "build": "rm -rf types && tsc --emitDeclarationOnly && vite build",
     "prepublishOnly": "npm run test && npm run build",
     "test": "vitest run"
   },
   "devDependencies": {
-    "rimraf": "^3.0.2",
     "rollup": "^3.9.0",
     "typescript": "^4.9.4",
     "vite": "^4.0.3",
