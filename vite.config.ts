@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite'
-import { builtinModules } from 'module'
+import { builtinModules } from 'node:module'
 import pkg from './package.json'
 
 export default defineConfig({
@@ -18,7 +18,7 @@ export default defineConfig({
         'vite',
         ...builtinModules,
         ...builtinModules.map(m => `node:${m}`),
-        ...Object.keys(pkg.dependencies),
+        ...Object.keys("dependencies" in pkg ? pkg.dependencies as object : {}),
       ],
       output: {
         exports: 'named',

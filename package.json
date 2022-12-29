@@ -22,12 +22,11 @@
     "prepublishOnly": "npm run test && npm run build",
     "test": "vitest run"
   },
-  "dependencies": {},
   "devDependencies": {
+    "rollup": "^3.9.0",
     "typescript": "^4.9.4",
     "vite": "^4.0.3",
-    "vitest": "^0.26.2",
-    "rollup": "^3.8.1"
+    "vitest": "^0.26.2"
   },
   "files": [
     "types",
