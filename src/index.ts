@@ -1,7 +1,13 @@
-import type { Plugin } from 'vite'
-import { build } from './build'
-import { bootstrap } from './serve'
-import type { Configuration } from './config'
+import {
+  type Plugin,
+  build as viteBuild,
+} from 'vite'
+import {
+  type Configuration,
+  resolveServerUrl,
+  resolveViteConfig,
+  withExternalBuiltins,
+} from './config'
 
 // public
 export {
@@ -10,7 +16,10 @@ export {
   resolveViteConfig,
   withExternalBuiltins,
 } from './config'
-export { build }
+
+export function build(config: Configuration) {
+  return viteBuild(withExternalBuiltins(resolveViteConfig(config)))
+}
 
 export default function electron(config: Configuration | Configuration[]): Plugin[] {
   const configArray = Array.isArray(config) ? config : [config]
@@ -22,8 +31,31 @@ export default function electron(config: Configuration | Configuration[]): Plugi
       apply: 'serve',
       configureServer(server) {
         server.httpServer?.once('listening', () => {
+          Object.assign(process.env, {
+            VITE_DEV_SERVER_URL: resolveServerUrl(server),
+          })
           for (const config of configArray) {
-            bootstrap(config, server)
+            config.vite ??= {}
+            config.vite.mode ??= server.config.mode
+            config.vite.build ??= {}
+            config.vite.build.watch ??= {}
+            config.vite.plugins ??= []
+            config.vite.plugins.push({
+              name: ':startup',
+              closeBundle() {
+                if (config.onstart) {
+                  config.onstart.call(this, {
+                    startup,
+                    reload() {
+                      server.ws.send({ type: 'full-reload' })
+                    },
+                  })
+                } else {
+                  startup()
+                }
+              },
+            })
+            build(config)
           }
         })
       },
@@ -53,7 +85,7 @@ export default function electron(config: Configuration | Configuration[]): Plugi
  * @param argv default value `['.', '--no-sandbox']`
  */
 export async function startup(argv = ['.', '--no-sandbox']) {
-  const { spawn } = await import('child_process')
+  const { spawn } = await import('node:child_process')
   // @ts-ignore
   const electron = await import('electron')
   const electronPath = <any>(electron.default ?? electron)

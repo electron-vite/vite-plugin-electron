@@ -1,8 +1,8 @@
 {
   "name": "vite-plugin-electron",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "Electron 🔗 Vite",
-  "main": "index.mjs",
+  "main": "index.js",
   "types": "types",
   "exports": {
     ".": {
@@ -18,16 +18,18 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite build --watch",
-    "build": "tsc --emitDeclarationOnly && vite build",
-    "prepublishOnly": "npm run build"
+    "build": "rm -rf types && tsc --emitDeclarationOnly && vite build",
+    "prepublishOnly": "npm run test && npm run build",
+    "test": "vitest run"
   },
   "dependencies": {
     "tree-kill": "^1.2.2"
   },
   "devDependencies": {
-    "rollup": "^3.7.3",
-    "typescript": "^4.7.4",
-    "vite": "^4.0.0"
+    "rollup": "^3.9.0",
+    "typescript": "^4.9.4",
+    "vite": "^4.0.3",
+    "vitest": "^0.26.2"
   },
   "files": [
     "types",
