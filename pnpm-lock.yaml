@@ -28,6 +28,20 @@ importers:
       vite: 4.0.3
       vite-plugin-electron: link:../..
 
+  examples/multiple-windows:
+    specifiers:
+      electron: ^22.0.0
+      electron-builder: ^23.6.0
+      typescript: ^4.9.4
+      vite: ^4.0.3
+      vite-plugin-electron: workspace:*
+    devDependencies:
+      electron: 22.0.0
+      electron-builder: 23.6.0
+      typescript: 4.9.4
+      vite: 4.0.3
+      vite-plugin-electron: link:../..
+
   examples/quick-start:
     specifiers:
       electron: ^22.0.0

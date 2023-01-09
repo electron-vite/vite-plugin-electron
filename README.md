@@ -2,8 +2,8 @@
 
 Electron 🔗 Vite
 
-[![NPM version](https://img.shields.io/npm/v/vite-plugin-electron.svg)](https://npmjs.org/package/vite-plugin-electron)
-[![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron.svg)](https://npmjs.org/package/vite-plugin-electron)
+[![NPM version](https://img.shields.io/npm/v/vite-plugin-electron.svg)](https://npmjs.com/package/vite-plugin-electron)
+[![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron.svg)](https://npmjs.com/package/vite-plugin-electron)
 [![GitHub Discord](https://img.shields.io/badge/chat-discord-blue?logo=discord)](https://discord.gg/YfjFuEgVUR)
 
 English | [简体中文](https://github.com/electron-vite/vite-plugin-electron/blob/main/README.zh-CN.md)
@@ -24,6 +24,7 @@ npm i vite-plugin-electron -D
 ## Examples
 
 - [quick-start](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/quick-start)
+- [multiple-windows](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-windows)
 - [custom-start-electron-app](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/custom-start-electron-app)
 - [bytecode](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/bytecode)
 
