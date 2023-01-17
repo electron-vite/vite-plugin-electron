@@ -1,12 +1,32 @@
-# vite-plugin-electron
+<p align="center">
+  <img width="170" src="https://github.com/electron-vite/vite-plugin-electron/blob/main/logo.svg?raw=true">
+</p>
+<div align="center">
+  <h1>vite-plugin-electron</h1>
+</div>
+<p align="center">Electron 🔗 Vite</p>
+<p align="center">
+  <a href="https://npmjs.com/package/vite-plugin-electron">
+    <img src="https://img.shields.io/npm/v/vite-plugin-electron.svg">
+  </a>
+  <a href="https://npmjs.com/package/vite-plugin-electron">
+    <img src="https://img.shields.io/npm/dm/vite-plugin-electron.svg">
+  </a>
+  <a href="https://discord.gg/YfjFuEgVUR">
+    <img src="https://img.shields.io/badge/chat-discord-blue?logo=discord">
+  </a>
+</p>
+<p align="center">
+  <strong>
+    <span>English</span>
+    |
+    <a href="https://github.com/electron-vite/vite-plugin-electron/blob/main/README.zh-CN.md">简体中文</a>
+  </strong>
+</p>
 
-Electron 🔗 Vite
+<br/>
 
-[![NPM version](https://img.shields.io/npm/v/vite-plugin-electron.svg)](https://npmjs.com/package/vite-plugin-electron)
-[![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron.svg)](https://npmjs.com/package/vite-plugin-electron)
-[![GitHub Discord](https://img.shields.io/badge/chat-discord-blue?logo=discord)](https://discord.gg/YfjFuEgVUR)
-
-English | [简体中文](https://github.com/electron-vite/vite-plugin-electron/blob/main/README.zh-CN.md)
+## Features
 
 - 🚀 Fully compatible with Vite and Vite's ecosystem <sub><sup>(Based on Vite)</sup></sub>
 - 🎭 Flexible configuration
