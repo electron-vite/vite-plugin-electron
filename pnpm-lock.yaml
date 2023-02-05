@@ -28,7 +28,7 @@ importers:
       vite: 4.0.3
       vite-plugin-electron: link:../..
 
-  examples/multiple-windows:
+  examples/multiple-renderer:
     specifiers:
       electron: ^22.0.0
       electron-builder: ^23.6.0
@@ -41,6 +41,24 @@ importers:
       typescript: 4.9.4
       vite: 4.0.3
       vite-plugin-electron: link:../..
+
+  examples/multiple-windows:
+    specifiers:
+      electron: ^22.0.0
+      electron-builder: ^23.6.0
+      typescript: ^4.9.4
+      vite: ^4.0.3
+      vite-plugin-electron: workspace:*
+      vite-plugin-electron-renderer: ^0.11.4
+      vite-plugin-multiple: ^0.1.1
+    devDependencies:
+      electron: 22.0.0
+      electron-builder: 23.6.0
+      typescript: 4.9.4
+      vite: 4.0.3
+      vite-plugin-electron: link:../..
+      vite-plugin-electron-renderer: 0.11.4
+      vite-plugin-multiple: 0.1.1
 
   examples/quick-start:
     specifiers:
@@ -499,10 +517,10 @@ packages:
     resolution: {integrity: sha512-dQYDuqm/rmy8GSCE6Xl/3ShJg6Ab4bZJMT8KaTKGzT436gl1DN4REP3FCWfXoh75qGTJ+u+WsdnnpO9Jl8nyMA==}
     engines: {node: '>=14.0.0'}
     dependencies:
-      7zip-bin: 5.1.1
       '@develar/schema-utils': 2.6.5
       '@electron/universal': 1.2.1
       '@malept/flatpak-bundler': 0.4.0
+      7zip-bin: 5.1.1
       async-exit-hook: 2.0.1
       bluebird-lst: 1.0.9
       builder-util: 23.6.0
@@ -670,9 +688,9 @@ packages:
   /builder-util/23.6.0:
     resolution: {integrity: sha512-QiQHweYsh8o+U/KNCZFSvISRnvRctb8m/2rB2I1JdByzvNKxPeFLlHFRPQRXab6aYeXc18j9LpsDLJ3sGQmWTQ==}
     dependencies:
-      7zip-bin: 5.1.1
       '@types/debug': 4.1.7
       '@types/fs-extra': 9.0.13
+      7zip-bin: 5.1.1
       app-builder-bin: 4.0.0
       bluebird-lst: 1.0.9
       builder-util-runtime: 9.1.1
@@ -1472,6 +1490,10 @@ packages:
     resolution: {integrity: sha512-0/BnGCCfyUMkBpeDgWihanIAF9JmZhHBgUhEqzvf+adhNGLoP6TaiI5oF8oyb3I45P+PcnrqihSf01M0l0G5+Q==}
     dev: true
 
+  /lib-esm/0.3.0:
+    resolution: {integrity: sha512-P7YcG7OnoaGL2h4j46g/m0P2xHMXlYf+0iCDvVrEfzUVxLe+abytgd2VjUhj9puqEgqRGEDbT504YWj75jHacA==}
+    dev: true
+
   /local-pkg/0.4.2:
     resolution: {integrity: sha512-mlERgSPrbxU3BP4qBqAvvwlgW4MTg78iwJdGGnv7kibKjWcJksrG3t6LB5lXI93wXRDvG4NpUgJFmTG4T6rdrg==}
     engines: {node: '>=14'}
@@ -2058,6 +2080,18 @@ packages:
       - sugarss
       - supports-color
       - terser
+    dev: true
+
+  /vite-plugin-electron-renderer/0.11.4:
+    resolution: {integrity: sha512-uYSrAuZbHYGd5SXUPaFfqpCxp1Q1zEHTn8N3a5PCYOCsgVH+0w87FnHyKP0yMizNr7FSfliQP7Xnzif0nEm7cQ==}
+    peerDependencies:
+      esbuild: '*'
+    dependencies:
+      lib-esm: 0.3.0
+    dev: true
+
+  /vite-plugin-multiple/0.1.1:
+    resolution: {integrity: sha512-lGMfMPH1JHhRESA9SkpijNNP8nI8rrS0Y2TNIQ5NkjcCmjFLNX8UkKkbMO7DVxxwuckidByS3sv94Xv6KbaRfQ==}
     dev: true
 
   /vite/4.0.3:

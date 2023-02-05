@@ -1,11 +1,11 @@
 {
-  "name": "vite-plugin-electron-multiple-windows",
+  "name": "vite-plugin-electron-multiple-renderer",
   "version": "0.0.0",
   "main": "dist-electron/main.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/electron-vite/vite-plugin-electron.git",
-    "directory": "examples/multiple-windows"
+    "directory": "examples/multiple-renderer"
   },
   "author": "草鞋没号 <308487730@qq.com>",
   "license": "MIT",

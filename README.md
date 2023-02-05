@@ -44,7 +44,8 @@ npm i vite-plugin-electron -D
 ## Examples
 
 - [quick-start](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/quick-start)
-- [multiple-windows](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-windows)
+- [multiple-window](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-window)
+- [multiple-renderer](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-renderer)
 - [custom-start-electron-app](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/custom-start-electron-app)
 - [bytecode](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/bytecode)
 
