@@ -127,25 +127,30 @@ export interface Configuration {
 **Example**
 
 ```js
-build(
-  withExternalBuiltins( // external Node.js builtin modules
-    resolveViteConfig( // with default config
-      {
-        entry: 'foo.ts',
-        vite: {
-          mode: 'foo-mode', // for .env file
-          plugins: [{
-            name: 'plugin-build-done',
-            closeBundle() {
-              // Startup Electron App
-              startup()
-            },
-          }],
-        },
-      }
-    )
-  )
-)
+import { build, startup } from 'vite-plugin-electron'
+
+const isDev = process.env.NODE_ENV === 'development'
+const isProd = process.env.NODE_ENV === 'production'
+
+build({
+  entry: 'electron/main.ts',
+  vite: {
+    mode: process.env.NODE_ENV,
+    build: {
+      minify: isProd,
+      watch: isDev ? {} : null,
+    },
+    plugins: [{
+      name: 'plugin-start-electron',
+      closeBundle() {
+        if (isDev) {
+          // Startup Electron App
+          startup()
+        }
+      },
+    }],
+  },
+})
 ```
 
 ## How to work
