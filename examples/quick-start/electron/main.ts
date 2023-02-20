@@ -37,6 +37,7 @@ function createWindow() {
   if (url) {
     win.loadURL(url)
   } else {
+    // win.loadFile('dist/index.html')
     win.loadFile(join(process.env.DIST, 'index.html'))
   }
 }
