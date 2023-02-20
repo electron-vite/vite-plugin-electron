@@ -35,25 +35,15 @@
 
 ![vite-plugin-electron.gif](https://github.com/caoxiemeihao/blog/blob/main/vite/vite-plugin-electron.gif?raw=true)
 
-## Install
+## Quick Setup
+
+1. Add the following dependency to your project
 
 ```sh
-npm i vite-plugin-electron -D
+npm i -D vite-plugin-electron
 ```
 
-## Examples
-
-- [quick-start](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/quick-start)
-- [multiple-renderer](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-renderer)
-- [bytecode](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/bytecode)
-<!--
-- [multiple-window](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-window)
-- [custom-start-electron-app](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/custom-start-electron-app)
--->
-
-## Usage
-
-vite.config.ts
+2. Add `vite-plugin-electron` to the `plugins` section of `vite.config.ts`
 
 ```js
 import electron from 'vite-plugin-electron'
@@ -67,21 +57,35 @@ export default {
 }
 ```
 
-You can use `process.env.VITE_DEV_SERVER_URL` when the vite command is called 'serve'
+3. Create the `electron/main.ts` file and type the following code
 
 ```js
-// electron main.js
-const win = new BrowserWindow({
-  title: 'Main window',
-})
+import { app, BrowserWindow } from 'electron'
 
-if (process.env.VITE_DEV_SERVER_URL) {
-  win.loadURL(process.env.VITE_DEV_SERVER_URL)
-} else {
-  // load your file
-  win.loadFile('yourOutputFile.html');
+app.whenReady().then(() => {
+  const win = new BrowserWindow({
+    title: 'Main window',
+  })
+
+  // You can use `process.env.VITE_DEV_SERVER_URL` when the vite command is called `serve`
+  if (process.env.VITE_DEV_SERVER_URL) {
+    win.loadURL(process.env.VITE_DEV_SERVER_URL)
+  } else {
+    // Load your file
+    win.loadFile('dist/index.html');
+  }
+})
+```
+
+4. Add the `main` entry to `package.json`
+
+```diff
+{
++ "main": "dist-electron/main.js"
 }
 ```
+
+That's it! You can now use Electron in your Vite app ✨
 
 ## API <sub><sup>(Define)</sup></sub>
 
@@ -112,6 +116,35 @@ export interface Configuration {
   }) => void | Promise<void>
 }
 ```
+
+## Recommend Structure
+
+Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-vanilla-ts) created based on `create vite` as an example
+
+```diff
++ ├─┬ electron
++ │ └── main.ts
+  ├─┬ src
+  │ ├── main.ts
+  │ ├── style.css
+  │ └── vite-env.d.ts
+  ├── .gitignore
+  ├── favicon.svg
+  ├── index.html
+  ├── package.json
+  ├── tsconfig.json
++ └── vite.config.ts
+```
+
+## [Examples](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples)
+
+- [quick-start](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/quick-start)
+- [multiple-renderer](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-renderer)
+- [bytecode](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/bytecode)
+<!--
+- [multiple-window](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-window)
+- [custom-start-electron-app](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/custom-start-electron-app)
+-->
 
 ## JavaScript API
 
@@ -156,25 +189,6 @@ build({
 ## How to work
 
 It just executes the `electron .` command in the Vite build completion hook and then starts or restarts the Electron App.
-
-## Recommend structure
-
-Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-vanilla-ts) created based on `create vite` as an example
-
-```diff
-+ ├─┬ electron
-+ │ └── main.ts
-  ├─┬ src
-  │ ├── main.ts
-  │ ├── style.css
-  │ └── vite-env.d.ts
-  ├── .gitignore
-  ├── favicon.svg
-  ├── index.html
-  ├── package.json
-  ├── tsconfig.json
-+ └── vite.config.ts
-```
 
 ## Be aware
 
