@@ -104,7 +104,7 @@ export interface Configuration {
    * If this `onstart` is passed, Electron App will not start automatically.  
    * However, you can start Electroo App via `startup` function.  
    */
-  onstart?: (this: import('rollup').PluginContext, options: {
+  onstart?: (args: {
     /**
      * Electron App startup function.  
      * It will mount the Electron App child-process to `process.electronApp`.  
