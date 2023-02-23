@@ -23,10 +23,10 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "rollup": "^3.9.0",
-    "typescript": "^4.9.4",
-    "vite": "^4.0.3",
-    "vitest": "^0.26.2"
+    "rollup": "^3.17.2",
+    "typescript": "^4.9.5",
+    "vite": "^4.1.4",
+    "vitest": "^0.28.5"
   },
   "files": [
     "types",
