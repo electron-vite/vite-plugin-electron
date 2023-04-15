@@ -201,7 +201,7 @@ It just executes the `electron .` command in the Vite build completion hook and 
     vite: {
       build: {
         rollupOptions: {
-          // Here are some C/C++ plugins that can't be built properly.
+          // Here are some C/C++ modules them can't be built properly.
           external: [
             'serialport',
             'sqlite3',
