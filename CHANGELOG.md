@@ -1,3 +1,28 @@
+## 0.11.2 (2022-04-15)
+
+- b033bc5 v0.11.2
+- 8190208 docs: typo
+- 111d495 refactor(🔨): better build logic
+- 76611a9 fix: disable `browserField` by default #136
+- 241534f feat: add `.npmrc` for `pnpm`
+- 65d4ab1 chore: bump deps
+- b4308e3 chore: rename
+- 036e52c docs: update
+- a222c48 examples: update quick-start
+- d04155c examples: add javascript-api
+- 9213ba0 docs: update
+- 9b8da83 fix: cannot find type definition #126
+- e864b81 examples: update multiple-window, add multiple-renderer
+- 0a226b5 docs: update
+- ff5e9dc feat: add logo.svg
+- 7cec6ad examples: add multiple-windows
+- f8528ed Merge pull request #123 from xhayper/patch-1
+- 1e9f9b0 feat: remove extra dependencies
+- 8fa6ce4 feat: update package and example
+- 1d7eca5 feat: add test 🌱
+- 9ef3e8e chore: bump deps
+- 56446e2 chore: cleanup
+
 ## 0.11.1 (2022-12-19)
 
 - 2bf7d0b docs: `startup()`
