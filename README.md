@@ -104,7 +104,7 @@ export interface Configuration {
    * If this `onstart` is passed, Electron App will not start automatically.  
    * However, you can start Electroo App via `startup` function.  
    */
-  onstart?: (this: import('rollup').PluginContext, options: {
+  onstart?: (args: {
     /**
      * Electron App startup function.  
      * It will mount the Electron App child-process to `process.electronApp`.  
@@ -201,7 +201,7 @@ It just executes the `electron .` command in the Vite build completion hook and 
     vite: {
       build: {
         rollupOptions: {
-          // Here are some C/C++ plugins that can't be built properly.
+          // Here are some C/C++ modules them can't be built properly.
           external: [
             'serialport',
             'sqlite3',

@@ -18,7 +18,7 @@ export interface Configuration {
    * If this `onstart` is passed, Electron App will not start automatically.  
    * However, you can start Electroo App via `startup` function.  
    */
-  onstart?: (this: import('rollup').PluginContext, options: {
+  onstart?: (args: {
     /**
      * Electron App startup function.  
      * It will mount the Electron App child-process to `process.electronApp`.  
@@ -54,6 +54,11 @@ export function resolveViteConfig(option: Configuration): InlineConfig {
       emptyOutDir: false,
     },
     resolve: {
+      // #136
+      // Some libs like `axios` must disable the `browserField`.
+      // @axios https://github.com/axios/axios/blob/v1.3.5/package.json#L129
+      // @vite https://github.com/vitejs/vite/blob/v4.2.1/packages/vite/src/node/plugins/resolve.ts#L294
+      browserField: false,
       // #98
       // Since we're building for electron (which uses Node.js), we don't want to use the "browser" field in the packages.
       // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.
