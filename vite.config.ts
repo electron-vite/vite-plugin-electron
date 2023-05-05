@@ -11,6 +11,7 @@ export default defineConfig({
   build: {
     minify: false,
     emptyOutDir: !isdev,
+    target: 'node14',
     lib: {
       entry: 'src/index.ts',
       formats: ['cjs', 'es'],
