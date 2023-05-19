@@ -15,7 +15,7 @@ const external_array: ExternalOption = ['electron']
 const external_regexp: ExternalOption = /electron/
 const external_function: ExternalOption = source => ['electron'].includes(source)
 
-describe('src/config', () => {
+describe('src/config.ts', () => {
   it('withExternalBuiltins', async () => {
     const external_str = withExternalBuiltins(getConfig(external_string))!.build!.rollupOptions!.external
     expect(external_str).toEqual(builtins.concat(external_string))

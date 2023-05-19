@@ -22,7 +22,7 @@
     "dev": "vite build --watch",
     "build": "vite build",
     "types": "tsc --emitDeclarationOnly",
-    "prepublishOnly": "npm run test && npm run build",
+    "prepublishOnly": "npm run build && npm run test",
     "test": "vitest run"
   },
   "devDependencies": {
