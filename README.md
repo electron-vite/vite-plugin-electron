@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="170" src="https://github.com/electron-vite/vite-plugin-electron/blob/main/logo.svg?raw=true">
+  <img width="170" src="https://github.com/electron-vite/vite-plugin-electron/blob/main/logo.animate.svg?raw=true">
 </p>
 <div align="center">
   <h1>vite-plugin-electron</h1>
