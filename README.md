@@ -33,7 +33,7 @@
 - 🐣 Few APIs, easy to use
 - 🔥 Hot restart
 
-![vite-plugin-electron.gif](https://github.com/caoxiemeihao/blog/blob/main/vite/vite-plugin-electron.gif?raw=true)
+![vite-plugin-electron.gif](https://github.com/electron-vite/vite-plugin-electron/blob/main/vite-plugin-electron.gif?raw=true)
 
 ## Quick Setup
 
@@ -89,10 +89,10 @@ That's it! You can now use Electron in your Vite app ✨
 
 ## API <sub><sup>(Define)</sup></sub>
 
-`electron(config: Configuration | Configuration[])`
+`electron(config: ElectronOptions | ElectronOptions[])`
 
 ```ts
-export interface Configuration {
+export interface ElectronOptions {
   /**
    * Shortcut of `build.lib.entry`
    */
@@ -150,8 +150,7 @@ Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree
 
 `vite-plugin-electron`'s JavaScript APIs are fully typed, and it's recommended to use TypeScript or enable JS type checking in VS Code to leverage the intellisense and validation.
 
-- `Configuration` - type
-- `defineConfig` - function
+- `ElectronOptions` - type
 - `resolveViteConfig` - function, Resolve the default Vite's `InlineConfig` for build Electron-Main
 - `withExternalBuiltins` - function
 - `build` - function
