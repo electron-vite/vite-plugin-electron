@@ -5,37 +5,10 @@ import {
   type ViteDevServer,
   mergeConfig,
 } from 'vite'
-
-export interface Configuration {
-  /**
-   * Shortcut of `build.lib.entry`
-   */
-  entry?: import('vite').LibraryOptions['entry']
-  vite?: import('vite').InlineConfig
-  /**
-   * Triggered when Vite is built every time -- `vite serve` command only.
-   * 
-   * If this `onstart` is passed, Electron App will not start automatically.  
-   * However, you can start Electroo App via `startup` function.  
-   */
-  onstart?: (args: {
-    /**
-     * Electron App startup function.  
-     * It will mount the Electron App child-process to `process.electronApp`.  
-     * @param argv default value `['.', '--no-sandbox']`
-     */
-    startup: (argv?: string[]) => Promise<void>
-    /** Reload Electron-Renderer */
-    reload: () => void
-  }) => void | Promise<void>
-}
-
-export function defineConfig(config: Configuration) {
-  return config
-}
+import type { ElectronOptions } from '.'
 
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
-export function resolveViteConfig(option: Configuration): InlineConfig {
+export function resolveViteConfig(options: ElectronOptions): InlineConfig {
   const defaultConfig: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
     configFile: false,
@@ -43,8 +16,8 @@ export function resolveViteConfig(option: Configuration): InlineConfig {
 
     build: {
       // @ts-ignore
-      lib: option.entry && {
-        entry: option.entry,
+      lib: options.entry && {
+        entry: options.entry,
         // At present, Electron(20) can only support CommonJs
         formats: ['cjs'],
         fileName: () => '[name].js',
@@ -66,7 +39,7 @@ export function resolveViteConfig(option: Configuration): InlineConfig {
     },
   }
 
-  return mergeConfig(defaultConfig, option?.vite || {})
+  return mergeConfig(defaultConfig, options?.vite || {})
 }
 
 export function withExternalBuiltins(config: InlineConfig) {
