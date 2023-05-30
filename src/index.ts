@@ -60,6 +60,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             options.vite.mode ??= server.config.mode
             options.vite.build ??= {}
             options.vite.build.watch ??= {}
+            options.vite.build.minify ??= false
             options.vite.plugins ??= []
             options.vite.plugins.push({
               name: ':startup',
