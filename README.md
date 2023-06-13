@@ -33,7 +33,7 @@
 - 🐣 Few APIs, easy to use
 - 🔥 Hot restart
 
-![vite-plugin-electron.gif](https://github.com/caoxiemeihao/blog/blob/main/vite/vite-plugin-electron.gif?raw=true)
+<!-- ![vite-plugin-electron.gif](https://github.com/electron-vite/vite-plugin-electron/blob/main/vite-plugin-electron.gif?raw=true) -->
 
 ## Quick Setup
 
@@ -89,10 +89,10 @@ That's it! You can now use Electron in your Vite app ✨
 
 ## API <sub><sup>(Define)</sup></sub>
 
-`electron(config: Configuration | Configuration[])`
+`electron(config: ElectronOptions | ElectronOptions[])`
 
 ```ts
-export interface Configuration {
+export interface ElectronOptions {
   /**
    * Shortcut of `build.lib.entry`
    */
@@ -150,8 +150,7 @@ Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree
 
 `vite-plugin-electron`'s JavaScript APIs are fully typed, and it's recommended to use TypeScript or enable JS type checking in VS Code to leverage the intellisense and validation.
 
-- `Configuration` - type
-- `defineConfig` - function
+- `ElectronOptions` - type
 - `resolveViteConfig` - function, Resolve the default Vite's `InlineConfig` for build Electron-Main
 - `withExternalBuiltins` - function
 - `build` - function
@@ -194,22 +193,57 @@ It just executes the `electron .` command in the Vite build completion hook and 
 
 - 🚨 By default, the files in `electron` folder will be built into the `dist-electron`
 - 🚨 Currently, `"type": "module"` is not supported in Electron
-- 🚨 In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages. So, put your Node.js package in `dependencies`. Unless you know how to properly build them with Vite.
-  ```js
-  electron({
-    entry: 'electron/main.ts',
-    vite: {
-      build: {
-        rollupOptions: {
-          // Here are some C/C++ modules them can't be built properly.
-          external: [
-            'serialport',
-            'sqlite3',
-          ],
+
+## C/C++ Native
+
+We have two ways to use C/C++ native modules
+
+**First**
+
+In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages
+
+So, put your Node.js package in `dependencies`. Unless you know how to properly build them with Vite
+
+```js
+export default {
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        build: {
+          rollupOptions: {
+            // Here are some C/C++ modules them can't be built properly
+            external: [
+              'serialport',
+              'sqlite3',
+            ],
+          },
         },
       },
-    },
-  }),
-  ```
+    }),
+  ],
+}
+```
+
+**Second**
+
+Use 👉 [vite-plugin-native](https://github.com/vite-plugin/vite-plugin-native)
+
+```js
+import native from 'vite-plugin-native'
+
+export default {
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [
+          native(/* options */),
+        ],
+      },
+    }),
+  ],
+}
+```
 
 <!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->

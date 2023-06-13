@@ -1,3 +1,10 @@
+## 0.12.0 (2022-06-13)
+
+- 6822409 docs: v0.12.0
+- 9ec9d3b v0.12.0
+- 53a0dd8 feat: disable minify during dev
+- 3925cd1 refactor: remove `defineConfig`, `Configuration` -> `ElectronOptions`, config.ts -> utils.ts
+
 ## 0.11.2 (2022-04-15)
 
 - b033bc5 v0.11.2

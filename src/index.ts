@@ -3,26 +3,47 @@ import {
   build as viteBuild,
 } from 'vite'
 import {
-  type Configuration,
   resolveServerUrl,
   resolveViteConfig,
   withExternalBuiltins,
-} from './config'
+} from './utils'
 
-// public
+// public utils
 export {
-  type Configuration,
-  defineConfig,
   resolveViteConfig,
   withExternalBuiltins,
-} from './config'
-
-export function build(config: Configuration) {
-  return viteBuild(withExternalBuiltins(resolveViteConfig(config)))
 }
 
-export default function electron(config: Configuration | Configuration[]): Plugin[] {
-  const configArray = Array.isArray(config) ? config : [config]
+export interface ElectronOptions {
+  /**
+   * Shortcut of `build.lib.entry`
+   */
+  entry?: import('vite').LibraryOptions['entry']
+  vite?: import('vite').InlineConfig
+  /**
+   * Triggered when Vite is built every time -- `vite serve` command only.
+   * 
+   * If this `onstart` is passed, Electron App will not start automatically.  
+   * However, you can start Electroo App via `startup` function.  
+   */
+  onstart?: (args: {
+    /**
+     * Electron App startup function.  
+     * It will mount the Electron App child-process to `process.electronApp`.  
+     * @param argv default value `['.', '--no-sandbox']`
+     */
+    startup: (argv?: string[]) => Promise<void>
+    /** Reload Electron-Renderer */
+    reload: () => void
+  }) => void | Promise<void>
+}
+
+export function build(options: ElectronOptions) {
+  return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
+}
+
+export default function electron(options: ElectronOptions | ElectronOptions[]): Plugin[] {
+  const optionsArray = Array.isArray(options) ? options : [options]
   let mode: string
 
   return [
@@ -34,17 +55,18 @@ export default function electron(config: Configuration | Configuration[]): Plugi
           Object.assign(process.env, {
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
-          for (const config of configArray) {
-            config.vite ??= {}
-            config.vite.mode ??= server.config.mode
-            config.vite.build ??= {}
-            config.vite.build.watch ??= {}
-            config.vite.plugins ??= []
-            config.vite.plugins.push({
+          for (const options of optionsArray) {
+            options.vite ??= {}
+            options.vite.mode ??= server.config.mode
+            options.vite.build ??= {}
+            options.vite.build.watch ??= {}
+            options.vite.build.minify ??= false
+            options.vite.plugins ??= []
+            options.vite.plugins.push({
               name: ':startup',
               closeBundle() {
-                if (config.onstart) {
-                  config.onstart.call(this, {
+                if (options.onstart) {
+                  options.onstart.call(this, {
                     startup,
                     reload() {
                       server.ws.send({ type: 'full-reload' })
@@ -55,7 +77,7 @@ export default function electron(config: Configuration | Configuration[]): Plugi
                 }
               },
             })
-            build(config)
+            build(options)
           }
         })
       },
@@ -69,10 +91,10 @@ export default function electron(config: Configuration | Configuration[]): Plugi
         mode = env.mode
       },
       async closeBundle() {
-        for (const config of configArray) {
-          config.vite ??= {}
-          config.vite.mode ??= mode
-          await build(config)
+        for (const options of optionsArray) {
+          options.vite ??= {}
+          options.vite.mode ??= mode
+          await build(options)
         }
       }
     },
