@@ -1,3 +1,7 @@
+## 0.13.0-beta.1 (2022-08-06)
+
+- e5403c1 feat: check `cjs` availabe
+
 ## 0.13.0-beta.0 (2022-08-06)
 
 - 5fbcf40 test: plugin `external_node_modules`
