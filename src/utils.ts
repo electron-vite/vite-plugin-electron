@@ -1,5 +1,8 @@
 import type { AddressInfo } from 'node:net'
-import { builtinModules } from 'node:module'
+import {
+  createRequire,
+  builtinModules,
+} from 'node:module'
 import {
   type InlineConfig,
   type Plugin,
@@ -129,6 +132,8 @@ export function external_node_modules(): Plugin {
       resolve = config.createResolver({ asSrc: false })
     },
     async resolveId(source, importer) {
+      if (!importer) return // entry file
+
       const external = {
         external: true,
         id: source,
@@ -139,11 +144,22 @@ export function external_node_modules(): Plugin {
       }
 
       if (bareImportRE.test(source)) {
+        const isAlias = await resolve(source, importer, true)
+        if (isAlias) return
+
         const id = await resolve(source, importer)
-        if (id?.includes('/node_modules/')) {
-          ids.set(source, id)
-          return external
+        if (!id) return
+        if (!id.includes('/node_modules/')) return
+
+        try {
+          // Because we build Main process into `cjs`, so a npm-pkg can be loaded by `require()`.
+          createRequire(importer)(source)
+        } catch {
+          return
         }
+
+        ids.set(source, id)
+        return external
       }
     },
   }
