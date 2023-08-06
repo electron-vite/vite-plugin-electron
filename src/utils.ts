@@ -2,6 +2,8 @@ import type { AddressInfo } from 'node:net'
 import { builtinModules } from 'node:module'
 import {
   type InlineConfig,
+  type Plugin,
+  type ResolveFn,
   type ViteDevServer,
   mergeConfig,
 } from 'vite'
@@ -108,5 +110,41 @@ export function resolveServerUrl(server: ViteDevServer): string | void {
       : `${protocol}://${hostname}:${port}${path}`
 
     return url
+  }
+}
+
+/**
+ * @see https://github.com/vitejs/vite/blob/v4.4.7/packages/vite/src/node/utils.ts#L140
+ */
+export const bareImportRE = /^(?![a-zA-Z]:)[\w@](?!.*:\/\/)/
+
+export function external_node_modules(): Plugin {
+  let resolve: ResolveFn
+  const ids = new Map<string, string>()
+
+  return {
+    name: 'external-node_modules',
+    enforce: 'pre',
+    configResolved(config) {
+      resolve = config.createResolver({ asSrc: false })
+    },
+    async resolveId(source, importer) {
+      const external = {
+        external: true,
+        id: source,
+      }
+
+      if (ids.get(source)) {
+        return external
+      }
+
+      if (bareImportRE.test(source)) {
+        const id = await resolve(source, importer)
+        if (id?.includes('/node_modules/')) {
+          ids.set(source, id)
+          return external
+        }
+      }
+    },
   }
 }

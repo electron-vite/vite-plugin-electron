@@ -6,12 +6,14 @@ import {
   resolveServerUrl,
   resolveViteConfig,
   withExternalBuiltins,
+  external_node_modules,
 } from './utils'
 
 // public utils
 export {
   resolveViteConfig,
   withExternalBuiltins,
+  external_node_modules,
 }
 
 export interface ElectronOptions {
@@ -62,21 +64,24 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             options.vite.build.watch ??= {}
             options.vite.build.minify ??= false
             options.vite.plugins ??= []
-            options.vite.plugins.push({
-              name: ':startup',
-              closeBundle() {
-                if (options.onstart) {
-                  options.onstart.call(this, {
-                    startup,
-                    reload() {
-                      server.ws.send({ type: 'full-reload' })
-                    },
-                  })
-                } else {
-                  startup()
-                }
+            options.vite.plugins.push(
+              external_node_modules(),
+              {
+                name: ':startup',
+                closeBundle() {
+                  if (options.onstart) {
+                    options.onstart.call(this, {
+                      startup,
+                      reload() {
+                        server.ws.send({ type: 'full-reload' })
+                      },
+                    })
+                  } else {
+                    startup()
+                  }
+                },
               },
-            })
+            )
             build(options)
           }
         })
