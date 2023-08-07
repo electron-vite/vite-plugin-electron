@@ -1,8 +1,8 @@
-## 0.13.0-beta.1 (2022-08-06)
+## 0.13.0-beta.1 (2023-08-06)
 
 - e5403c1 feat: check `cjs` availabe
 
-## 0.13.0-beta.0 (2022-08-06)
+## 0.13.0-beta.0 (2023-08-06)
 
 - 5fbcf40 test: plugin `external_node_modules`
 - 9803e26 feat: non-bundle during dev 🚀
@@ -21,14 +21,14 @@ Modules in `node_modules` are not bundled during development, it's fast!
 ┗—————————————————————————————————————┛
 ```
 
-## 0.12.0 (2022-06-13)
+## 0.12.0 (2023-06-13)
 
 - 6822409 docs: v0.12.0
 - 9ec9d3b v0.12.0
 - 53a0dd8 feat: disable minify during dev
 - 3925cd1 refactor: remove `defineConfig`, `Configuration` -> `ElectronOptions`, config.ts -> utils.ts
 
-## 0.11.2 (2022-04-15)
+## 0.11.2 (2023-04-15)
 
 - b033bc5 v0.11.2
 - 8190208 docs: typo
