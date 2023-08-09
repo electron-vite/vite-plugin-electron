@@ -21,6 +21,7 @@ export interface ElectronOptions {
    * Shortcut of `build.lib.entry`
    */
   entry?: import('vite').LibraryOptions['entry']
+  fileName?: import('vite').LibraryOptions['fileName']
   vite?: import('vite').InlineConfig
   /**
    * Triggered when Vite is built every time -- `vite serve` command only.

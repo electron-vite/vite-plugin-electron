@@ -25,7 +25,7 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
         entry: options.entry,
         // At present, Electron(20) can only support CommonJs
         formats: ['cjs'],
-        fileName: () => '[name].js',
+        fileName: options.fileName || (() => '[name].js'),
       },
       outDir: 'dist-electron',
       // Avoid multiple entries affecting each other
