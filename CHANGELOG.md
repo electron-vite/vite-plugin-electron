@@ -1,3 +1,30 @@
+## 0.13.0-beta.2 (2023-08-21)
+
+- 86d9a34 chore: update pnpm lock
+- c6aceb3 refactor: standalone `Not Bundle` plugin
+- b3decf4 Merge pull request #150 from haodaking/changelog
+- 3f77d12 Update CHANGELOG.md
+
+Users need to import the `notBundle` plugin explicitly. See **[👉 Not Bundle](https://github.com/electron-vite/vite-plugin-electron/tree/v0.13.0-beta.2#not-bundle)**
+
+```js
+import electron from 'vite-plugin-electron'
+import { notBundle } from 'vite-plugin-electron/plugin'
+
+export default {
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [
+          notBundle(/* NotBundleOptions */),
+        ],
+      },
+    }),
+  ],
+}
+```
+
 ## 0.13.0-beta.1 (2023-08-06)
 
 - e5403c1 feat: check `cjs` availabe
