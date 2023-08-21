@@ -31,7 +31,9 @@
 - 🚀 Fully compatible with Vite and Vite's ecosystem <sub><sup>(Based on Vite)</sup></sub>
 - 🎭 Flexible configuration
 - 🐣 Few APIs, easy to use
-- 🔥 Hot restart
+- [🔥 Hot restart <sub><sup>(Main process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-restart)
+- [🔄 Hot reload <sub><sup>(Preload scripts)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-reload)
+- [⚡️ HMR <sub><sup>(Renderer process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hmr)
 
 <!-- ![vite-plugin-electron.gif](https://github.com/electron-vite/vite-plugin-electron/blob/main/vite-plugin-electron.gif?raw=true) -->
 
@@ -185,6 +187,36 @@ build({
 })
 ```
 
+## Not Bundle
+
+During dev, we exclude the `cjs` npm-pkg from bundle. **It's fast**! Like Vite's [👉 Not Bundle](https://vitejs.dev/guide/why.html#why-not-bundle-with-esbuild). **Only works during the `vite serve` phase by default**.
+
+```js
+import electron from 'vite-plugin-electron'
+import { notBundle } from 'vite-plugin-electron/plugin'
+
+export default {
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [
+          notBundle(/* NotBundleOptions */),
+        ],
+      },
+    }),
+  ],
+}
+```
+
+`notBundle(/* NotBundleOptions */)`
+
+```ts
+export interface NotBundleOptions {
+  filter?: (id: string) => void | false
+}
+```
+
 ## How to work
 
 It just executes the `electron .` command in the Vite build completion hook and then starts or restarts the Electron App.
@@ -198,7 +230,7 @@ It just executes the `electron .` command in the Vite build completion hook and 
 
 We have two ways to use C/C++ native modules
 
-**First**
+**First way**
 
 In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages
 
@@ -225,7 +257,7 @@ export default {
 }
 ```
 
-**Second**
+**Second way**
 
 Use 👉 [vite-plugin-native](https://github.com/vite-plugin/vite-plugin-native)
 

@@ -1,12 +1,7 @@
 import type { AddressInfo } from 'node:net'
-import {
-  createRequire,
-  builtinModules,
-} from 'node:module'
+import { builtinModules } from 'node:module'
 import {
   type InlineConfig,
-  type Plugin,
-  type ResolveFn,
   type ViteDevServer,
   mergeConfig,
 } from 'vite'
@@ -113,54 +108,5 @@ export function resolveServerUrl(server: ViteDevServer): string | void {
       : `${protocol}://${hostname}:${port}${path}`
 
     return url
-  }
-}
-
-/**
- * @see https://github.com/vitejs/vite/blob/v4.4.7/packages/vite/src/node/utils.ts#L140
- */
-export const bareImportRE = /^(?![a-zA-Z]:)[\w@](?!.*:\/\/)/
-
-export function external_node_modules(): Plugin {
-  let resolve: ResolveFn
-  const ids = new Map<string, string>()
-
-  return {
-    name: 'external-node_modules',
-    enforce: 'pre',
-    configResolved(config) {
-      resolve = config.createResolver({ asSrc: false })
-    },
-    async resolveId(source, importer) {
-      if (!importer) return // entry file
-
-      const external = {
-        external: true,
-        id: source,
-      }
-
-      if (ids.get(source)) {
-        return external
-      }
-
-      if (bareImportRE.test(source)) {
-        const isAlias = await resolve(source, importer, true)
-        if (isAlias) return
-
-        const id = await resolve(source, importer)
-        if (!id) return
-        if (!id.includes('/node_modules/')) return
-
-        try {
-          // Because we build Main process into `cjs`, so a npm-pkg can be loaded by `require()`.
-          createRequire(importer)(source)
-        } catch {
-          return
-        }
-
-        ids.set(source, id)
-        return external
-      }
-    },
   }
 }
