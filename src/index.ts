@@ -6,14 +6,12 @@ import {
   resolveServerUrl,
   resolveViteConfig,
   withExternalBuiltins,
-  external_node_modules,
 } from './utils'
 
 // public utils
 export {
   resolveViteConfig,
   withExternalBuiltins,
-  external_node_modules,
 }
 
 export interface ElectronOptions {
@@ -65,8 +63,6 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             options.vite.build.minify ??= false
             options.vite.plugins ??= []
             options.vite.plugins.push(
-              // During dev, we exclude the `cjs` npm-pkg from bundle, mush like Vite :)
-              external_node_modules(),
               {
                 name: ':startup',
                 closeBundle() {

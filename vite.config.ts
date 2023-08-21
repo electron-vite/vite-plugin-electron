@@ -6,40 +6,53 @@ import { defineConfig } from 'vite'
 import pkg from './package.json'
 
 const isdev = process.argv.slice(2).includes('--watch')
+const istest = process.env.NODE_ENV === 'test'
 
-export default defineConfig({
-  build: {
-    minify: false,
-    emptyOutDir: !isdev,
-    lib: {
-      entry: 'src/index.ts',
-      formats: ['cjs', 'es'],
-      fileName: format => format === 'es' ? '[name].mjs' : '[name].js',
-    },
-    rollupOptions: {
-      external: [
-        'electron',
-        'vite',
-        ...builtinModules,
-        ...builtinModules.map(m => `node:${m}`),
-        ...Object.keys('dependencies' in pkg ? pkg.dependencies as object : {}),
-      ],
-      output: {
-        exports: 'named',
+export default defineConfig(() => {
+  if (!isdev && !istest) {
+    for (const dir of ['dist', 'plugin']) {
+      fs.rmSync(path.join(__dirname, dir), { recursive: true, force: true })
+    }
+  }
+
+  return {
+    build: {
+      minify: false,
+      emptyOutDir: false,
+      outDir: '',
+      lib: {
+        entry: {
+          'dist/index': 'src/index.ts',
+          'plugin/index': 'src/plugin.ts',
+        },
+        formats: ['cjs', 'es'],
+        fileName: format => format === 'es' ? '[name].mjs' : '[name].js',
+      },
+      rollupOptions: {
+        external: [
+          'electron',
+          'vite',
+          ...builtinModules,
+          ...builtinModules.map(m => `node:${m}`),
+          ...Object.keys('dependencies' in pkg ? pkg.dependencies as object : {}),
+        ],
+        output: {
+          exports: 'named',
+        },
       },
     },
-  },
-  plugins: [{
-    name: 'generate-types',
-    async closeBundle() {
-      if (process.env.NODE_ENV === 'test') return
+    plugins: [{
+      name: 'generate-types',
+      async closeBundle() {
+        if (istest) return
 
-      removeTypes()
-      await generateTypes()
-      moveTypesToDist()
-      removeTypes()
-    },
-  }],
+        removeTypes()
+        await generateTypes()
+        moveTypesToDist()
+        removeTypes()
+      },
+    }],
+  }
 })
 
 function removeTypes() {
@@ -64,9 +77,16 @@ function generateTypes() {
 function moveTypesToDist() {
   const types = path.join(__dirname, 'types')
   const dist = path.join(__dirname, 'dist')
+  const plugin = path.join(__dirname, 'plugin')
   const files = fs.readdirSync(types).filter(n => n.endsWith('.d.ts'))
   for (const file of files) {
-    fs.copyFileSync(path.join(types, file), path.join(dist, file))
-    console.log('[types]', `types/${file} -> dist/${file}`)
+    const from = path.join(types, file)
+    const to = file.includes('plugin.d.ts')
+      ? path.join(plugin, 'index.d.ts')
+      : path.join(dist, file)
+    fs.writeFileSync(to, fs.readFileSync(from, 'utf8'))
+
+    const cwd = process.cwd()
+    console.log('[types]', `${path.relative(cwd, from)} -> ${path.relative(cwd, to)}`)
   }
 }

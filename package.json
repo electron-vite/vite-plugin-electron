@@ -21,9 +21,9 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
-    "types": "tsc --emitDeclarationOnly",
-    "prepublishOnly": "npm run test && npm run build",
-    "test": "vitest run"
+    "types": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm run test"
   },
   "devDependencies": {
     "rollup": "^3.17.2",
@@ -33,6 +33,7 @@
   },
   "files": [
     "dist",
+    "plugin",
     "electron-env.d.ts"
   ],
   "keywords": [
