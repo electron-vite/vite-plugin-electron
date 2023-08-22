@@ -10,6 +10,11 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
+    "./plugin": {
+      "types": "./plugin/index.d.ts",
+      "import": "./plugin/index.mjs",
+      "require": "./plugin/index.js"
+    },
     "./*": "./*"
   },
   "repository": {
