@@ -24,7 +24,6 @@ export function notBundle(options: NotBundleOptions = {}): Plugin {
     name: 'vite-plugin-electron:not-bundle',
     // Run before the builtin plugin 'vite:resolve'
     enforce: 'pre',
-    apply: 'serve',
     configResolved(config) {
       resolve = config.createResolver({ asSrc: false })
     },

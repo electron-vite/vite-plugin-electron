@@ -28,11 +28,11 @@
 
 ## Features
 
-- 🚀 Fully compatible with Vite and Vite's ecosystem <sub><sup>(Based on Vite)</sup></sub>
-- 🎭 Flexible configuration
 - 🐣 Few APIs, easy to use
-- [🔥 Hot restart <sub><sup>(Main process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-restart)
-- [🔄 Hot reload <sub><sup>(Preload scripts)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-reload)
+- 🌱 Fully compatible with Vite and Vite's ecosystem <sub><sup>(Based on Vite)</sup></sub>
+- [🚀 Not Bundle, It's fast <sub><sup>(Like Vite's Not Bundle)</sup></sub>](https://github.com/electron-vite/vite-plugin-electron#not-bundle)
+- [🔥 Hot Restart <sub><sup>(Main process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-restart)
+- [🔄 Hot Reload <sub><sup>(Preload scripts)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-reload)
 - [⚡️ HMR <sub><sup>(Renderer process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hmr)
 
 <!-- ![vite-plugin-electron.gif](https://github.com/electron-vite/vite-plugin-electron/blob/main/vite-plugin-electron.gif?raw=true) -->
@@ -187,36 +187,6 @@ build({
 })
 ```
 
-## Not Bundle
-
-During dev, we exclude the `cjs` npm-pkg from bundle. **It's fast**! Like Vite's [👉 Not Bundle](https://vitejs.dev/guide/why.html#why-not-bundle-with-esbuild). **Only works during the `vite serve` phase by default**.
-
-```js
-import electron from 'vite-plugin-electron'
-import { notBundle } from 'vite-plugin-electron/plugin'
-
-export default {
-  plugins: [
-    electron({
-      entry: 'electron/main.ts',
-      vite: {
-        plugins: [
-          notBundle(/* NotBundleOptions */),
-        ],
-      },
-    }),
-  ],
-}
-```
-
-`notBundle(/* NotBundleOptions */)`
-
-```ts
-export interface NotBundleOptions {
-  filter?: (id: string) => void | false
-}
-```
-
 ## How to work
 
 It just executes the `electron .` command in the Vite build completion hook and then starts or restarts the Electron App.
@@ -279,3 +249,55 @@ export default {
 ```
 
 <!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
+
+---
+
+## Not Bundle
+
+> Added in: v0.13.0
+
+During the development phase, we can exclude the `cjs` format of npm-pkg from bundle. Like Vite's [👉 Not Bundle](https://vitejs.dev/guide/why.html#why-not-bundle-with-esbuild). **It's fast**!
+
+```js
+import electron from 'vite-plugin-electron'
+import { notBundle } from 'vite-plugin-electron/plugin'
+
+export default defineConfig(({ command }) => ({
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [
+          command === 'serve' && notBundle(/* NotBundleOptions */),
+        ],
+      },
+    }),
+  ],
+}))
+```
+
+**API**
+
+`notBundle(/* NotBundleOptions */)`
+
+```ts
+export interface NotBundleOptions {
+  filter?: (id: string) => void | false
+}
+```
+
+**How to work**
+
+Let's use the `electron-log` as an examples.
+
+```js
+┏—————————————————————————————————————┓
+│ import log from 'electron-log'      │
+┗—————————————————————————————————————┛
+                   ↓
+Modules in `node_modules` are not bundled during development, it's fast!
+                   ↓
+┏—————————————————————————————————————┓
+│ const log = require('electron-log') │
+┗—————————————————————————————————————┛
+```
