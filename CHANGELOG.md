@@ -1,3 +1,29 @@
+## 0.13.0-beta.3 (2023-08-22)
+
+- 37e14b0 fix: remove `apply: 'serve'`
+- 4f196e3 fix: export bare `vite-plugin-electron/plugin`
+- 06c91f3 docs: v0.13.0
+
+The user decides when `notBundle` should be used. See **[👉 Not Bundle](https://github.com/electron-vite/vite-plugin-electron/tree/v0.13.0-beta.3#not-bundle)**
+
+```js
+import electron from 'vite-plugin-electron'
+import { notBundle } from 'vite-plugin-electron/plugin'
+
+export default defineConfig(({ command }) => ({
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [
+          command === 'serve' && notBundle(/* NotBundleOptions */),
+        ],
+      },
+    }),
+  ],
+}))
+```
+
 ## 0.13.0-beta.2 (2023-08-21)
 
 - 86d9a34 chore: update pnpm lock
