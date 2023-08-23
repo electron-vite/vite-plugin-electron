@@ -28,12 +28,12 @@
 
 ## Features
 
-- 🐣 Few APIs, easy to use
-- 🌱 Fully compatible with Vite and Vite's ecosystem <sub><sup>(Based on Vite)</sup></sub>
-- [🚀 Not Bundle, It's fast <sub><sup>(Like Vite's Not Bundle)</sup></sub>](https://github.com/electron-vite/vite-plugin-electron#not-bundle)
 - [🔥 Hot Restart <sub><sup>(Main process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-restart)
 - [🔄 Hot Reload <sub><sup>(Preload scripts)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-reload)
 - [⚡️ HMR <sub><sup>(Renderer process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hmr)
+- [🚀 Not Bundle, It's fast <sub><sup>(Like Vite's Not Bundle)</sup></sub>](https://github.com/electron-vite/vite-plugin-electron#not-bundle)
+- 🌱 Fully compatible with Vite and Vite's ecosystem <sub><sup>(Based on Vite)</sup></sub>
+- 🐣 Few APIs, easy to use
 
 <!-- ![vite-plugin-electron.gif](https://github.com/electron-vite/vite-plugin-electron/blob/main/vite-plugin-electron.gif?raw=true) -->
 
@@ -89,9 +89,33 @@ app.whenReady().then(() => {
 
 That's it! You can now use Electron in your Vite app ✨
 
+## Simple API
+
+Many times, for a developer who is new to Vite and Electron, the oversimplified and open API design is confusing to them. Maybe Simple API makes them easier to understand. :)
+
+```js
+import electron from 'vite-plugin-electron/simple'
+
+export default {
+  plugins: [
+    electron({
+      main: {
+        entry: 'electron/main.ts',
+      },
+      // Optional: input must be use absolute path
+      preload: {
+        input: __dirname + '/electron/preload.ts',
+      },
+      // Optional: Use Node.js API in the Renderer process
+      renderer: {},
+    }),
+  ],
+}
+```
+
 ## API <sub><sup>(Define)</sup></sub>
 
-`electron(config: ElectronOptions | ElectronOptions[])`
+`electron(options: ElectronOptions | ElectronOptions[])`
 
 ```ts
 export interface ElectronOptions {
