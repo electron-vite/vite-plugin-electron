@@ -6,7 +6,7 @@ import {
   expect,
   it,
 } from 'vitest'
-import { notBundle } from '../plugin'
+import { notBundle } from '../dist/plugin'
 
 const pluginNotBundle = notBundle()
 pluginNotBundle.apply = undefined

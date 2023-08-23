@@ -13,6 +13,9 @@ importers:
       vite:
         specifier: ^4.1.4
         version: 4.1.4(@types/node@18.0.6)
+      vite-plugin-electron-renderer:
+        specifier: ^0.14.5
+        version: 0.14.5
       vitest:
         specifier: ^0.28.5
         version: 0.28.5
@@ -2263,6 +2266,10 @@ packages:
     resolution: {integrity: sha512-n0w8vrQFafaY1tmIPIQAck4zLanGLYcthvGttH00KRJg47Sjh2mp5Hb8VJ3l8FmpnYTobnl949+N4sunTR1WBA==}
     dependencies:
       lib-esm: 0.3.0
+    dev: true
+
+  /vite-plugin-electron-renderer@0.14.5:
+    resolution: {integrity: sha512-EQ7ORuPp8vFPCqfuGnVo7d36fXS0IFH4/RUlKb1drseix3TQEPcgwEuFADdXBxRgqMp70njz/1m0kdf5lEsm8w==}
     dev: true
 
   /vite-plugin-multiple@0.2.0:
