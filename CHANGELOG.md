@@ -1,3 +1,20 @@
+## 0.14.0-beta.0 (2023-08-23)
+
+- d3cf87f feat: simple API build
+- d8c3c27 feat: simple API 🥳
+
+See **[👉 Simple API](https://github.com/electron-vite/vite-plugin-electron/tree/v0.14.0-beta.0#simple-api)**
+
+```js
+import electron from 'vite-plugin-electron/simple'
+
+electron({
+  main: {},
+  preload: {},
+  renderer: {},
+})
+```
+
 ## 0.13.0-beta.3 (2023-08-22)
 
 - 37e14b0 fix: remove `apply: 'serve'`
