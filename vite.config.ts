@@ -19,11 +19,12 @@ export default defineConfig(() => {
     build: {
       minify: false,
       emptyOutDir: false,
-      outDir: '',
+      outDir: 'dist',
       lib: {
         entry: {
-          'dist/index': 'src/index.ts',
-          'plugin/index': 'src/plugin.ts',
+          index: 'src/index.ts',
+          plugin: 'src/plugin.ts',
+          simple: 'src/simple.ts',
         },
         formats: ['cjs', 'es'],
         fileName: format => format === 'es' ? '[name].mjs' : '[name].js',
@@ -32,6 +33,7 @@ export default defineConfig(() => {
         external: [
           'electron',
           'vite',
+          'vite-plugin-electron-renderer',
           ...builtinModules,
           ...builtinModules.map(m => `node:${m}`),
           ...Object.keys('dependencies' in pkg ? pkg.dependencies as object : {}),
@@ -77,13 +79,10 @@ function generateTypes() {
 function moveTypesToDist() {
   const types = path.join(__dirname, 'types')
   const dist = path.join(__dirname, 'dist')
-  const plugin = path.join(__dirname, 'plugin')
   const files = fs.readdirSync(types).filter(n => n.endsWith('.d.ts'))
   for (const file of files) {
     const from = path.join(types, file)
-    const to = file.includes('plugin.d.ts')
-      ? path.join(plugin, 'index.d.ts')
-      : path.join(dist, file)
+    const to = path.join(dist, file)
     fs.writeFileSync(to, fs.readFileSync(from, 'utf8'))
 
     const cwd = process.cwd()

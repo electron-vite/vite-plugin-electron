@@ -11,9 +11,14 @@
       "require": "./dist/index.js"
     },
     "./plugin": {
-      "types": "./plugin/index.d.ts",
-      "import": "./plugin/index.mjs",
-      "require": "./plugin/index.js"
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.mjs",
+      "require": "./dist/plugin.js"
+    },
+    "./simple": {
+      "types": "./dist/simple.d.ts",
+      "import": "./dist/simple.mjs",
+      "require": "./dist/simple.js"
     },
     "./*": "./*"
   },
@@ -31,16 +36,26 @@
     "test": "vitest run",
     "prepublishOnly": "npm run build && npm run test"
   },
+  "peerDependencies": {
+    "vite-plugin-electron-renderer": "*"
+  },
+  "peerDependenciesMeta": {
+    "vite-plugin-electron-renderer": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "rollup": "^3.17.2",
     "typescript": "^4.9.5",
     "vite": "^4.1.4",
+    "vite-plugin-electron-renderer": "^0.14.5",
     "vitest": "^0.28.5"
   },
   "files": [
     "dist",
-    "plugin",
-    "electron-env.d.ts"
+    "electron-env.d.ts",
+    "plugin.d.ts",
+    "simple.d.ts"
   ],
   "keywords": [
     "vite",
