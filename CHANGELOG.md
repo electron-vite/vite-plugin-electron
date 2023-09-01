@@ -1,3 +1,7 @@
+## 0.14.0 (2023-09-01)
+
+- 3cc71ca feat(simple): build Preload scripts as `cjs` by default
+
 ## 0.14.0-beta.0 (2023-08-23)
 
 - d3cf87f feat: simple API build

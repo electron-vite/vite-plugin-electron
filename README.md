@@ -26,6 +26,8 @@
 
 <br/>
 
+In short, `vite-plugin-electron` makes developing Electron apps as easy as normal Vite projects.
+
 ## Features
 
 - [🔥 Hot Restart <sub><sup>(Main process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-restart)
@@ -94,6 +96,7 @@ That's it! You can now use Electron in your Vite app ✨
 Many times, for a developer who is new to Vite and Electron, the oversimplified and open API design is confusing to them. Maybe Simple API makes them easier to understand. :)
 
 ```js
+// Just like v0.9.x
 import electron from 'vite-plugin-electron/simple'
 
 export default {
