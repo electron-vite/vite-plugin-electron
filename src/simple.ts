@@ -12,7 +12,7 @@ export interface ElectronSimpleOptions {
     /**
      * Shortcut of `build.rollupOptions.input`.
      * 
-     * Preload scripts perhaps bundle as web format, so use the `build.rollupOptions.input` instead `build.lib.entry`.
+     * Preload scripts may contain Web assets, so use the `build.rollupOptions.input` instead `build.lib.entry`.
      */
     input: InputOption
   }
@@ -23,6 +23,7 @@ export interface ElectronSimpleOptions {
   renderer?: import('vite-plugin-electron-renderer').RendererOptions
 }
 
+// The simple API just like v0.9.x
 // Vite v3.x support async plugin.
 export default async function electronSimple(options: ElectronSimpleOptions): Promise<Plugin[]> {
   const opts = [options.main]
@@ -44,6 +45,8 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
           rollupOptions: {
             input,
             output: {
+              // For use the Electron API - `import { contextBridge, ipcRenderer } from 'electron'`
+              format: 'cjs',
               // Only one file will be bundled, which is consistent with the behavior of `build.lib`
               manualChunks: {},
               // https://github.com/vitejs/vite/blob/v4.4.9/packages/vite/src/node/build.ts#L604
