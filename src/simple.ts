@@ -45,7 +45,8 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
           rollupOptions: {
             input,
             output: {
-              // For use the Electron API - `import { contextBridge, ipcRenderer } from 'electron'`
+              // For use the Electron API - `import { contextBridge, ipcRenderer } from 'electron'`,
+              // Note, however, that `preload.ts` should not be split. 🚧
               format: 'cjs',
               // Only one file will be bundled, which is consistent with the behavior of `build.lib`
               manualChunks: {},
