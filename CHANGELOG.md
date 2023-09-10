@@ -1,3 +1,7 @@
+## 0.14.1 (2023-09-10)
+
+- ba14f55 feat(simple): Preload scripts code not split by default
+
 ## 0.14.0 (2023-09-01)
 
 - 3cc71ca feat(simple): build Preload scripts as `cjs` by default
