@@ -48,16 +48,28 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
               // For use the Electron API - `import { contextBridge, ipcRenderer } from 'electron'`,
               // Note, however, that `preload.ts` should not be split. 🚧
               format: 'cjs',
-              // Only one file will be bundled, which is consistent with the behavior of `build.lib`
-              manualChunks: {},
+
+              // Whether Node.js is enabled in the Main process or not, the Preload scripts supports loading `electron` module, 
+              // so we need to build it in `cjs` format.
+
+              // e.g.
+              // import { ipcRenderer } from 'electron'
+              // // ↓↓↓↓ Build with `cjs` format ↓↓↓↓
+              // const { ipcRenderer } = require('electron')
+
+              // When Rollup builds code in `cjs` format, it will automatically split the code into multiple chunks, and use `require()` to load them, 
+              // and use `require()` to load other modules when `nodeIntegration: false` in the Main process Errors will occur.
+              // So we need to configure Rollup not to split the code when building to ensure that it works correctly with `nodeIntegration: false`.
+              inlineDynamicImports: true,
+
               // https://github.com/vitejs/vite/blob/v4.4.9/packages/vite/src/node/build.ts#L604
               entryFileNames: '[name].js',
               chunkFileNames: '[name].js',
               assetFileNames: '[name].[ext]',
             },
           },
-        } as UserConfig,
-      }, viteConfig),
+        },
+      } as UserConfig, viteConfig),
     }
     opts.push(preload)
   }
