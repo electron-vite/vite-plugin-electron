@@ -55,6 +55,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           Object.assign(process.env, {
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
+          let closeBundleCount = 0
           for (const options of optionsArray) {
             options.vite ??= {}
             options.vite.mode ??= server.config.mode
@@ -66,6 +67,18 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
               {
                 name: ':startup',
                 closeBundle() {
+                  /*
+                  closeBundle is emitted for both the preload and main electron
+                  files. If we simply run Electron once either one finishes,
+                  the other one might not finish in time. Usually, the faster
+                  one is the preload, meaning if main is *a lot* larger than it,
+                  Electron might start before the file is done building,
+                  leading to an "Unable to find Electron app at ..." error
+                   */
+                  closeBundleCount++
+                  if (closeBundleCount < optionsArray.length)
+                    return
+
                   if (options.onstart) {
                     options.onstart.call(this, {
                       startup,
