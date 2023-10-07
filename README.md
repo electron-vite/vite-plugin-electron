@@ -107,7 +107,7 @@ export default {
       },
       // Optional: input must be use absolute path
       preload: {
-        input: __dirname + '/electron/preload.ts',
+        input: 'electron/preload.ts',
       },
       // Optional: Use Node.js API in the Renderer process
       renderer: {},
