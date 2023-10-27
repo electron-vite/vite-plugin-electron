@@ -36,6 +36,19 @@ export interface ElectronOptions {
     /** Reload Electron-Renderer */
     reload: () => void
   }) => void | Promise<void>
+
+  /**
+   * It is up to the developer to decide whether to use treeKill
+   *
+   * @example
+   *
+   * package.json
+   * // use TreeKill, please add tree-kill in devDependencies
+   * "tree-kill": "^1.2.2"
+   *
+   * @defaule `false` treeKill is not used by default
+   */
+  useTreeKill?: boolean
 }
 
 export function build(options: ElectronOptions) {
@@ -62,6 +75,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             options.vite.build.watch ??= {}
             options.vite.build.minify ??= false
             options.vite.plugins ??= []
+            startup.useTreeKill = !!options.useTreeKill
             options.vite.plugins.push(
               {
                 name: ':startup',
@@ -125,10 +139,22 @@ export async function startup(argv = ['.', '--no-sandbox']) {
     process.once('exit', startup.exit)
   }
 }
+
 startup.hookProcessExit = false
-startup.exit = () => {
-  if (process.electronApp) {
-    process.electronApp.removeAllListeners()
-    process.electronApp.kill()
+startup.useTreeKill = false
+
+startup.exit = async () => {
+  if (!process.electronApp) {
+    return
   }
+
+  process.electronApp.removeAllListeners()
+
+  if (startup.useTreeKill) {
+    const { default: treeKill } = await import("tree-kill")
+    treeKill(process.electronApp.pid!)
+    return;
+  }
+
+  process.electronApp.kill()
 }
