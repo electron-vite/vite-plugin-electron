@@ -1,35 +1,53 @@
-# vite-plugin-electron
+<p align="center">
+  <img width="170" src="https://github.com/electron-vite/vite-plugin-electron/blob/main/logo.svg?raw=true">
+</p>
+<div align="center">
+  <h1>vite-plugin-electron</h1>
+</div>
+<p align="center">Electron 🔗 Vite</p>
+<p align="center">
+  <a href="https://npmjs.com/package/vite-plugin-electron">
+    <img src="https://img.shields.io/npm/v/vite-plugin-electron.svg">
+  </a>
+  <a href="https://npmjs.com/package/vite-plugin-electron">
+    <img src="https://img.shields.io/npm/dm/vite-plugin-electron.svg">
+  </a>
+  <a href="https://discord.gg/YfjFuEgVUR">
+    <img src="https://img.shields.io/badge/chat-discord-blue?logo=discord">
+  </a>
+</p>
+<p align="center">
+  <strong>
+    <span>English</span>
+    |
+    <a href="https://github.com/electron-vite/vite-plugin-electron/blob/main/README.zh-CN.md">简体中文</a>
+  </strong>
+</p>
 
-Electron 🔗 Vite
+<br/>
 
-[![NPM version](https://img.shields.io/npm/v/vite-plugin-electron.svg)](https://npmjs.org/package/vite-plugin-electron)
-[![NPM Downloads](https://img.shields.io/npm/dm/vite-plugin-electron.svg)](https://npmjs.org/package/vite-plugin-electron)
-[![GitHub Discord](https://img.shields.io/badge/chat-discord-blue?logo=discord)](https://discord.gg/YfjFuEgVUR)
+In short, `vite-plugin-electron` makes developing Electron apps as easy as normal Vite projects.
 
-English | [简体中文](https://github.com/electron-vite/vite-plugin-electron/blob/main/README.zh-CN.md)
+## Features
 
-- 🚀 Fully compatible with Vite and Vite's ecosystem <sub><sup>(Based on Vite)</sup></sub>
-- 🎭 Flexible configuration
+- [🔥 Hot Restart <sub><sup>(Main process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-restart)
+- [🔄 Hot Reload <sub><sup>(Preload scripts)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-reload)
+- [⚡️ HMR <sub><sup>(Renderer process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hmr)
+- [🚀 Not Bundle, It's fast <sub><sup>(Like Vite's Not Bundle)</sup></sub>](https://github.com/electron-vite/vite-plugin-electron#not-bundle)
+- 🌱 Fully compatible with Vite and Vite's ecosystem <sub><sup>(Based on Vite)</sup></sub>
 - 🐣 Few APIs, easy to use
-- 🔥 Hot restart
 
-![vite-plugin-electron.gif](https://github.com/caoxiemeihao/blog/blob/main/vite/vite-plugin-electron.gif?raw=true)
+<!-- ![vite-plugin-electron.gif](https://github.com/electron-vite/vite-plugin-electron/blob/main/vite-plugin-electron.gif?raw=true) -->
 
-## Install
+## Quick Setup
+
+1. Add the following dependency to your project
 
 ```sh
-npm i vite-plugin-electron -D
+npm i -D vite-plugin-electron
 ```
 
-## Examples
-
-- [quick-start](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/quick-start)
-- [custom-start-electron-app](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/custom-start-electron-app)
-- [bytecode](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/bytecode)
-
-## Usage
-
-vite.config.ts
+2. Add `vite-plugin-electron` to the `plugins` section of `vite.config.ts`
 
 ```js
 import electron from 'vite-plugin-electron'
@@ -43,28 +61,67 @@ export default {
 }
 ```
 
-You can use `process.env.VITE_DEV_SERVER_URL` when the vite command is called 'serve'
+3. Create the `electron/main.ts` file and type the following code
 
 ```js
-// electron main.js
-const win = new BrowserWindow({
-  title: 'Main window',
-})
+import { app, BrowserWindow } from 'electron'
 
-if (process.env.VITE_DEV_SERVER_URL) {
-  win.loadURL(process.env.VITE_DEV_SERVER_URL)
-} else {
-  // load your file
-  win.loadFile('yourOutputFile.html');
+app.whenReady().then(() => {
+  const win = new BrowserWindow({
+    title: 'Main window',
+  })
+
+  // You can use `process.env.VITE_DEV_SERVER_URL` when the vite command is called `serve`
+  if (process.env.VITE_DEV_SERVER_URL) {
+    win.loadURL(process.env.VITE_DEV_SERVER_URL)
+  } else {
+    // Load your file
+    win.loadFile('dist/index.html');
+  }
+})
+```
+
+4. Add the `main` entry to `package.json`
+
+```diff
+{
++ "main": "dist-electron/main.js"
+}
+```
+
+That's it! You can now use Electron in your Vite app ✨
+
+## Simple API
+
+Many times, for a developer who is new to Vite and Electron, the oversimplified and open API design is confusing to them. Maybe Simple API makes them easier to understand. :)
+
+```js
+// Just like v0.9.x
+import electron from 'vite-plugin-electron/simple'
+
+export default {
+  plugins: [
+    electron({
+      main: {
+        entry: 'electron/main.ts',
+      },
+      // Optional: input must be use absolute path
+      preload: {
+        input: __dirname + '/electron/preload.ts',
+      },
+      // Optional: Use Node.js API in the Renderer process
+      renderer: {},
+    }),
+  ],
 }
 ```
 
 ## API <sub><sup>(Define)</sup></sub>
 
-`electron(config: Configuration | Configuration[])`
+`electron(options: ElectronOptions | ElectronOptions[])`
 
 ```ts
-export interface Configuration {
+export interface ElectronOptions {
   /**
    * Shortcut of `build.lib.entry`
    */
@@ -76,7 +133,7 @@ export interface Configuration {
    * If this `onstart` is passed, Electron App will not start automatically.  
    * However, you can start Electroo App via `startup` function.  
    */
-  onstart?: (this: import('rollup').PluginContext, options: {
+  onstart?: (args: {
     /**
      * Electron App startup function.  
      * It will mount the Electron App child-process to `process.electronApp`.  
@@ -89,46 +146,7 @@ export interface Configuration {
 }
 ```
 
-## JavaScript API
-
-`vite-plugin-electron`'s JavaScript APIs are fully typed, and it's recommended to use TypeScript or enable JS type checking in VS Code to leverage the intellisense and validation.
-
-- `Configuration` - type
-- `defineConfig` - function
-- `resolveViteConfig` - function, Resolve the default Vite's `InlineConfig` for build Electron-Main
-- `withExternalBuiltins` - function
-- `build` - function
-- `startup` - function
-
-**Example**
-
-```js
-build(
-  withExternalBuiltins( // external Node.js builtin modules
-    resolveViteConfig( // with default config
-      {
-        entry: 'foo.ts',
-        vite: {
-          mode: 'foo-mode', // for .env file
-          plugins: [{
-            name: 'plugin-build-done',
-            closeBundle() {
-              // Startup Electron App
-              startup()
-            },
-          }],
-        },
-      }
-    )
-  )
-)
-```
-
-## How to work
-
-It just executes the `electron .` command in the Vite build completion hook and then starts or restarts the Electron App.
-
-## Recommend structure
+## Recommend Structure
 
 Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-vanilla-ts) created based on `create vite` as an example
 
@@ -147,26 +165,166 @@ Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree
 + └── vite.config.ts
 ```
 
+## [Examples](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples)
+
+- [quick-start](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/quick-start)
+- [multiple-renderer](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-renderer)
+- [bytecode](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/bytecode)
+<!--
+- [multiple-window](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-window)
+- [custom-start-electron-app](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/custom-start-electron-app)
+-->
+
+## JavaScript API
+
+`vite-plugin-electron`'s JavaScript APIs are fully typed, and it's recommended to use TypeScript or enable JS type checking in VS Code to leverage the intellisense and validation.
+
+- `ElectronOptions` - type
+- `resolveViteConfig` - function, Resolve the default Vite's `InlineConfig` for build Electron-Main
+- `withExternalBuiltins` - function
+- `build` - function
+- `startup` - function
+
+**Example**
+
+```js
+import { build, startup } from 'vite-plugin-electron'
+
+const isDev = process.env.NODE_ENV === 'development'
+const isProd = process.env.NODE_ENV === 'production'
+
+build({
+  entry: 'electron/main.ts',
+  vite: {
+    mode: process.env.NODE_ENV,
+    build: {
+      minify: isProd,
+      watch: isDev ? {} : null,
+    },
+    plugins: [{
+      name: 'plugin-start-electron',
+      closeBundle() {
+        if (isDev) {
+          // Startup Electron App
+          startup()
+        }
+      },
+    }],
+  },
+})
+```
+
+## How to work
+
+It just executes the `electron .` command in the Vite build completion hook and then starts or restarts the Electron App.
+
 ## Be aware
 
 - 🚨 By default, the files in `electron` folder will be built into the `dist-electron`
 - 🚨 Currently, `"type": "module"` is not supported in Electron
-- 🚨 In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages. So, put your Node.js package in `dependencies`. Unless you know how to properly build them with Vite.
-  ```js
-  electron({
-    entry: 'electron/main.ts',
-    vite: {
-      build: {
-        rollupOptions: {
-          // Here are some C/C++ plugins that can't be built properly.
-          external: [
-            'serialport',
-            'sqlite3',
-          ],
+
+## C/C++ Native
+
+We have two ways to use C/C++ native modules
+
+**First way**
+
+In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages
+
+So, put your Node.js package in `dependencies`. Unless you know how to properly build them with Vite
+
+```js
+export default {
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        build: {
+          rollupOptions: {
+            // Here are some C/C++ modules them can't be built properly
+            external: [
+              'serialport',
+              'sqlite3',
+            ],
+          },
         },
       },
-    },
-  }),
-  ```
+    }),
+  ],
+}
+```
+
+**Second way**
+
+Use 👉 [vite-plugin-native](https://github.com/vite-plugin/vite-plugin-native)
+
+```js
+import native from 'vite-plugin-native'
+
+export default {
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [
+          native(/* options */),
+        ],
+      },
+    }),
+  ],
+}
+```
 
 <!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
+
+---
+
+## Not Bundle
+
+> Added in: v0.13.0
+
+During the development phase, we can exclude the `cjs` format of npm-pkg from bundle. Like Vite's [👉 Not Bundle](https://vitejs.dev/guide/why.html#why-not-bundle-with-esbuild). **It's fast**!
+
+```js
+import electron from 'vite-plugin-electron'
+import { notBundle } from 'vite-plugin-electron/plugin'
+
+export default defineConfig(({ command }) => ({
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [
+          command === 'serve' && notBundle(/* NotBundleOptions */),
+        ],
+      },
+    }),
+  ],
+}))
+```
+
+**API**
+
+`notBundle(/* NotBundleOptions */)`
+
+```ts
+export interface NotBundleOptions {
+  filter?: (id: string) => void | false
+}
+```
+
+**How to work**
+
+Let's use the `electron-log` as an examples.
+
+```js
+┏—————————————————————————————————————┓
+│ import log from 'electron-log'      │
+┗—————————————————————————————————————┛
+                   ↓
+Modules in `node_modules` are not bundled during development, it's fast!
+                   ↓
+┏—————————————————————————————————————┓
+│ const log = require('electron-log') │
+┗—————————————————————————————————————┛
+```

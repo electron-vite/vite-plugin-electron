@@ -11,7 +11,8 @@
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
-    "outDir": "types"
+    "outDir": "types",
+    "emitDeclarationOnly": true
   },
-  "include": ["src/**/*.ts", "electron-env.d.ts"]
+  "include": ["src", "electron-env.d.ts"]
 }

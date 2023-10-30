@@ -1,14 +1,26 @@
 {
   "name": "vite-plugin-electron",
-  "version": "0.11.1",
+  "version": "0.14.1",
   "description": "Electron 🔗 Vite",
-  "main": "index.js",
-  "types": "types",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./index.mjs",
-      "require": "./index.js"
-    }
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.mjs",
+      "require": "./dist/plugin.js"
+    },
+    "./simple": {
+      "types": "./dist/simple.d.ts",
+      "import": "./dist/simple.mjs",
+      "require": "./dist/simple.js"
+    },
+    "./*": "./*"
   },
   "repository": {
     "type": "git",
@@ -16,26 +28,37 @@
   },
   "author": "草鞋没号 <308487730@qq.com>",
   "license": "MIT",
+  "packageManager": "pnpm@8.0.0",
   "scripts": {
     "dev": "vite build --watch",
-    "build": "rm -rf types && tsc --emitDeclarationOnly && vite build",
-    "prepublishOnly": "npm run test && npm run build",
-    "test": "vitest run"
+    "build": "vite build",
+    "types": "tsc",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm run test"
+  },
+  "peerDependencies": {
+    "vite-plugin-electron-renderer": "*"
+  },
+  "peerDependenciesMeta": {
+    "vite-plugin-electron-renderer": {
+      "optional": true
+    }
   },
   "dependencies": {
     "tree-kill": "^1.2.2"
   },
   "devDependencies": {
-    "rollup": "^3.9.0",
-    "typescript": "^4.9.4",
-    "vite": "^4.0.3",
-    "vitest": "^0.26.2"
+    "rollup": "^3.17.2",
+    "typescript": "^4.9.5",
+    "vite": "^4.1.4",
+    "vite-plugin-electron-renderer": "^0.14.5",
+    "vitest": "^0.28.5"
   },
   "files": [
-    "types",
-    "index.mjs",
-    "index.js",
-    "electron-env.d.ts"
+    "dist",
+    "electron-env.d.ts",
+    "plugin.d.ts",
+    "simple.d.ts"
   ],
   "keywords": [
     "vite",

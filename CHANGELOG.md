@@ -1,3 +1,136 @@
+## 0.14.1 (2023-09-10)
+
+- ba14f55 feat(simple): Preload scripts code not split by default
+
+## 0.14.0 (2023-09-01)
+
+- 3cc71ca feat(simple): build Preload scripts as `cjs` by default
+
+## 0.14.0-beta.0 (2023-08-23)
+
+- d3cf87f feat: simple API build
+- d8c3c27 feat: simple API 🥳
+
+See **[👉 Simple API](https://github.com/electron-vite/vite-plugin-electron/tree/v0.14.0-beta.0#simple-api)**
+
+```js
+import electron from 'vite-plugin-electron/simple'
+
+electron({
+  main: {},
+  preload: {},
+  renderer: {},
+})
+```
+
+## 0.13.0-beta.3 (2023-08-22)
+
+- 37e14b0 fix: remove `apply: 'serve'`
+- 4f196e3 fix: export bare `vite-plugin-electron/plugin`
+- 06c91f3 docs: v0.13.0
+
+The user decides when `notBundle` should be used. See **[👉 Not Bundle](https://github.com/electron-vite/vite-plugin-electron/tree/v0.13.0-beta.3#not-bundle)**
+
+```js
+import electron from 'vite-plugin-electron'
+import { notBundle } from 'vite-plugin-electron/plugin'
+
+export default defineConfig(({ command }) => ({
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [
+          command === 'serve' && notBundle(/* NotBundleOptions */),
+        ],
+      },
+    }),
+  ],
+}))
+```
+
+## 0.13.0-beta.2 (2023-08-21)
+
+- 86d9a34 chore: update pnpm lock
+- c6aceb3 refactor: standalone `Not Bundle` plugin
+- b3decf4 Merge pull request #150 from haodaking/changelog
+- 3f77d12 Update CHANGELOG.md
+
+Users need to import the `notBundle` plugin explicitly. See **[👉 Not Bundle](https://github.com/electron-vite/vite-plugin-electron/tree/v0.13.0-beta.2#not-bundle)**
+
+```js
+import electron from 'vite-plugin-electron'
+import { notBundle } from 'vite-plugin-electron/plugin'
+
+export default {
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [
+          notBundle(/* NotBundleOptions */),
+        ],
+      },
+    }),
+  ],
+}
+```
+
+## 0.13.0-beta.1 (2023-08-06)
+
+- e5403c1 feat: check `cjs` availabe
+
+## 0.13.0-beta.0 (2023-08-06)
+
+- 5fbcf40 test: plugin `external_node_modules`
+- 9803e26 feat: non-bundle during dev 🚀
+
+Let's use the `electron-log` as an examples.
+
+```js
+┏—————————————————————————————————————┓
+│ import log from 'electron-log'      │
+┗—————————————————————————————————————┛
+                   ↓
+Modules in `node_modules` are not bundled during development, it's fast!
+                   ↓
+┏—————————————————————————————————————┓
+│ const log = require('electron-log') │
+┗—————————————————————————————————————┛
+```
+
+## 0.12.0 (2023-06-13)
+
+- 6822409 docs: v0.12.0
+- 9ec9d3b v0.12.0
+- 53a0dd8 feat: disable minify during dev
+- 3925cd1 refactor: remove `defineConfig`, `Configuration` -> `ElectronOptions`, config.ts -> utils.ts
+
+## 0.11.2 (2023-04-15)
+
+- b033bc5 v0.11.2
+- 8190208 docs: typo
+- 111d495 refactor(🔨): better build logic
+- 76611a9 fix: disable `browserField` by default #136
+- 241534f feat: add `.npmrc` for `pnpm`
+- 65d4ab1 chore: bump deps
+- b4308e3 chore: rename
+- 036e52c docs: update
+- a222c48 examples: update quick-start
+- d04155c examples: add javascript-api
+- 9213ba0 docs: update
+- 9b8da83 fix: cannot find type definition #126
+- e864b81 examples: update multiple-window, add multiple-renderer
+- 0a226b5 docs: update
+- ff5e9dc feat: add logo.svg
+- 7cec6ad examples: add multiple-windows
+- f8528ed Merge pull request #123 from xhayper/patch-1
+- 1e9f9b0 feat: remove extra dependencies
+- 8fa6ce4 feat: update package and example
+- 1d7eca5 feat: add test 🌱
+- 9ef3e8e chore: bump deps
+- 56446e2 chore: cleanup
+
 ## 0.11.1 (2022-12-19)
 
 - 2bf7d0b docs: `startup()`

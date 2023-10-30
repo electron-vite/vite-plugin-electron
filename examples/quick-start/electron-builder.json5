@@ -3,7 +3,7 @@
  */
 {
   "appId": "YourAppID",
-  "asar": true,
+  "asar": false,
   "directories": {
     "output": "release/${version}"
   },

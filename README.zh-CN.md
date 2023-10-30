@@ -16,7 +16,7 @@
     vite: {
       build: {
         rollupOptions: {
-          // Here are some C/C++ plugins that can't be built properly.
+          // Here are some C/C++ modules them can't be built properly.
           external: [
             'serialport',
             'sqlite3',

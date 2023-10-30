@@ -110,6 +110,3 @@ package-lock.json
 yarn.lock
 
 /types
-/index.mjs
-/index.cjs
-/index.js
