@@ -37,15 +37,16 @@
     "prepublishOnly": "npm run build && npm run test"
   },
   "peerDependencies": {
-    "vite-plugin-electron-renderer": "*"
+    "vite-plugin-electron-renderer": "*",
+    "tree-kill": "*"
   },
   "peerDependenciesMeta": {
     "vite-plugin-electron-renderer": {
       "optional": true
+    },
+    "tree-kill": {
+      "optional": true
     }
-  },
-  "dependencies": {
-    "tree-kill": "^1.2.2"
   },
   "devDependencies": {
     "rollup": "^3.17.2",

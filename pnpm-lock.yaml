@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       tree-kill:
-        specifier: ^1.2.2
+        specifier: '*'
         version: 1.2.2
     devDependencies:
       rollup:
