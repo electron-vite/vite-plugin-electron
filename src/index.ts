@@ -114,9 +114,11 @@ export async function startup(argv = ['.', '--no-sandbox']) {
   const electron = await import('electron')
   const electronPath = <any>(electron.default ?? electron)
 
-  startup.exit()
+  await startup.exit()
+
   // Start Electron.app
   process.electronApp = spawn(electronPath, argv, { stdio: 'inherit' })
+
   // Exit command after Electron.app exits
   process.electronApp.once('exit', process.exit)
 
@@ -130,8 +132,8 @@ startup.exit = async () => {
   if (process.electronApp) {
     process.electronApp.removeAllListeners()
     try {
-      const { default: kill } = await import('tree-kill')
-      kill(process.electronApp.pid!)
+      const { default: treeKill } = await import('tree-kill')
+      treeKill(process.electronApp.pid!)
     } catch (e) {
       process.electronApp.kill()
     }
