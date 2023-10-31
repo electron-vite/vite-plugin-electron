@@ -103,11 +103,12 @@ export default {
   plugins: [
     electron({
       main: {
+        // Shortcut of `build.lib.entry`
         entry: 'electron/main.ts',
       },
-      // Optional: input must be use absolute path
       preload: {
-        input: __dirname + '/electron/preload.ts',
+        // Shortcut of `build.rollupOptions.input`
+        input: 'electron/preload.ts',
       },
       // Optional: Use Node.js API in the Renderer process
       renderer: {},
@@ -165,15 +166,9 @@ Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree
 + └── vite.config.ts
 ```
 
-## [Examples](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples)
+## Examples
 
-- [quick-start](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/quick-start)
-- [multiple-renderer](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-renderer)
-- [bytecode](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/bytecode)
-<!--
-- [multiple-window](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/multiple-window)
-- [custom-start-electron-app](https://github.com/electron-vite/vite-plugin-electron/tree/main/examples/custom-start-electron-app)
--->
+There are many cases here 👉 [electron-vite-samples](https://github.com/caoxiemeihao/electron-vite-samples)
 
 ## JavaScript API
 
@@ -328,3 +323,10 @@ Modules in `node_modules` are not bundled during development, it's fast!
 │ const log = require('electron-log') │
 ┗—————————————————————————————————————┛
 ```
+
+## FAQ
+
+- `electron` does not exit correctly | 使用ctrl + c 停止代码，electron后台不关闭 | [#122](https://github.com/electron-vite/vite-plugin-electron/pull/122), [#168](https://github.com/electron-vite/vite-plugin-electron/issues/168)
+
+  * Add `tree-kill` into you dependencies, `npm i -D tree-kill`.
+
