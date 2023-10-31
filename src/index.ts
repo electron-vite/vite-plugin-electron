@@ -22,14 +22,14 @@ export interface ElectronOptions {
   vite?: import('vite').InlineConfig
   /**
    * Triggered when Vite is built every time -- `vite serve` command only.
-   * 
-   * If this `onstart` is passed, Electron App will not start automatically.  
-   * However, you can start Electroo App via `startup` function.  
+   *
+   * If this `onstart` is passed, Electron App will not start automatically.
+   * However, you can start Electroo App via `startup` function.
    */
   onstart?: (args: {
     /**
-     * Electron App startup function.  
-     * It will mount the Electron App child-process to `process.electronApp`.  
+     * Electron App startup function.
+     * It will mount the Electron App child-process to `process.electronApp`.
      * @param argv default value `['.', '--no-sandbox']`
      */
     startup: (argv?: string[]) => Promise<void>
@@ -104,8 +104,8 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
 }
 
 /**
- * Electron App startup function.  
- * It will mount the Electron App child-process to `process.electronApp`.  
+ * Electron App startup function.
+ * It will mount the Electron App child-process to `process.electronApp`.
  * @param argv default value `['.', '--no-sandbox']`
  */
 export async function startup(argv = ['.', '--no-sandbox']) {
@@ -114,9 +114,11 @@ export async function startup(argv = ['.', '--no-sandbox']) {
   const electron = await import('electron')
   const electronPath = <any>(electron.default ?? electron)
 
-  startup.exit()
+  await startup.exit()
+
   // Start Electron.app
   process.electronApp = spawn(electronPath, argv, { stdio: 'inherit' })
+
   // Exit command after Electron.app exits
   process.electronApp.once('exit', process.exit)
 
@@ -126,9 +128,14 @@ export async function startup(argv = ['.', '--no-sandbox']) {
   }
 }
 startup.hookProcessExit = false
-startup.exit = () => {
+startup.exit = async () => {
   if (process.electronApp) {
     process.electronApp.removeAllListeners()
-    process.electronApp.kill()
+    try {
+      const { default: treeKill } = await import('tree-kill')
+      treeKill(process.electronApp.pid!)
+    } catch (e) {
+      process.electronApp.kill()
+    }
   }
 }

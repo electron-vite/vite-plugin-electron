@@ -31,12 +31,12 @@ export default defineConfig(() => {
       },
       rollupOptions: {
         external: [
-          'electron',
           'vite',
-          'vite-plugin-electron-renderer',
+          'electron',
           ...builtinModules,
           ...builtinModules.map(m => `node:${m}`),
           ...Object.keys('dependencies' in pkg ? pkg.dependencies as object : {}),
+          ...Object.keys('peerDependencies' in pkg ? pkg.peerDependencies as object : {}),
         ],
         output: {
           exports: 'named',
