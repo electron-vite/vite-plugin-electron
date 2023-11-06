@@ -1,3 +1,7 @@
+## 0.15.2 (2023-11-06)
+
+- 9719203 chore: better exit `electron` logic
+
 ## 0.15.1 (2023-11-06)
 
 - 2119108 fix: correct use `tree-kill`
