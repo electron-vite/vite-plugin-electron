@@ -110,3 +110,23 @@ export function resolveServerUrl(server: ViteDevServer): string | void {
     return url
   }
 }
+
+export function calcEntryCount(optionsArray: ElectronOptions[]) {
+  return optionsArray.reduce((count, options) => {
+    const input = options.vite?.build?.rollupOptions?.input
+
+    // `input` option have higher priority.
+    // https://github.com/vitejs/vite/blob/v4.4.9/packages/vite/src/node/build.ts#L494
+    if (input) {
+      count += typeof input === 'string'
+        ? 1
+        : Object.keys(input).length
+    } else if (options.entry) {
+      count += typeof options.entry === 'string'
+        ? 1
+        : Object.keys(options.entry).length
+    }
+
+    return count
+  }, 0)
+}

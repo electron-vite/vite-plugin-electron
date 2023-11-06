@@ -138,11 +138,20 @@ startup.hookProcessExit = false
 startup.exit = async () => {
   if (process.electronApp) {
     process.electronApp.removeAllListeners()
-    try {
-      const { default: treeKill } = await import('tree-kill')
-      treeKill(process.electronApp.pid!)
-    } catch (e) {
-      process.electronApp.kill()
-    }
+
+    import('tree-kill')
+      .then(m => m.default(process.electronApp.pid!))
+      .catch(e => {
+        if (e.code === 'ERR_MODULE_NOT_FOUND') {
+          console.log(
+            '[vite-plugin-electron]',
+            'install tree-kill to exit all associated processes, place run "npm i tree-kill".',
+          )
+        } else {
+          console.error(e)
+        }
+      })
+
+    process.electronApp.kill() // `tree-kill` doesn't work locally on my Mac(2023-11-06) 🤔
   }
 }
