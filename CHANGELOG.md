@@ -1,3 +1,30 @@
+## 0.15.0 (2023-11-06)
+
+- 234be07 fix: `tree-kill` doesn't work
+- 5e6c36d feat: `calcEntryCount()`
+- bbd6bd1 Merge branch 'main' of github.com:electron-vite/vite-plugin-electron into main
+- 9a910e5 Merge pull request #166 from CommandMC/fix/wait-for-all-files
+- 3962718 fix: startup electron wait for all files built
+- 7f75ae2 Merge branch 'fix/wait-for-all-files' of https://github.com/CommandMC/vite-plugin-electron into main
+- 65b73c2 Merge pull request #122 from sevenc-nanashi/main
+- e4033c3 Merge pull request #1 from caoxiemeihao/cleanup
+- 8e70a39 chore: cleanup
+- 20dd675 refactor: migrate examples to `github.com/caoxiemeihao/electron-vite-samples`
+- de9259f Change: Use peer-dependency
+- 8247192 Merge: main -> main
+- ab990b9 Wait until the last file is done bundling before starting Electron
+- 6e5a033 Merge pull request #163 from electron-vite/v0.14.1
+
+**Fixs:**
+
+- `electron` does not exit correctly | 使用ctrl + c 停止代码，electron后台不关闭 [#168](https://github.com/electron-vite/vite-plugin-electron/issues/168), [#122](https://github.com/electron-vite/vite-plugin-electron/pull/122)
+- Fixed `electron` startup timing [#166](https://github.com/electron-vite/vite-plugin-electron/pull/166)
+
+**Contributors:**
+
+- [#122](https://github.com/electron-vite/vite-plugin-electron/pull/122)@[sevenc-nanashi](https://github.com/sevenc-nanashi)
+- [#166](https://github.com/electron-vite/vite-plugin-electron/pull/166)@[CommandMC](https://github.com/CommandMC)
+
 ## 0.14.1 (2023-09-10)
 
 - ba14f55 feat(simple): Preload scripts code not split by default
