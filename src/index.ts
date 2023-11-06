@@ -121,7 +121,7 @@ export async function startup(argv = ['.', '--no-sandbox']) {
   const electron = await import('electron')
   const electronPath = <any>(electron.default ?? electron)
 
-  await startup.exit()
+  startup.exit()
 
   // Start Electron.app
   process.electronApp = spawn(electronPath, argv, { stdio: 'inherit' })
@@ -131,31 +131,14 @@ export async function startup(argv = ['.', '--no-sandbox']) {
 
   if (!startup.hookedProcessExit) {
     startup.hookedProcessExit = true
-    process.once('exit', () => {
-      startup.exit()
-      // When the process exits, `tree-kill` does not have enough time to complete execution, so `electronApp` needs to be killed immediately.
-      process.electronApp.kill()
-    })
+    process.once('exit', startup.exit)
   }
 }
 startup.hookedProcessExit = false
 startup.exit = async () => {
   if (process.electronApp) {
     process.electronApp.removeAllListeners()
-
-    await import('tree-kill')
-      .then(m => m.default(process.electronApp.pid!))
-      .catch(e => {
-        process.electronApp.kill()
-
-        if (e.code === 'ERR_MODULE_NOT_FOUND') {
-          console.log(
-            '[vite-plugin-electron]',
-            'Please install tree-kill to exit all associated processes, run "npm i tree-kill -D".',
-          )
-        } else {
-          console.error(e)
-        }
-      })
+    // SIGINT can be sent to the process tree #122
+    process.electronApp.kill('SIGINT')
   }
 }
