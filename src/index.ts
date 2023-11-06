@@ -6,6 +6,7 @@ import {
   resolveServerUrl,
   resolveViteConfig,
   withExternalBuiltins,
+  calcEntryCount,
 } from './utils'
 
 // public utils
@@ -55,6 +56,10 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           Object.assign(process.env, {
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
+
+          const entryCount = calcEntryCount(optionsArray)
+          let closeBundleCount = 0
+
           for (const options of optionsArray) {
             options.vite ??= {}
             options.vite.mode ??= server.config.mode
@@ -66,6 +71,8 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
               {
                 name: ':startup',
                 closeBundle() {
+                  if (++closeBundleCount < entryCount) return
+
                   if (options.onstart) {
                     options.onstart.call(this, {
                       startup,
