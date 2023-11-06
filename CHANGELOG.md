@@ -1,3 +1,7 @@
+## 0.15.1 (2023-11-06)
+
+- 2119108 fix: correct use `tree-kill`
+
 ## 0.15.0 (2023-11-06)
 
 - 234be07 fix: `tree-kill` doesn't work

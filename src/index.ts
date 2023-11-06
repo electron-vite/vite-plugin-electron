@@ -129,29 +129,33 @@ export async function startup(argv = ['.', '--no-sandbox']) {
   // Exit command after Electron.app exits
   process.electronApp.once('exit', process.exit)
 
-  if (!startup.hookProcessExit) {
-    startup.hookProcessExit = true
-    process.once('exit', startup.exit)
+  if (!startup.hookedProcessExit) {
+    startup.hookedProcessExit = true
+    process.once('exit', () => {
+      startup.exit()
+      // When the process exits, `tree-kill` does not have enough time to complete execution, so `electronApp` needs to be killed immediately.
+      process.electronApp.kill()
+    })
   }
 }
-startup.hookProcessExit = false
+startup.hookedProcessExit = false
 startup.exit = async () => {
   if (process.electronApp) {
     process.electronApp.removeAllListeners()
 
-    import('tree-kill')
+    await import('tree-kill')
       .then(m => m.default(process.electronApp.pid!))
       .catch(e => {
+        process.electronApp.kill()
+
         if (e.code === 'ERR_MODULE_NOT_FOUND') {
           console.log(
             '[vite-plugin-electron]',
-            'install tree-kill to exit all associated processes, place run "npm i tree-kill".',
+            'Please install tree-kill to exit all associated processes, run "npm i tree-kill -D".',
           )
         } else {
           console.error(e)
         }
       })
-
-    process.electronApp.kill() // `tree-kill` doesn't work locally on my Mac(2023-11-06) 🤔
   }
 }
