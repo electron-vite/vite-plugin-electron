@@ -6,6 +6,7 @@ import {
   resolveServerUrl,
   resolveViteConfig,
   withExternalBuiltins,
+  calcEntryCount,
 } from './utils'
 
 // public utils
@@ -22,14 +23,14 @@ export interface ElectronOptions {
   vite?: import('vite').InlineConfig
   /**
    * Triggered when Vite is built every time -- `vite serve` command only.
-   * 
-   * If this `onstart` is passed, Electron App will not start automatically.  
-   * However, you can start Electroo App via `startup` function.  
+   *
+   * If this `onstart` is passed, Electron App will not start automatically.
+   * However, you can start Electroo App via `startup` function.
    */
   onstart?: (args: {
     /**
-     * Electron App startup function.  
-     * It will mount the Electron App child-process to `process.electronApp`.  
+     * Electron App startup function.
+     * It will mount the Electron App child-process to `process.electronApp`.
      * @param argv default value `['.', '--no-sandbox']`
      */
     startup: (argv?: string[]) => Promise<void>
@@ -55,7 +56,10 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           Object.assign(process.env, {
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
+
+          const entryCount = calcEntryCount(optionsArray)
           let closeBundleCount = 0
+
           for (const options of optionsArray) {
             options.vite ??= {}
             options.vite.mode ??= server.config.mode
@@ -67,17 +71,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
               {
                 name: ':startup',
                 closeBundle() {
-                  /*
-                  closeBundle is emitted for both the preload and main electron
-                  files. If we simply run Electron once either one finishes,
-                  the other one might not finish in time. Usually, the faster
-                  one is the preload, meaning if main is *a lot* larger than it,
-                  Electron might start before the file is done building,
-                  leading to an "Unable to find Electron app at ..." error
-                   */
-                  closeBundleCount++
-                  if (closeBundleCount < optionsArray.length)
-                    return
+                  if (++closeBundleCount < entryCount) return
 
                   if (options.onstart) {
                     options.onstart.call(this, {
@@ -117,8 +111,8 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
 }
 
 /**
- * Electron App startup function.  
- * It will mount the Electron App child-process to `process.electronApp`.  
+ * Electron App startup function.
+ * It will mount the Electron App child-process to `process.electronApp`.
  * @param argv default value `['.', '--no-sandbox']`
  */
 export async function startup(argv = ['.', '--no-sandbox']) {
@@ -127,9 +121,11 @@ export async function startup(argv = ['.', '--no-sandbox']) {
   const electron = await import('electron')
   const electronPath = <any>(electron.default ?? electron)
 
-  startup.exit()
+  await startup.exit()
+
   // Start Electron.app
   process.electronApp = spawn(electronPath, argv, { stdio: 'inherit' })
+
   // Exit command after Electron.app exits
   process.electronApp.once('exit', process.exit)
 
@@ -139,9 +135,14 @@ export async function startup(argv = ['.', '--no-sandbox']) {
   }
 }
 startup.hookProcessExit = false
-startup.exit = () => {
+startup.exit = async () => {
   if (process.electronApp) {
     process.electronApp.removeAllListeners()
-    process.electronApp.kill()
+    try {
+      const { default: treeKill } = await import('tree-kill')
+      treeKill(process.electronApp.pid!)
+    } catch (e) {
+      process.electronApp.kill()
+    }
   }
 }
