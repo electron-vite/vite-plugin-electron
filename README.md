@@ -323,3 +323,10 @@ Modules in `node_modules` are not bundled during development, it's fast!
 │ const log = require('electron-log') │
 ┗—————————————————————————————————————┛
 ```
+
+## FAQ
+
+- `electron` does not exit correctly | 使用ctrl + c 停止代码，electron后台不关闭 | [#122](https://github.com/electron-vite/vite-plugin-electron/pull/122), [#168](https://github.com/electron-vite/vite-plugin-electron/issues/168)
+
+  * Add `tree-kill` into you dependencies, `npm i -D tree-kill`.
+
