@@ -146,6 +146,7 @@ startup.exit = async () => {
     await import('tree-kill')
       .then(m => m.default(
         process.electronApp.pid!,
+        'SIGKILL',
         error => error && process.electronApp.kill(),
       ))
       .catch(e => {
