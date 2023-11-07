@@ -1,3 +1,7 @@
+## 0.15.3 (2023-11-07)
+
+- 20907ef chore: recover `v0.15.1`
+
 ## 0.15.2 (2023-11-06)
 
 - 9719203 chore: better exit `electron` logic
