@@ -1,3 +1,12 @@
+## 0.15.4 (2023-11-08)
+
+- 532e0b4 Merge pull request #177 from Siykt/main
+- 845c39b fix: add SIGKILL to tree-kill call
+
+**Contributors:**
+
+- [#177](https://github.com/electron-vite/vite-plugin-electron/pull/177)@[Siykt](https://github.com/Siykt)
+
 ## 0.15.3 (2023-11-07)
 
 - 20907ef chore: recover `v0.15.1`
