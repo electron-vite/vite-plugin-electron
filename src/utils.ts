@@ -18,8 +18,7 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
       // @ts-ignore
       lib: options.entry && {
         entry: options.entry,
-        // At present, Electron(20) can only support CommonJs
-        formats: ['cjs'],
+        formats: ['es'],
         fileName: () => '[name].js',
       },
       outDir: 'dist-electron',
