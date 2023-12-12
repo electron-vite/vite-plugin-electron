@@ -1,3 +1,8 @@
+## 0.15.5 (2023-12-12)
+
+- f57a60a fix(#182, #187): correctly `options.reload()`
+- f606551 Merge pull request #178 from electron-vite/v0.15.4
+
 ## 0.15.4 (2023-11-08)
 
 - 532e0b4 Merge pull request #177 from Siykt/main
