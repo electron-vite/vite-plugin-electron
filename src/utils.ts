@@ -27,11 +27,6 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
       emptyOutDir: false,
     },
     resolve: {
-      // #136
-      // Some libs like `axios` must disable the `browserField`.
-      // @axios https://github.com/axios/axios/blob/v1.3.5/package.json#L129
-      // @vite https://github.com/vitejs/vite/blob/v4.2.1/packages/vite/src/node/plugins/resolve.ts#L294
-      browserField: false,
       // #98
       // Since we're building for electron (which uses Node.js), we don't want to use the "browser" field in the packages.
       // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.

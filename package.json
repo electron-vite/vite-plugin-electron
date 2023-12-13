@@ -41,20 +41,20 @@
     "vite-plugin-electron-renderer": "*"
   },
   "peerDependenciesMeta": {
-    "vite-plugin-electron-renderer": {
+    "tree-kill": {
       "optional": true
     },
-    "tree-kill": {
+    "vite-plugin-electron-renderer": {
       "optional": true
     }
   },
   "devDependencies": {
-    "rollup": "^3.29.4",
+    "rollup": "^4.8.0",
     "tree-kill": "^1.2.2",
-    "typescript": "^5.2.2",
-    "vite": "^4.5.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
     "vite-plugin-electron-renderer": "^0.14.5",
-    "vitest": "^0.34.6"
+    "vitest": "^1.0.4"
   },
   "files": [
     "dist",
