@@ -50,12 +50,21 @@ npm i -D vite-plugin-electron
 2. Add `vite-plugin-electron` to the `plugins` section of `vite.config.ts`
 
 ```js
-import electron from 'vite-plugin-electron'
+import electron from 'vite-plugin-electron/simple'
 
 export default {
   plugins: [
     electron({
-      entry: 'electron/main.ts',
+      main: {
+        // Shortcut of `build.lib.entry`
+        entry: 'electron/main.ts',
+      },
+      preload: {
+        // Shortcut of `build.rollupOptions.input`
+        input: 'electron/preload.ts',
+      },
+      // Optional: Use Node.js API in the Renderer process
+      renderer: {},
     }),
   ],
 }
@@ -85,39 +94,31 @@ app.whenReady().then(() => {
 
 ```diff
 {
-+ "main": "dist-electron/main.js"
++ "main": "dist-electron/main.mjs"
 }
 ```
 
 That's it! You can now use Electron in your Vite app ✨
 
-## Simple API
+## Flat API
 
-Many times, for a developer who is new to Vite and Electron, the oversimplified and open API design is confusing to them. Maybe Simple API makes them easier to understand. :)
+In most cases, it is recommended that you use the simpler `vite-plugin-electron/simple` API. If you know very well how this plugin works or you want to use `vite-plugin-electron` as a secondary encapsulation of low-level API, then the flat API is more suitable for you. It is also simple but more flexible. :)
+
+The difference compared to the simple API is that it does not identify which entry represents `preload` and the adaptation to preload.
 
 ```js
-// Just like v0.9.x
-import electron from 'vite-plugin-electron/simple'
+import electron from 'vite-plugin-electron'
 
 export default {
   plugins: [
     electron({
-      main: {
-        // Shortcut of `build.lib.entry`
-        entry: 'electron/main.ts',
-      },
-      preload: {
-        // Shortcut of `build.rollupOptions.input`
-        input: 'electron/preload.ts',
-      },
-      // Optional: Use Node.js API in the Renderer process
-      renderer: {},
+      entry: 'electron/main.ts',
     }),
   ],
 }
 ```
 
-## API <sub><sup>(Define)</sup></sub>
+## Flat API <sub><sup>(Define)</sup></sub>
 
 `electron(options: ElectronOptions | ElectronOptions[])`
 
@@ -276,7 +277,7 @@ export default {
 
 ## Not Bundle
 
-> Added in: v0.13.0
+> Added in: v0.13.0 | Experimental
 
 During the development phase, we can exclude the `cjs` format of npm-pkg from bundle. Like Vite's [👉 Not Bundle](https://vitejs.dev/guide/why.html#why-not-bundle-with-esbuild). **It's fast**!
 
