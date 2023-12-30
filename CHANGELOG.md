@@ -1,3 +1,73 @@
+## 0.28.0-beta.1 (2023-12-30)
+
+- 9ec82b5 feat: supports electron@28, build `esm` by default
+- 5dd3ccd feat: bump deps to vite@5, electron@28 and others
+- 39520cc feat: upgrade to vite@5
+- 3340cfc chore: prevent encounter problem
+
+> Why `v0.28.0`? This is consistent with `electron@28`, meaning it is recommended to use electron@28+, which is the first version to support `esm`.
+
+#### Migration to v0.28.0-beta.1
+
+- Update `main` of `package.json` for `esm`
+
+  ```diff
+  {
+  - "main": "dist-electron/main.js",
+  + "main": "dist-electron/main.mjs",
+  }
+  ```
+
+- If you still need to use `cjs`, you need to make some changes
+
+  **Simple API**
+
+  ```diff
+  import electron from 'vite-plugin-electron/simple'
+
+  export default {
+    plugins: [
+      electron({
+        main: {
+  -       entry: 'electron/main.ts',
+  +       vite: {
+  +         build: {
+  +           lib: {
+  +             entry: 'electron/main.ts',
+  +             formats: ['cjs'],
+  +             fileName: () => '[name].js',
+  +           },
+  +         },
+  +       },
+        },
+      }),
+    ],
+  }
+  ```
+
+  **Flat API**
+
+  ```diff
+  import electron from 'vite-plugin-electron'
+
+  export default {
+    plugins: [
+      electron({
+  -     entry: 'electron/main.ts',
+  +     vite: {
+  +       build: {
+  +         lib: {
+  +           entry: 'electron/main.ts',
+  +           formats: ['cjs'],
+  +           fileName: () => '[name].js',
+  +         },
+  +       },
+        },
+      }),
+    ],
+  }
+  ```
+
 ## 0.15.5 (2023-12-12)
 
 - f57a60a fix(#182, #187): correctly `options.reload()`
