@@ -57,14 +57,16 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
               // // ↓↓↓↓ Build with `cjs` format ↓↓↓↓
               // const { ipcRenderer } = require('electron')
 
+              // At electron@28.0.0 the built-in modules still supports `cjs` | `require('electron')` | 2023-12-30
+
               // When Rollup builds code in `cjs` format, it will automatically split the code into multiple chunks, and use `require()` to load them, 
               // and use `require()` to load other modules when `nodeIntegration: false` in the Main process Errors will occur.
               // So we need to configure Rollup not to split the code when building to ensure that it works correctly with `nodeIntegration: false`.
               inlineDynamicImports: true,
 
               // https://github.com/vitejs/vite/blob/v4.4.9/packages/vite/src/node/build.ts#L604
-              entryFileNames: '[name].js',
-              chunkFileNames: '[name].js',
+              entryFileNames: '[name].mjs',
+              chunkFileNames: '[name].mjs',
               assetFileNames: '[name].[ext]',
             },
           },
