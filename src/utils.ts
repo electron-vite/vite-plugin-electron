@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { builtinModules } from 'node:module'
 import {
@@ -9,6 +11,8 @@ import type { ElectronOptions } from '.'
 
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
 export function resolveViteConfig(options: ElectronOptions): InlineConfig {
+  const packageJson = resolvePackageJson() ?? {}
+  const esmodule = packageJson.type === 'module'
   const defaultConfig: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
     configFile: false,
@@ -19,8 +23,8 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
       lib: options.entry && {
         entry: options.entry,
         // Since Electron(28) supports ESModule
-        formats: ['es'],
-        fileName: () => '[name].mjs',
+        formats: esmodule ? ['es'] : ['cjs'],
+        fileName: () => '[name].js',
       },
       outDir: 'dist-electron',
       // Avoid multiple entries affecting each other
@@ -124,4 +128,17 @@ export function calcEntryCount(optionsArray: ElectronOptions[]) {
 
     return count
   }, 0)
+}
+
+export function resolvePackageJson(root = process.cwd()): {
+  type?: 'module' | 'commonjs'
+  [key: string]: any
+} | null {
+  const packageJsonPath = path.join(root, 'package.json')
+  const packageJsonStr = fs.readFileSync(packageJsonPath, 'utf8')
+  try {
+    return JSON.parse(packageJsonStr)
+  } catch {
+    return null
+  }
 }
