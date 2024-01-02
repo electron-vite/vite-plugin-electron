@@ -1,3 +1,13 @@
+## 0.28.0-beta.2 (2024-01-02)
+
+- f557a98 feat: supports `"type": "module"`, better `esm` logic
+
+#### Migration to v0.28.0-beta.2
+
+- **No break changes**. Just need to define `"type": "module"` in package.json for supports `esm` :)
+- **By the way**. Recommend using the `vite-plugin-electron/simple` API. It is simpler, and the main difference is its adaptation to `preload` scripts.
+- **electron@28** Preload scripts [👉 limitations](https://github.com/electron/electron/blob/v30.0.0-nightly.20231218/docs/tutorial/esm.md#preload-scripts).
+
 ## 0.28.0-beta.1 (2023-12-30)
 
 - 9ec82b5 feat: supports electron@28, build `esm` by default
@@ -9,7 +19,9 @@
 
 #### Migration to v0.28.0-beta.1
 
-- Update `main` of `package.json` for `esm`
+**🚨 deprecated**
+
+- ~~Update `main` of `package.json` for `esm`~~
 
   ```diff
   {
@@ -18,9 +30,9 @@
   }
   ```
 
-- If you still need to use `cjs`, you need to make some changes
+- ~~If you still need to use `cjs`, you need to make some changes~~
 
-  **Simple API**
+  **~~Simple API~~**
 
   ```diff
   import electron from 'vite-plugin-electron/simple'
@@ -45,7 +57,7 @@
   }
   ```
 
-  **Flat API**
+  **~~Flat API~~**
 
   ```diff
   import electron from 'vite-plugin-electron'
