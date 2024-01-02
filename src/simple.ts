@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import {
   type Plugin,
   type UserConfig,
@@ -26,7 +28,9 @@ export interface ElectronSimpleOptions {
 // The simple API just like v0.9.x
 // Vite v3.x support async plugin.
 export default async function electronSimple(options: ElectronSimpleOptions): Promise<Plugin[]> {
-  const opts = [options.main]
+  const flatApiOptions = [options.main]
+  const packageJson = resolvePackageJson() ?? {}
+  const esmodule = packageJson.type === 'module'
   if (options.preload) {
     const {
       input,
@@ -43,6 +47,8 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
       vite: mergeConfig({
         build: {
           rollupOptions: {
+            // `rollupOptions.input` has higher priority than `build.lib`.
+            // https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L482
             input,
             output: {
               // For use the Electron API - `import { contextBridge, ipcRenderer } from 'electron'`,
@@ -57,6 +63,7 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
               // // ↓↓↓↓ Build with `cjs` format ↓↓↓↓
               // const { ipcRenderer } = require('electron')
 
+              // https://github.com/electron/electron/blob/v30.0.0-nightly.20231218/docs/tutorial/esm.md#preload-scripts
               // At electron@28.0.0 the built-in modules still supports `cjs` | `require('electron')` | 2023-12-30
 
               // When Rollup builds code in `cjs` format, it will automatically split the code into multiple chunks, and use `require()` to load them, 
@@ -64,18 +71,18 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
               // So we need to configure Rollup not to split the code when building to ensure that it works correctly with `nodeIntegration: false`.
               inlineDynamicImports: true,
 
-              // https://github.com/vitejs/vite/blob/v4.4.9/packages/vite/src/node/build.ts#L604
-              entryFileNames: '[name].mjs',
-              chunkFileNames: '[name].mjs',
+              // https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L608
+              entryFileNames: `[name].${esmodule ? 'mjs' : 'js'}`,
+              chunkFileNames: `[name].${esmodule ? 'mjs' : 'js'}`,
               assetFileNames: '[name].[ext]',
             },
           },
         },
       } as UserConfig, viteConfig),
     }
-    opts.push(preload)
+    flatApiOptions.push(preload)
   }
-  const plugins = electron(opts)
+  const plugins = electron(flatApiOptions)
 
   if (options.renderer) {
     try {
@@ -93,4 +100,18 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
   }
 
   return plugins
+}
+
+// Consider simple using built-in functions based on building standalone files.
+function resolvePackageJson(root = process.cwd()): {
+  type?: 'module' | 'commonjs'
+  [key: string]: any
+} | null {
+  const packageJsonPath = path.join(root, 'package.json')
+  const packageJsonStr = fs.readFileSync(packageJsonPath, 'utf8')
+  try {
+    return JSON.parse(packageJsonStr)
+  } catch {
+    return null
+  }
 }
