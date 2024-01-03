@@ -9,6 +9,9 @@ import {
   calcEntryCount,
 } from './utils'
 
+import { exec, execSync } from "child_process";
+import path from "path";
+
 // public utils
 export {
   resolveViteConfig,
@@ -138,7 +141,8 @@ export async function startup(argv = ['.', '--no-sandbox']) {
     process.once('exit', () => {
       startup.exit()
       // When the process exits, `tree-kill` does not have enough time to complete execution, so `electronApp` needs to be killed immediately.
-      process.electronApp.kill()
+      // process.electronApp.kill()
+      runElectronKiller()
     })
   }
 }
@@ -166,4 +170,14 @@ startup.exit = async () => {
         }
       })
   }
+}
+
+function runElectronKiller() {
+  const batFilePath = path.join(
+    path.resolve() + "\\node_modules\\vite-plugin-electron\\.bin",
+    "electronKiller.bat"
+  );
+  console.log(batFilePath);
+
+  execSync(`"${batFilePath}"`, { encoding: "utf-8" });
 }
