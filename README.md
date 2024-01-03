@@ -102,7 +102,7 @@ That's it! You can now use Electron in your Vite app ✨
 
 ## Flat API
 
-In most cases, it is recommended that you use the simpler `vite-plugin-electron/simple` API. If you know very well how this plugin works or you want to use `vite-plugin-electron` as a secondary encapsulation of low-level API, then the flat API is more suitable for you. It is also simple but more flexible. :)
+In most cases, the `vite-plugin-electron/simple` API is recommended. If you know very well how this plugin works or you want to use `vite-plugin-electron` API as a secondary encapsulation of low-level API, then the flat API is more suitable for you. It is also simple but more flexible. :)
 
 The difference compared to the simple API is that it does not identify which entry represents `preload` and the adaptation to preload.
 
@@ -117,6 +117,12 @@ export default {
   ],
 }
 ```
+
+## Flat API vs Simple API
+
+- Simple API is based on the Flat API
+- Simple API incluess some Preload scripts preset configs.
+- Flat API provides some more general APIs, which you can use for secondary encapsulation, such as [nuxt-electron](https://github.com/caoxiemeihao/nuxt-electron).
 
 ## Flat API <sub><sup>(Define)</sup></sub>
 
