@@ -53,7 +53,7 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
             output: {
               // For use the Electron API - `import { contextBridge, ipcRenderer } from 'electron'`,
               // Note, however, that `preload.ts` should not be split. 🚧
-              format: 'cjs',
+              format: esmodule ? 'esm' : 'cjs',
 
               // Whether Node.js is enabled in the Main process or not, the Preload scripts supports loading `electron` module, 
               // so we need to build it in `cjs` format.
