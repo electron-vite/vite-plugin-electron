@@ -1,3 +1,7 @@
+## 0.28.0-beta.3 (2024-01-05)
+
+- d7c0a91 feat: preload built `format` adapt to `esm`
+
 ## 0.28.0-beta.2 (2024-01-02)
 
 - f557a98 feat: supports `"type": "module"`, better `esm` logic
