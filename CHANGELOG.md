@@ -1,3 +1,7 @@
+## 0.28.0 (2024-01-07)
+
+- 20170a5 refactor: preload built `format` use `esm` by default
+
 ## 0.28.0-beta.3 (2024-01-05)
 
 - d7c0a91 feat: preload built `format` adapt to `esm`
