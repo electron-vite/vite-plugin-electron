@@ -50,10 +50,12 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
             // `rollupOptions.input` has higher priority than `build.lib`.
             // https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L482
             input,
+            // For use the Electron API - `import { contextBridge, ipcRenderer } from 'electron'`,
             output: {
-              // For use the Electron API - `import { contextBridge, ipcRenderer } from 'electron'`,
-              // Note, however, that `preload.ts` should not be split. 🚧
-              format: esmodule ? 'esm' : 'cjs',
+              // In most cases, use `cjs` format.
+              // @see - https://github.com/electron/electron/blob/v30.0.0-nightly.20240104/docs/tutorial/esm.md#preload-scripts
+              // @see - https://github.com/electron-vite/vite-plugin-electron-preload/blob/v0.2.0/src/index.ts#L24-L47
+              format: 'cjs',
 
               // Whether Node.js is enabled in the Main process or not, the Preload scripts supports loading `electron` module, 
               // so we need to build it in `cjs` format.
@@ -63,15 +65,13 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
               // // ↓↓↓↓ Build with `cjs` format ↓↓↓↓
               // const { ipcRenderer } = require('electron')
 
-              // https://github.com/electron/electron/blob/v30.0.0-nightly.20231218/docs/tutorial/esm.md#preload-scripts
-              // At electron@28.0.0 the built-in modules still supports `cjs` | `require('electron')` | 2023-12-30
-
+              // Note, however, that `preload.ts` should not be split. 🚧
               // When Rollup builds code in `cjs` format, it will automatically split the code into multiple chunks, and use `require()` to load them, 
               // and use `require()` to load other modules when `nodeIntegration: false` in the Main process Errors will occur.
               // So we need to configure Rollup not to split the code when building to ensure that it works correctly with `nodeIntegration: false`.
               inlineDynamicImports: true,
 
-              // https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L608
+              // @see - https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L608
               entryFileNames: `[name].${esmodule ? 'mjs' : 'js'}`,
               chunkFileNames: `[name].${esmodule ? 'mjs' : 'js'}`,
               assetFileNames: '[name].[ext]',
