@@ -142,3 +142,156 @@ export function resolvePackageJson(root = process.cwd()): {
     return null
   }
 }
+
+import childProcess from "child_process";
+var spawnSync = childProcess.spawnSync;
+var execSync = childProcess.execSync;
+
+/**
+ * copy tree-kill ,get sync and ts version
+ * @see https://github.com/pkrumins/node-tree-kill/blob/master/index.js
+ * Due to its synchronous nature and poor performance, it is recommended to use this function only in exit scenarios.
+ */
+export function treeKillSync(
+  pid: number,
+  signal?: string | number,
+  callback?: (err: Error | undefined) => void
+): void {
+  if (typeof signal === "function" && callback === undefined) {
+    callback = signal;
+    signal = undefined;
+  }
+
+  pid = parseInt(pid as unknown as string);
+  if (Number.isNaN(pid)) {
+    if (callback) {
+      return callback(new Error("pid must be a number"));
+    } else {
+      throw new Error("pid must be a number");
+    }
+  }
+
+  var tree: any = {};
+  var pidsToProcess: any = {};
+  tree[pid] = [];
+  pidsToProcess[pid] = 1;
+
+  switch (process.platform) {
+    case "win32":
+      execSync("taskkill /pid " + pid + " /T /F", callback as any);
+      break;
+    case "darwin":
+      buildProcessTree(
+        pid,
+        tree,
+        pidsToProcess,
+        function (parentPid: any) {
+          return spawnSync("pgrep", ["-P", parentPid]);
+        },
+        function () {
+          killAll(tree, signal, callback);
+        }
+      );
+      break;
+    // case 'sunos':
+    //     buildProcessTreeSunOS(pid, tree, pidsToProcess, function () {
+    //         killAll(tree, signal, callback);
+    //     });
+    //     break;
+    default: // Linux
+      buildProcessTree(
+        pid,
+        tree,
+        pidsToProcess,
+        function (parentPid: any) {
+          return spawnSync("ps", [
+            "-o",
+            "pid",
+            "--no-headers",
+            "--ppid",
+            parentPid,
+          ]);
+        },
+        function () {
+          killAll(tree, signal, callback);
+        }
+      );
+      break;
+  }
+}
+
+function killAll(
+  tree: any,
+  signal?: string | number,
+  callback?: (err?: any) => void
+) {
+  var killed: any = {};
+  try {
+    Object.keys(tree).forEach(function (pid) {
+      tree[pid].forEach(function (pidpid: any) {
+        if (!killed[pidpid]) {
+          killPid(pidpid, signal);
+          killed[pidpid] = 1;
+        }
+      });
+      if (!killed[pid]) {
+        killPid(pid as unknown as number, signal);
+        killed[pid] = 1;
+      }
+    });
+  } catch (err) {
+    if (callback) {
+      return callback(err);
+    } else {
+      throw err;
+    }
+  }
+  if (callback) {
+    return callback();
+  }
+}
+
+function killPid(pid: number, signal?: string | number) {
+  try {
+    process.kill(parseInt(pid as unknown as string, 10), signal);
+  } catch (err: any) {
+    if (err.code !== "ESRCH") throw err;
+  }
+}
+
+function buildProcessTree(
+  parentPid: number | string,
+  tree: any,
+  pidsToProcess: any,
+  spawnChildProcessesList: any,
+  cb: () => void
+) {
+  var ps = spawnChildProcessesList(parentPid);
+  var allData: any = "";
+  ps.stdout.on("data", function (data: any) {
+    var data = data.toString("ascii");
+    allData += data;
+  });
+
+  var onClose = function (code: any) {
+    delete pidsToProcess[parentPid];
+
+    if (code != 0) {
+      // no more parent processes
+      if (Object.keys(pidsToProcess).length == 0) {
+        cb();
+      }
+      return;
+    }
+
+    allData.match(/\d+/g).forEach(function (pid: any) {
+      pid = parseInt(pid, 10);
+      tree[parentPid].push(pid);
+      tree[pid] = [];
+      pidsToProcess[pid] = 1;
+      buildProcessTree(pid, tree, pidsToProcess, spawnChildProcessesList, cb);
+    });
+  };
+
+  ps.on("close", onClose);
+}

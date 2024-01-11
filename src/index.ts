@@ -7,6 +7,7 @@ import {
   resolveViteConfig,
   withExternalBuiltins,
   calcEntryCount,
+  treeKillSync,
 } from './utils'
 
 // public utils
@@ -138,7 +139,8 @@ export async function startup(argv = ['.', '--no-sandbox']) {
     process.once('exit', () => {
       startup.exit()
       // When the process exits, `tree-kill` does not have enough time to complete execution, so `electronApp` needs to be killed immediately.
-      process.electronApp.kill()
+      // process.electronApp.kill()
+      treeKillSync(process.electronApp.pid!);
     })
   }
 }
