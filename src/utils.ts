@@ -36,6 +36,10 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
       // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.
       mainFields: ['module', 'jsnext:main', 'jsnext'],
     },
+    define: {
+      // @see - https://github.com/vitejs/vite/blob/v5.0.11/packages/vite/src/node/plugins/define.ts#L20
+      'process.env': 'process.env',
+    },
   }
 
   return mergeConfig(defaultConfig, options?.vite || {})
