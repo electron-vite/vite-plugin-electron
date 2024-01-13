@@ -48,28 +48,44 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
         build: {
           rollupOptions: {
             // `rollupOptions.input` has higher priority than `build.lib`.
-            // https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L482
+            // @see - https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L482
             input,
-            // For use the Electron API - `import { contextBridge, ipcRenderer } from 'electron'`,
             output: {
-              // In most cases, use `cjs` format.
-              // @see - https://github.com/electron/electron/blob/v30.0.0-nightly.20240104/docs/tutorial/esm.md#preload-scripts
-              // @see - https://github.com/electron-vite/vite-plugin-electron-preload/blob/v0.2.0/src/index.ts#L24-L47
+              // In most cases, use `cjs` format
               format: 'cjs',
-
-              // Whether Node.js is enabled in the Main process or not, the Preload scripts supports loading `electron` module, 
-              // so we need to build it in `cjs` format.
-
-              // e.g.
-              // import { ipcRenderer } from 'electron'
-              // // ↓↓↓↓ Build with `cjs` format ↓↓↓↓
-              // const { ipcRenderer } = require('electron')
+              // `require()` can usable matrix
+              //  @see - https://github.com/electron/electron/blob/v30.0.0-nightly.20240104/docs/tutorial/esm.md#preload-scripts
+              //  ┏———————————————————————————————————┳——————————┳———————————┓
+              //  │ webPreferences: { }               │  import  │  require  │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: false(undefined) │    ✘     │     ✔     │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: true             │    ✔     │     ✔     │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ sandbox: true(undefined)          │    ✘     │     ✔     │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ sandbox: false                    │    ✔     │     ✘     │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: false            │    ✘     │     ✔     │
+              //  │ sandbox: true                     │          │           │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: false            │    ✔     │     ✘     │
+              //  │ sandbox: false                    │          │           │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: true             │    ✘     │     ✔     │
+              //  │ sandbox: true                     │          │           │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: true             │    ✔     │     ✔     │
+              //  │ sandbox: false                    │          │           │
+              //  ┗———————————————————————————————————┸——————————┸———————————┛
+              //  - import(✘): SyntaxError: Cannot use import statement outside a module
+              //  - require(✘): ReferenceError: require is not defined in ES module scope, you can use import instead
 
               // Note, however, that `preload.ts` should not be split. 🚧
+              inlineDynamicImports: true,
               // When Rollup builds code in `cjs` format, it will automatically split the code into multiple chunks, and use `require()` to load them, 
               // and use `require()` to load other modules when `nodeIntegration: false` in the Main process Errors will occur.
               // So we need to configure Rollup not to split the code when building to ensure that it works correctly with `nodeIntegration: false`.
-              inlineDynamicImports: true,
 
               // @see - https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L608
               entryFileNames: `[name].${esmodule ? 'mjs' : 'js'}`,
