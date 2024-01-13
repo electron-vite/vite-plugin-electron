@@ -1,12 +1,89 @@
+## 0.28.0 (2024-01-07)
+
+- 20170a5 refactor: preload built `format` use `esm` by default
+
+#### Migration to v0.28.0
+
+- **No break changes**. Just need to define `"type": "module"` in package.json for supports `esm` :)
+- **By the way**. Recommend using the `vite-plugin-electron/simple` API. It is simpler, and the main difference is its adaptation to `preload` scripts.
+- **electron@28** Preload scripts [👉 limitations](https://github.com/electron/electron/blob/v30.0.0-nightly.20240104/docs/tutorial/esm.md#preload-scripts).
+
+#### Preload scripts
+
+In most cases, use `cjs` format
+
+```log
+`require()` can usable matrix
+
+@see - https://github.com/electron/electron/blob/v30.0.0-nightly.20240104/docs/tutorial/esm.md#preload-scripts
+┏———————————————————————————————————┳——————————┳———————————┓
+│ webPreferences: { }               │  import  │  require  │
+┠———————————————————————————————————╂——————————╂———————————┨
+│ nodeIntegration: false(undefined) │    ✘     │     ✔     │
+┠———————————————————————————————————╂——————————╂———————————┨
+│ nodeIntegration: true             │    ✔     │     ✔     │
+┠———————————————————————————————————╂——————————╂———————————┨
+│ sandbox: true(undefined)          │    ✘     │     ✔     │
+┠———————————————————————————————————╂——————————╂———————————┨
+│ sandbox: false                    │    ✔     │     ✘     │
+┠———————————————————————————————————╂——————————╂———————————┨
+│ nodeIntegration: false            │    ✘     │     ✔     │
+│ sandbox: true                     │          │           │
+┠———————————————————————————————————╂——————————╂———————————┨
+│ nodeIntegration: false            │    ✔     │     ✘     │
+│ sandbox: false                    │          │           │
+┠———————————————————————————————————╂——————————╂———————————┨
+│ nodeIntegration: true             │    ✘     │     ✔     │
+│ sandbox: true                     │          │           │
+┠———————————————————————————————————╂——————————╂———————————┨
+│ nodeIntegration: true             │    ✔     │     ✔     │
+│ sandbox: false                    │          │           │
+┗———————————————————————————————————┸——————————┸———————————┛
+- import(✘): SyntaxError: Cannot use import statement outside a module
+- require(✘): ReferenceError: require is not defined in ES module scope, you can use import instead
+```
+
+#### Built format
+
+This is just the default behavior, and you can modify them at any time through custom config in the `vite.config.js`
+
+```log
+{ "type": "module" }
+┏————————————————————┳——————————┳———————————┓
+│       built        │  format  │   suffix  │
+┠————————————————————╂——————————╂———————————┨
+│ main process       │   esm    │    .js    │
+┠————————————————————╂——————————╂———————————┨
+│ preload scripts    │   cjs    │   .mjs    │ diff
+┠————————————————————╂——————————╂———————————┨
+│ renderer process   │    -     │    .js    │
+┗————————————————————┸——————————┸———————————┛
+
+{ "type": "commonjs" } - default
+┏————————————————————┳——————————┳———————————┓
+│       built        │  format  │   suffix  │
+┠————————————————————╂——————————╂———————————┨
+│ main process       │   cjs    │    .js    │
+┠————————————————————╂——————————╂———————————┨
+│ preload scripts    │   cjs    │    .js    │ diff
+┠————————————————————╂——————————╂———————————┨
+│ renderer process   │    -     │    .js    │
+┗————————————————————┸——————————┸———————————┛
+```
+
+## 0.28.0-beta.3 (2024-01-05)
+
+- d7c0a91 feat: preload built `format` adapt to `esm`
+
 ## 0.28.0-beta.2 (2024-01-02)
 
 - f557a98 feat: supports `"type": "module"`, better `esm` logic
 
 #### Migration to v0.28.0-beta.2
 
-- **No break changes**. Just need to define `"type": "module"` in package.json for supports `esm` :)
-- **By the way**. Recommend using the `vite-plugin-electron/simple` API. It is simpler, and the main difference is its adaptation to `preload` scripts.
-- **electron@28** Preload scripts [👉 limitations](https://github.com/electron/electron/blob/v30.0.0-nightly.20231218/docs/tutorial/esm.md#preload-scripts).
+- ~~**No break changes**. Just need to define `"type": "module"` in package.json for supports `esm` :)~~
+- ~~**By the way**. Recommend using the `vite-plugin-electron/simple` API. It is simpler, and the main difference is its adaptation to `preload` scripts.~~
+- ~~**electron@28** Preload scripts [👉 limitations](https://github.com/electron/electron/blob/v30.0.0-nightly.20231218/docs/tutorial/esm.md#preload-scripts).~~
 
 ## 0.28.0-beta.1 (2023-12-30)
 
