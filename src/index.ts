@@ -131,27 +131,29 @@ export async function startup(argv = ['.', '--no-sandbox']) {
 
   if (!startup.hookedProcessExit) {
     startup.hookedProcessExit = true
-    process.once('exit', () => {
-      startup.exit()
+    process.once('exit', async () => {
+      await startup.exit()
       // When the process exits, `tree-kill` does not have enough time to complete execution, so `electronApp` needs to be killed immediately.
       process.electronApp.kill()
     })
   }
 }
 startup.hookedProcessExit = false
-startup.exit = async () => {
-  if (process.electronApp) {
-    process.electronApp.removeAllListeners()
+startup.exit = () => {
+  if (!process.electronApp) {
+    return Promise.resolve(null)
+  }
 
+  process.electronApp.removeAllListeners()
+
+  return new Promise<Error | void>(async resolve => {
     await import('tree-kill')
       .then(m => m.default(
         process.electronApp.pid!,
         'SIGKILL',
-        error => error && process.electronApp.kill(),
+        resolve,
       ))
       .catch(e => {
-        process.electronApp.kill()
-
         if (e.code === 'ERR_MODULE_NOT_FOUND') {
           console.log(
             '[vite-plugin-electron]',
@@ -160,6 +162,9 @@ startup.exit = async () => {
         } else {
           console.error(e)
         }
+
+        process.electronApp.kill()
+        resolve(e)
       })
-  }
+  })
 }
