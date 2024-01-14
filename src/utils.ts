@@ -112,6 +112,7 @@ export function resolveServerUrl(server: ViteDevServer): string | void {
 }
 
 export function calcEntryCount(optionsArray: ElectronOptions[]) {
+  return optionsArray.length
   return optionsArray.reduce((count, options) => {
     const input = options.vite?.build?.rollupOptions?.input
 
