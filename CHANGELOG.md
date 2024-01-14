@@ -1,3 +1,8 @@
+## 0.15.6 (2024-01-14)
+
+- 0615e99 fix: correct `startup.exit()` for Windows
+- e616cf9 fix: correct `calcEntryCount()` for startup
+
 ## 0.15.5 (2023-12-12)
 
 - f57a60a fix(#182, #187): correctly `options.reload()`
