@@ -6,7 +6,6 @@ import {
   resolveServerUrl,
   resolveViteConfig,
   withExternalBuiltins,
-  calcEntryCount,
   treeKillSync,
 } from './utils'
 
@@ -58,7 +57,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
 
-          const entryCount = calcEntryCount(optionsArray)
+          const entryCount = optionsArray.length
           let closeBundleCount = 0
 
           for (const options of optionsArray) {
