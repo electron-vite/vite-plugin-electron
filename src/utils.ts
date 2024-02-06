@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import cp from 'node:child_process'
 import type { AddressInfo } from 'node:net'
 import { builtinModules } from 'node:module'
 import {
@@ -8,6 +9,12 @@ import {
   mergeConfig,
 } from 'vite'
 import type { ElectronOptions } from '.'
+
+export interface PidTree {
+  pid: number
+  ppid: number
+  children?: PidTree[]
+}
 
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
 export function resolveViteConfig(options: ElectronOptions): InlineConfig {
@@ -145,4 +152,45 @@ export function resolvePackageJson(root = process.cwd()): {
   } catch {
     return null
   }
+}
+
+/**
+ * Inspired `tree-kill`, implemented based on sync-api. #168
+ * @see https://github.com/pkrumins/node-tree-kill/blob/v1.2.2/index.js
+ */
+export function treeKillSync(pid: number) {
+  if (process.platform === 'win32') {
+    cp.execSync(`taskkill /pid ${pid} /T /F`)
+  } else {
+    killTree(pidTree())
+  }
+}
+
+function pidTree(tree: PidTree = { pid: process.pid, ppid: process.ppid }) {
+  const command = process.platform === 'darwin'
+    ? `pgrep -P ${tree.pid}` // Mac
+    : `ps -o pid --no-headers --ppid ${tree.ppid}` // Linux
+
+  try {
+    const childs = cp
+      .execSync(command, { encoding: 'utf8' })
+      .match(/\d+/g)
+      ?.map(id => +id)
+
+    if (childs) {
+      tree.children = childs.map(cid => pidTree({ pid: cid, ppid: tree.pid }))
+    }
+  } catch { }
+
+  return tree
+}
+
+function killTree(tree: PidTree) {
+  if (tree.children) {
+    for (const child of tree.children) {
+      killTree(child)
+    }
+  }
+
+  process.kill(tree.pid)
 }
