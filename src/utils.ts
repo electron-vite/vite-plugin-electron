@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import cp from 'node:child_process'
 import type { AddressInfo } from 'node:net'
 import { builtinModules } from 'node:module'
 import {
@@ -8,6 +9,12 @@ import {
   mergeConfig,
 } from 'vite'
 import type { ElectronOptions } from '.'
+
+export interface PidTree {
+  pid: number
+  ppid: number
+  children?: PidTree[]
+}
 
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
 export function resolveViteConfig(options: ElectronOptions): InlineConfig {
@@ -35,6 +42,10 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
       // Since we're building for electron (which uses Node.js), we don't want to use the "browser" field in the packages.
       // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.
       mainFields: ['module', 'jsnext:main', 'jsnext'],
+    },
+    define: {
+      // @see - https://github.com/vitejs/vite/blob/v5.0.11/packages/vite/src/node/plugins/define.ts#L20
+      'process.env': 'process.env',
     },
   }
 
@@ -110,26 +121,6 @@ export function resolveServerUrl(server: ViteDevServer): string | void {
   }
 }
 
-export function calcEntryCount(optionsArray: ElectronOptions[]) {
-  return optionsArray.reduce((count, options) => {
-    const input = options.vite?.build?.rollupOptions?.input
-
-    // `input` option have higher priority.
-    // https://github.com/vitejs/vite/blob/v4.4.9/packages/vite/src/node/build.ts#L494
-    if (input) {
-      count += typeof input === 'string'
-        ? 1
-        : Object.keys(input).length
-    } else if (options.entry) {
-      count += typeof options.entry === 'string'
-        ? 1
-        : Object.keys(options.entry).length
-    }
-
-    return count
-  }, 0)
-}
-
 export function resolvePackageJson(root = process.cwd()): {
   type?: 'module' | 'commonjs'
   [key: string]: any
@@ -141,4 +132,45 @@ export function resolvePackageJson(root = process.cwd()): {
   } catch {
     return null
   }
+}
+
+/**
+ * Inspired `tree-kill`, implemented based on sync-api. #168
+ * @see https://github.com/pkrumins/node-tree-kill/blob/v1.2.2/index.js
+ */
+export function treeKillSync(pid: number) {
+  if (process.platform === 'win32') {
+    cp.execSync(`taskkill /pid ${pid} /T /F`)
+  } else {
+    killTree(pidTree())
+  }
+}
+
+function pidTree(tree: PidTree = { pid: process.pid, ppid: process.ppid }) {
+  const command = process.platform === 'darwin'
+    ? `pgrep -P ${tree.pid}` // Mac
+    : `ps -o pid --no-headers --ppid ${tree.ppid}` // Linux
+
+  try {
+    const childs = cp
+      .execSync(command, { encoding: 'utf8' })
+      .match(/\d+/g)
+      ?.map(id => +id)
+
+    if (childs) {
+      tree.children = childs.map(cid => pidTree({ pid: cid, ppid: tree.pid }))
+    }
+  } catch { }
+
+  return tree
+}
+
+function killTree(tree: PidTree) {
+  if (tree.children) {
+    for (const child of tree.children) {
+      killTree(child)
+    }
+  }
+
+  process.kill(tree.pid)
 }

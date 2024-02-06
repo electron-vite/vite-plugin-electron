@@ -6,7 +6,7 @@ import {
   resolveServerUrl,
   resolveViteConfig,
   withExternalBuiltins,
-  calcEntryCount,
+  treeKillSync,
 } from './utils'
 
 // public utils
@@ -33,7 +33,7 @@ export interface ElectronOptions {
      * It will mount the Electron App child-process to `process.electronApp`.
      * @param argv default value `['.', '--no-sandbox']`
      */
-    startup: (argv?: string[]) => Promise<void>
+    startup: (argv?: string[], options?: import('node:child_process').SpawnOptions) => Promise<void>
     /** Reload Electron-Renderer */
     reload: () => void
   }) => void | Promise<void>
@@ -57,7 +57,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
 
-          const entryCount = calcEntryCount(optionsArray)
+          const entryCount = optionsArray.length
           let closeBundleCount = 0
 
           for (const options of optionsArray) {
@@ -119,7 +119,10 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
  * It will mount the Electron App child-process to `process.electronApp`.
  * @param argv default value `['.', '--no-sandbox']`
  */
-export async function startup(argv = ['.', '--no-sandbox']) {
+export async function startup(
+  argv = ['.', '--no-sandbox'],
+  options?: import('node:child_process').SpawnOptions,
+) {
   const { spawn } = await import('node:child_process')
   // @ts-ignore
   const electron = await import('electron')
@@ -128,7 +131,7 @@ export async function startup(argv = ['.', '--no-sandbox']) {
   await startup.exit()
 
   // Start Electron.app
-  process.electronApp = spawn(electronPath, argv, { stdio: 'inherit' })
+  process.electronApp = spawn(electronPath, argv, { stdio: 'inherit', ...options })
 
   // Exit command after Electron.app exits
   process.electronApp.once('exit', process.exit)
@@ -138,7 +141,8 @@ export async function startup(argv = ['.', '--no-sandbox']) {
     process.once('exit', () => {
       startup.exit()
       // When the process exits, `tree-kill` does not have enough time to complete execution, so `electronApp` needs to be killed immediately.
-      process.electronApp.kill()
+      // process.electronApp.kill()
+      treeKillSync(process.electronApp.pid!);
     })
   }
 }
