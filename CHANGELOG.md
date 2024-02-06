@@ -1,3 +1,16 @@
+## 0.28.1 (2024-02-06)
+
+- efc5826 fix: correct `calcEntryCount()` for startup
+- cf0e91f feat: startup support `SpawnOptions` #194
+- 512a1c5 Merge pull request #204 from SanGongHappy/tree-kill-sync
+- edf4bf6 refactor: better `treeKillSync` implemented
+- 82cd32f Merge branch 'electron-vite:main' into tree-kill-sync
+- 6e122a7 feat: polyfill `process.env` by default
+- 45f28bb (github/main, main) chore: update CHANGELOG
+- f9b81e4 chore(simple): update comments
+- b5376a9 docs: add `Built format`
+- e334366 copy tree-kill
+
 ## 0.28.0 (2024-01-07)
 
 - 20170a5 refactor: preload built `format` use `esm` by default

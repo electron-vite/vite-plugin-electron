@@ -137,17 +137,17 @@ export interface ElectronOptions {
   vite?: import('vite').InlineConfig
   /**
    * Triggered when Vite is built every time -- `vite serve` command only.
-   * 
-   * If this `onstart` is passed, Electron App will not start automatically.  
-   * However, you can start Electroo App via `startup` function.  
+   *
+   * If this `onstart` is passed, Electron App will not start automatically.
+   * However, you can start Electroo App via `startup` function.
    */
   onstart?: (args: {
     /**
-     * Electron App startup function.  
-     * It will mount the Electron App child-process to `process.electronApp`.  
+     * Electron App startup function.
+     * It will mount the Electron App child-process to `process.electronApp`.
      * @param argv default value `['.', '--no-sandbox']`
      */
-    startup: (argv?: string[]) => Promise<void>
+    startup: (argv?: string[], options?: import('node:child_process').SpawnOptions) => Promise<void>
     /** Reload Electron-Renderer */
     reload: () => void
   }) => void | Promise<void>
