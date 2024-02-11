@@ -1,3 +1,7 @@
+## 0.28.2 (2024-02-11)
+
+- 5b0fc87 feat: use `treeKillSync()` instead `tree-kill`
+
 ## 0.28.1 (2024-02-06)
 
 - efc5826 fix: correct `calcEntryCount()` for startup
