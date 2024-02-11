@@ -142,11 +142,11 @@ export function treeKillSync(pid: number) {
   if (process.platform === 'win32') {
     cp.execSync(`taskkill /pid ${pid} /T /F`)
   } else {
-    killTree(pidTree())
+    killTree(pidTree({ pid, ppid: process.pid }))
   }
 }
 
-function pidTree(tree: PidTree = { pid: process.pid, ppid: process.ppid }) {
+function pidTree(tree: PidTree) {
   const command = process.platform === 'darwin'
     ? `pgrep -P ${tree.pid}` // Mac
     : `ps -o pid --no-headers --ppid ${tree.ppid}` // Linux
