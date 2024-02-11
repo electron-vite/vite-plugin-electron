@@ -138,36 +138,13 @@ export async function startup(
 
   if (!startup.hookedProcessExit) {
     startup.hookedProcessExit = true
-    process.once('exit', () => {
-      startup.exit()
-      // When the process exits, `tree-kill` does not have enough time to complete execution, so `electronApp` needs to be killed immediately.
-      // process.electronApp.kill()
-      treeKillSync(process.electronApp.pid!);
-    })
+    process.once('exit', startup.exit)
   }
 }
 startup.hookedProcessExit = false
 startup.exit = async () => {
   if (process.electronApp) {
     process.electronApp.removeAllListeners()
-
-    await import('tree-kill')
-      .then(m => m.default(
-        process.electronApp.pid!,
-        'SIGKILL',
-        error => error && process.electronApp.kill(),
-      ))
-      .catch(e => {
-        process.electronApp.kill()
-
-        if (e.code === 'ERR_MODULE_NOT_FOUND') {
-          console.log(
-            '[vite-plugin-electron]',
-            'Please install tree-kill to exit all associated processes, run "npm i tree-kill -D".',
-          )
-        } else {
-          console.error(e)
-        }
-      })
+    treeKillSync(process.electronApp.pid!)
   }
 }
