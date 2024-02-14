@@ -129,7 +129,8 @@ export async function startup(
   const electronPath = <any>(electron.default ?? electron)
 
   await startup.exit()
-
+  // Switch console to utf-8 encoding https://github.com/electron/electron/issues/7137
+  spawn( 'chcp', [ '65001' ] );
   // Start Electron.app
   process.electronApp = spawn(electronPath, argv, { stdio: 'inherit', ...options })
 
