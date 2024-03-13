@@ -1,3 +1,7 @@
+## 0.28.3 (2024-03-13)
+
+- a300c08 fix: remove electron@28 version pre-deps
+
 ## 0.28.2 (2024-02-11)
 
 - 5b0fc87 feat: use `treeKillSync()` instead `tree-kill`
