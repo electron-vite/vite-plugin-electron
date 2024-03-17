@@ -36,6 +36,14 @@
     "test": "vitest run",
     "prepublishOnly": "npm run build && npm run test"
   },
+  "peerDependencies": {
+    "vite-plugin-electron-renderer": "*"
+  },
+  "peerDependenciesMeta": {
+    "vite-plugin-electron-renderer": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "rollup": "^4.13.0",
     "typescript": "^5.4.2",
