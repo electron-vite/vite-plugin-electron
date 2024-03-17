@@ -1,3 +1,8 @@
+## 0.28.4 (2024-03-17)
+
+- 4f7748c chore: restore `vite-plugin-electron-renderer` in `peerDependencies`
+- 412ed9b fix(#214): catch the `process.kill(pid)` error
+
 ## 0.28.3 (2024-03-13)
 
 - a300c08 fix: remove electron@28 version pre-deps
