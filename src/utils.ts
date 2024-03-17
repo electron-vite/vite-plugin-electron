@@ -172,5 +172,7 @@ function killTree(tree: PidTree) {
     }
   }
 
-  process.kill(tree.pid)
+  try {
+    process.kill(tree.pid) // #214
+  } catch { /* empty */ }
 }
