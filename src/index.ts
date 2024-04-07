@@ -15,6 +15,23 @@ export {
   withExternalBuiltins,
 }
 
+type StartupOptions = {
+  /**
+   * Electron startup argv
+   * @default ['.', '--no-sandbox']
+   */
+  argv?: string[],
+  /**
+   * Spawn options
+   */
+  options?: import('node:child_process').SpawnOptions,
+  /**
+   * Hook after exit current instance and before new instance startup
+   * @param argv startup argv
+   */
+  beforeStartup?: (argv: string[]) => (void | Promise<void>)
+}
+
 export interface ElectronOptions {
   /**
    * Shortcut of `build.lib.entry`
@@ -33,7 +50,7 @@ export interface ElectronOptions {
      * It will mount the Electron App child-process to `process.electronApp`.
      * @param argv default value `['.', '--no-sandbox']`
      */
-    startup: (argv?: string[], options?: import('node:child_process').SpawnOptions) => Promise<void>
+    startup: (options?: StartupOptions) => Promise<void>
     /** Reload Electron-Renderer */
     reload: () => void
   }) => void | Promise<void>
@@ -117,18 +134,21 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
 /**
  * Electron App startup function.
  * It will mount the Electron App child-process to `process.electronApp`.
- * @param argv default value `['.', '--no-sandbox']`
+ * @param options startup options
  */
-export async function startup(
+export async function startup({
   argv = ['.', '--no-sandbox'],
-  options?: import('node:child_process').SpawnOptions,
-) {
+  options,
+  beforeStartup,
+}: StartupOptions = {}) {
   const { spawn } = await import('node:child_process')
   // @ts-ignore
   const electron = await import('electron')
   const electronPath = <any>(electron.default ?? electron)
 
   await startup.exit()
+
+  await beforeStartup?.(argv)
 
   // Start Electron.app
   process.electronApp = spawn(electronPath, argv, { stdio: 'inherit', ...options })
