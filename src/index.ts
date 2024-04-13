@@ -78,7 +78,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                       startup,
                       reload() {
                         if (process.electronApp) {
-                          server.ws.send({ type: 'full-reload' })
+                          server.hot.send({ type: 'full-reload' })
                         } else {
                           startup()
                         }
