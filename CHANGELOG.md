@@ -1,3 +1,14 @@
+## 0.28.5 (2024-04-19)
+
+- f325403 chore: update comments
+- 5ebd3a6 Merge pull request #229 from ThatKawaiiSam/feat/custom-electron-fork
+- dbc85dc feat: allow custom electron forks in `startup` call
+- 8b076be chore: update deprecated API
+
+**Contributors:**
+
+- [#229](https://github.com/electron-vite/vite-plugin-electron/pull/229)@[ThatKawaiiSam](https://github.com/ThatKawaiiSam)
+
 ## 0.28.4 (2024-03-17)
 
 - 4f7748c chore: restore `vite-plugin-electron-renderer` in `peerDependencies`
