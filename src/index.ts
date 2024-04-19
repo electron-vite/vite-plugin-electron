@@ -32,6 +32,8 @@ export interface ElectronOptions {
      * Electron App startup function.
      * It will mount the Electron App child-process to `process.electronApp`.
      * @param argv default value `['.', '--no-sandbox']`
+     * @param options options for `child_process.spawn`
+     * @param customElectronPkg custom electron package name (default: 'electron')
      */
     startup: (argv?: string[], options?: import('node:child_process').SpawnOptions) => Promise<void>
     /** Reload Electron-Renderer */
@@ -78,7 +80,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                       startup,
                       reload() {
                         if (process.electronApp) {
-                          server.ws.send({ type: 'full-reload' })
+                          server.hot.send({ type: 'full-reload' })
                         } else {
                           startup()
                         }
@@ -118,14 +120,17 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
  * Electron App startup function.
  * It will mount the Electron App child-process to `process.electronApp`.
  * @param argv default value `['.', '--no-sandbox']`
+ * @param options options for `child_process.spawn`
+ * @param customElectronPkg custom electron package name (default: 'electron')
  */
 export async function startup(
   argv = ['.', '--no-sandbox'],
   options?: import('node:child_process').SpawnOptions,
+  customElectronPkg?: string,
 ) {
   const { spawn } = await import('node:child_process')
   // @ts-ignore
-  const electron = await import('electron')
+  const electron = await import(customElectronPkg ?? 'electron')
   const electronPath = <any>(electron.default ?? electron)
 
   await startup.exit()
