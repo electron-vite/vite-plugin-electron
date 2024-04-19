@@ -146,6 +146,8 @@ export interface ElectronOptions {
      * Electron App startup function.
      * It will mount the Electron App child-process to `process.electronApp`.
      * @param argv default value `['.', '--no-sandbox']`
+     * @param options options for `child_process.spawn`
+     * @param customElectronPkg custom electron package name (default: 'electron')
      */
     startup: (argv?: string[], options?: import('node:child_process').SpawnOptions) => Promise<void>
     /** Reload Electron-Renderer */
