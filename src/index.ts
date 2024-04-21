@@ -80,7 +80,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                       startup,
                       reload() {
                         if (process.electronApp) {
-                          server.hot.send({ type: 'full-reload' })
+                          (server.hot || server.ws).send({ type: 'full-reload' })
                         } else {
                           startup()
                         }
