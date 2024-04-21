@@ -35,7 +35,7 @@ export interface ElectronOptions {
      * @param options options for `child_process.spawn`
      * @param customElectronPkg custom electron package name (default: 'electron')
      */
-    startup: (argv?: string[], options?: import('node:child_process').SpawnOptions) => Promise<void>
+    startup: (argv?: string[], options?: import('node:child_process').SpawnOptions, customElectronPkg?: string) => Promise<void>
     /** Reload Electron-Renderer */
     reload: () => void
   }) => void | Promise<void>
@@ -80,7 +80,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                       startup,
                       reload() {
                         if (process.electronApp) {
-                          server.hot.send({ type: 'full-reload' })
+                          (server.hot || server.ws).send({ type: 'full-reload' })
                         } else {
                           startup()
                         }

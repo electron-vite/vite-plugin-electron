@@ -149,7 +149,7 @@ export interface ElectronOptions {
      * @param options options for `child_process.spawn`
      * @param customElectronPkg custom electron package name (default: 'electron')
      */
-    startup: (argv?: string[], options?: import('node:child_process').SpawnOptions) => Promise<void>
+    startup: (argv?: string[], options?: import('node:child_process').SpawnOptions, customElectronPkg?: string) => Promise<void>
     /** Reload Electron-Renderer */
     reload: () => void
   }) => void | Promise<void>
