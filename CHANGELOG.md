@@ -1,3 +1,9 @@
+## 0.28.6 (2024-04-21)
+
+- be94383 fix: `ElectronOptions['startup']` definition
+- 96905d9 chore: compatible vite@4 resolve node first
+- a16fe3c fix: hot-reload compatible vite@4
+
 ## 0.28.5 (2024-04-19)
 
 - f325403 chore: update comments
