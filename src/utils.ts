@@ -38,6 +38,9 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
       emptyOutDir: false,
     },
     resolve: {
+      // @ts-ignore
+      browserField: false,
+      conditions: ['node'],
       // #98
       // Since we're building for electron (which uses Node.js), we don't want to use the "browser" field in the packages.
       // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.
