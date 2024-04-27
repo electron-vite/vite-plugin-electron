@@ -1,3 +1,13 @@
+## 0.28.7 (2024-04-27)
+
+- b3cf74c chore: cleanup, code format
+- 957b144 Merge pull request #233 from kuoruan/feat/config
+- c0f2647 feat: inherit more config from base user config
+
+**Contributors:**
+
+- [#233](https://github.com/electron-vite/vite-plugin-electron/pull/233)@[kuoruan](https://github.com/kuoruan)
+
 ## 0.28.6 (2024-04-21)
 
 - be94383 fix: `ElectronOptions['startup']` definition
