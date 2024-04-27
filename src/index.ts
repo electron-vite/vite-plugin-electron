@@ -1,7 +1,8 @@
 import {
   type Plugin,
-  build as viteBuild,
+  type ConfigEnv,
   type UserConfig,
+  build as viteBuild,
 } from 'vite'
 import {
   resolveServerUrl,
@@ -48,8 +49,8 @@ export function build(options: ElectronOptions) {
 
 export default function electron(options: ElectronOptions | ElectronOptions[]): Plugin[] {
   const optionsArray = Array.isArray(options) ? options : [options]
-  let mode: string
   let userConfig: UserConfig
+  let configEnv: ConfigEnv
 
   return [
     {
@@ -70,9 +71,11 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             options.vite.root ??= server.config.root
             options.vite.envDir ??= server.config.envDir
             options.vite.envPrefix ??= server.config.envPrefix
+
             options.vite.build ??= {}
             options.vite.build.watch ??= {}
             options.vite.build.minify ??= false
+
             options.vite.plugins ??= []
             options.vite.plugins.push(
               {
@@ -107,14 +110,15 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
       apply: 'build',
       config(config, env) {
         userConfig = config
+        configEnv = env
+
         // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
         config.base ??= './'
-        mode = env.mode
       },
       async closeBundle() {
         for (const options of optionsArray) {
           options.vite ??= {}
-          options.vite.mode ??= mode
+          options.vite.mode ??= configEnv.mode
           options.vite.root ??= userConfig.root
           options.vite.envDir ??= userConfig.envDir
           options.vite.envPrefix ??= userConfig.envPrefix
