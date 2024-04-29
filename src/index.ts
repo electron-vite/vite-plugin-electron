@@ -86,6 +86,9 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                   if (options.onstart) {
                     options.onstart.call(this, {
                       startup,
+                      // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
+                      // Because Vite only inserts `/@vite/client` into the `*.html` entry file.
+                      // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
                       reload() {
                         if (process.electronApp) {
                           (server.hot || server.ws).send({ type: 'full-reload' })
