@@ -103,8 +103,8 @@ export function resolveHostname(hostname: string) {
   return loopbackHosts.has(hostname) || wildcardHosts.has(hostname) ? 'localhost' : hostname
 }
 
-export function resolveServerUrl(server: ViteDevServer): string | void {
-  const addressInfo = server.httpServer!.address()
+export function resolveServerUrl(server: ViteDevServer) {
+  const addressInfo = server.httpServer?.address()
   const isAddressInfo = (x: any): x is AddressInfo => x?.address
 
   if (isAddressInfo(addressInfo)) {
