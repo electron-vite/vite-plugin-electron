@@ -73,7 +73,9 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             options.vite.envPrefix ??= server.config.envPrefix
 
             options.vite.build ??= {}
-            options.vite.build.watch ??= {}
+            if (!Object.keys(options.vite.build).includes('watch')) { // #252
+              options.vite.build.watch = {}
+            }
             options.vite.build.minify ??= false
 
             options.vite.plugins ??= []
