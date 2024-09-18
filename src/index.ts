@@ -167,7 +167,10 @@ export async function startup(
 startup.hookedProcessExit = false
 startup.exit = async () => {
   if (process.electronApp) {
-    process.electronApp.removeAllListeners()
-    treeKillSync(process.electronApp.pid!)
+    await new Promise((resolve) => {
+      process.electronApp.removeAllListeners()
+      process.electronApp.once('exit', resolve)
+      treeKillSync(process.electronApp.pid!)
+    })
   }
 }
