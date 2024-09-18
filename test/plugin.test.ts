@@ -10,6 +10,7 @@ import { notBundle } from '../dist/plugin'
 
 const pluginNotBundle = notBundle()
 pluginNotBundle.apply = undefined
+const normalizingNewLineRE = /[\r\n]+/g
 
 describe('src/plugin', () => {
   it('notBundle', async () => {
@@ -29,7 +30,9 @@ describe('src/plugin', () => {
 
     const distMain = fs.readFileSync(path.join(__dirname, '__snapshots__/external-main.js'), 'utf-8')
     const snapMain = fs.readFileSync(path.join(__dirname, 'dist/external-main.js'), 'utf-8')
+    const normalDistMain = distMain.replace(normalizingNewLineRE, '\n')
+    const normalSnapMain = snapMain.replace(normalizingNewLineRE, '\n')
 
-    expect(distMain).equal(snapMain)
+    expect(normalDistMain).equal(normalSnapMain)
   })
 })
