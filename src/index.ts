@@ -73,7 +73,9 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             options.vite.envPrefix ??= server.config.envPrefix
 
             options.vite.build ??= {}
-            options.vite.build.watch ??= {}
+            if (!Object.keys(options.vite.build).includes('watch')) { // #252
+              options.vite.build.watch = {}
+            }
             options.vite.build.minify ??= false
 
             options.vite.plugins ??= []
@@ -86,6 +88,9 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                   if (options.onstart) {
                     options.onstart.call(this, {
                       startup,
+                      // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
+                      // Because Vite only inserts `/@vite/client` into the `*.html` entry file.
+                      // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
                       reload() {
                         if (process.electronApp) {
                           (server.hot || server.ws).send({ type: 'full-reload' })
@@ -162,7 +167,10 @@ export async function startup(
 startup.hookedProcessExit = false
 startup.exit = async () => {
   if (process.electronApp) {
-    process.electronApp.removeAllListeners()
-    treeKillSync(process.electronApp.pid!)
+    await new Promise((resolve) => {
+      process.electronApp.removeAllListeners()
+      process.electronApp.once('exit', resolve)
+      treeKillSync(process.electronApp.pid!)
+    })
   }
 }
