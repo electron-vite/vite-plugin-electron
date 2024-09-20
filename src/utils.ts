@@ -141,15 +141,11 @@ export function resolvePackageJson(root = process.cwd()): {
  * Inspired `tree-kill`, implemented based on sync-api. #168
  * @see https://github.com/pkrumins/node-tree-kill/blob/v1.2.2/index.js
  */
-export function treeKillSync(pid: number) {
-  if (process.platform === 'win32') {
-    cp.execSync(`taskkill /pid ${pid} /T /F`)
-  } else {
-    killTree(pidTree({ pid, ppid: process.pid }))
-  }
+export function killTreeWin32(pid: number) {
+  cp.execSync(`taskkill /pid ${pid} /T /F`)
 }
 
-function pidTree(tree: PidTree) {
+export function pidTree(tree: PidTree) {
   const command = process.platform === 'darwin'
     ? `pgrep -P ${tree.pid}` // Mac
     : `ps -o pid --no-headers --ppid ${tree.ppid}` // Linux
@@ -168,7 +164,7 @@ function pidTree(tree: PidTree) {
   return tree
 }
 
-function killTree(tree: PidTree) {
+export function killTree(tree: PidTree) {
   if (tree.children) {
     for (const child of tree.children) {
       killTree(child)
