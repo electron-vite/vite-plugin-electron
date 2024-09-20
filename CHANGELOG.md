@@ -1,3 +1,11 @@
+## 0.28.8 (2024-09-19)
+
+- 3239718 fix: better exit app #251
+- 927885d fix: unable to disable watch #252
+- f043f74 chore: cleanup
+- 149c4a9 Merge pull request #247 from think-flow/testfix
+- f9bda13 fix: notBundle test is failed
+
 ## 0.28.7 (2024-04-27)
 
 - b3cf74c chore: cleanup, code format
