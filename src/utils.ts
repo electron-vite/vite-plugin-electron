@@ -5,6 +5,7 @@ import type { AddressInfo } from 'node:net'
 import { builtinModules } from 'node:module'
 import {
   type InlineConfig,
+  type ResolvedConfig,
   type ViteDevServer,
   mergeConfig,
 } from 'vite'
@@ -134,6 +135,68 @@ export function resolvePackageJson(root = process.cwd()): {
     return JSON.parse(packageJsonStr)
   } catch {
     return null
+  }
+}
+
+/** @see https://github.com/vitejs/vite/blob/v5.4.9/packages/vite/src/node/build.ts#L489-L504 */
+export function resolveInput(config: ResolvedConfig) {
+  const options = config.build
+  const { root } = config
+  const libOptions = options.lib
+
+  const resolve = (p: string) => path.resolve(root, p)
+  const input = libOptions
+    ? options.rollupOptions?.input ||
+    (typeof libOptions.entry === 'string'
+      ? resolve(libOptions.entry)
+      : Array.isArray(libOptions.entry)
+        ? libOptions.entry.map(resolve)
+        : Object.fromEntries(
+          Object.entries(libOptions.entry).map(([alias, file]) => [
+            alias,
+            resolve(file),
+          ]),
+        ))
+    : options.rollupOptions?.input
+
+  if (input) return input
+
+  const indexHtml = resolve('index.html')
+  return fs.existsSync(indexHtml) ? indexHtml : undefined
+}
+
+/**
+ * When run the `vite build` command, there must be an entry file. 
+ * If the user does not need Renderer, we need to create a temporary entry file to avoid Vite throw error.
+ * @inspired https://github.com/vitejs/vite/blob/v5.4.9/packages/vite/src/node/config.ts#L1234-L1236
+ */
+export async function mockIndexHtml(config: ResolvedConfig) {
+  const { root, build } = config
+  const output = path.resolve(root, build.outDir)
+  const content = `
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>vite-plugin-electron</title>
+  </head>
+  <body>
+    <div>An entry file for electron renderer process.</div>
+  </body>
+</html>
+`.trim()
+  const index = 'index.html'
+  const filepath = path.join(root, index)
+  const distpath = path.join(output, index)
+
+  await fs.promises.writeFile(filepath, content)
+
+  return {
+    async remove() {
+      await fs.promises.unlink(filepath)
+      await fs.promises.unlink(distpath)
+    },
+    filepath,
+    distpath,
   }
 }
 

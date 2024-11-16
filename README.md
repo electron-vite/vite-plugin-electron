@@ -246,6 +246,24 @@ build({
 })
 ```
 
+**Hot Reload**
+
+Since `v0.29.0`, when preload scripts are rebuilt, they will send an `electron-vite&type=hot-reload` event to the main process.  
+If your App doesn't need a renderer process, this will give you **hot-reload**.
+
+```js
+// electron/main.ts
+
+process.on('message', (msg) => {
+  if (msg === 'electron-vite&type=hot-reload') {
+    for (const win of BrowserWindow.getAllWindows()) {
+      // Hot reload preload scripts
+      win.webContents.reload()
+    }
+  }
+})
+```
+
 ## How to work
 
 It just executes the `electron .` command in the Vite build completion hook and then starts or restarts the Electron App.

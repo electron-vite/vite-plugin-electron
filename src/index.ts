@@ -7,6 +7,8 @@ import {
 import {
   resolveServerUrl,
   resolveViteConfig,
+  resolveInput,
+  mockIndexHtml,
   withExternalBuiltins,
   treeKillSync,
 } from './utils'
@@ -51,6 +53,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   const optionsArray = Array.isArray(options) ? options : [options]
   let userConfig: UserConfig
   let configEnv: ConfigEnv
+  let mockdInput: Awaited<ReturnType<typeof mockIndexHtml>> | undefined
 
   return [
     {
@@ -89,11 +92,14 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                     options.onstart.call(this, {
                       startup,
                       // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
-                      // Because Vite only inserts `/@vite/client` into the `*.html` entry file.
+                      // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
                       // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
                       reload() {
                         if (process.electronApp) {
                           (server.hot || server.ws).send({ type: 'full-reload' })
+
+                          // For Electron apps that don't need to use the renderer process.
+                          startup.send('electron-vite&type=hot-reload')
                         } else {
                           startup()
                         }
@@ -120,7 +126,15 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
         config.base ??= './'
       },
+      async configResolved(config) {
+        const input = resolveInput(config)
+        if (input == null) {
+          mockdInput = await mockIndexHtml(config)
+        }
+      },
       async closeBundle() {
+        mockdInput?.remove()
+
         for (const options of optionsArray) {
           options.vite ??= {}
           options.vite.mode ??= configEnv.mode
@@ -154,7 +168,10 @@ export async function startup(
   await startup.exit()
 
   // Start Electron.app
-  process.electronApp = spawn(electronPath, argv, { stdio: 'inherit', ...options })
+  process.electronApp = spawn(electronPath, argv, {
+    stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+    ...options,
+  })
 
   // Exit command after Electron.app exits
   process.electronApp.once('exit', process.exit)
@@ -164,6 +181,14 @@ export async function startup(
     process.once('exit', startup.exit)
   }
 }
+
+startup.send = (message: string) => {
+  if (process.electronApp) {
+    // Based on { stdio: [,,, 'ipc'] }
+    process.electronApp.send?.(message)
+  }
+}
+
 startup.hookedProcessExit = false
 startup.exit = async () => {
   if (process.electronApp) {
