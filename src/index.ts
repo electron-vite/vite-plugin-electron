@@ -7,6 +7,8 @@ import {
 import {
   resolveServerUrl,
   resolveViteConfig,
+  resolveInput,
+  mockIndexHtml,
   withExternalBuiltins,
   treeKillSync,
 } from './utils'
@@ -51,6 +53,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   const optionsArray = Array.isArray(options) ? options : [options]
   let userConfig: UserConfig
   let configEnv: ConfigEnv
+  let mockdInput: Awaited<ReturnType<typeof mockIndexHtml>> | undefined
 
   return [
     {
@@ -120,7 +123,15 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
         config.base ??= './'
       },
+      async configResolved(config) {
+        const input = resolveInput(config)
+        if (input == null) {
+          mockdInput = await mockIndexHtml(config)
+        }
+      },
       async closeBundle() {
+        mockdInput?.remove()
+
         for (const options of optionsArray) {
           options.vite ??= {}
           options.vite.mode ??= configEnv.mode
