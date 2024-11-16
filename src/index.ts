@@ -92,11 +92,14 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                     options.onstart.call(this, {
                       startup,
                       // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
-                      // Because Vite only inserts `/@vite/client` into the `*.html` entry file.
+                      // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
                       // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
                       reload() {
                         if (process.electronApp) {
                           (server.hot || server.ws).send({ type: 'full-reload' })
+
+                          // For Electron apps that don't need to use the renderer process.
+                          startup.send('electron-vite&type=hot-reload')
                         } else {
                           startup()
                         }
@@ -165,7 +168,10 @@ export async function startup(
   await startup.exit()
 
   // Start Electron.app
-  process.electronApp = spawn(electronPath, argv, { stdio: 'inherit', ...options })
+  process.electronApp = spawn(electronPath, argv, {
+    stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+    ...options,
+  })
 
   // Exit command after Electron.app exits
   process.electronApp.once('exit', process.exit)
@@ -175,6 +181,14 @@ export async function startup(
     process.once('exit', startup.exit)
   }
 }
+
+startup.send = (message: string) => {
+  if (process.electronApp) {
+    // Based on { stdio: [,,, 'ipc'] }
+    process.electronApp.send?.(message)
+  }
+}
+
 startup.hookedProcessExit = false
 startup.exit = async () => {
   if (process.electronApp) {
