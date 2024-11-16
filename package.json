@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-electron",
-  "version": "0.28.8",
+  "version": "0.29.0",
   "description": "Electron 🔗 Vite",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,7 +26,7 @@
     "type": "git",
     "url": "git+https://github.com/electron-vite/vite-plugin-electron.git"
   },
-  "author": "草鞋没号 <308487730@qq.com>",
+  "author": "Leo Wang(草鞋没号) <308487730@qq.com>",
   "license": "MIT",
   "packageManager": "pnpm@8.0.0",
   "scripts": {

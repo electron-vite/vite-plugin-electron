@@ -1,3 +1,26 @@
+## 0.29.0 (2024-11-16)
+
+- 638d0f3 feat: support main process control hot-reload
+- c58fbf9 feat: mock index.html for support use the main process only
+
+**Hot Reload**
+
+Since `v0.29.0`, when preload scripts are rebuilt, they will send an `electron-vite&type=hot-reload` event to the main process.  
+If your App doesn't need a renderer process, this will give you **hot-reload**.
+
+```js
+// electron/main.ts
+
+process.on('message', (msg) => {
+  if (msg === 'electron-vite&type=hot-reload') {
+    for (const win of BrowserWindow.getAllWindows()) {
+      // Hot reload preload scripts
+      win.webContents.reload()
+    }
+  }
+})
+```
+
 ## 0.28.8 (2024-09-19)
 
 - 3239718 fix: better exit app #251
