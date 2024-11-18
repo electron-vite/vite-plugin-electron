@@ -33,8 +33,9 @@ In short, `vite-plugin-electron` makes developing Electron apps as easy as norma
 - [🔥 Hot Restart <sub><sup>(Main process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-restart)
 - [🔄 Hot Reload <sub><sup>(Preload scripts)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-reload)
 - [⚡️ HMR <sub><sup>(Renderer process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hmr)
-- [🚀 Not Bundle, It's fast <sub><sup>(Like Vite's Not Bundle)</sup></sub>](https://github.com/electron-vite/vite-plugin-electron#not-bundle)
+<!-- - [🚀 Not Bundle, It's fast <sub><sup>(Like Vite's Not Bundle)</sup></sub>](https://github.com/electron-vite/vite-plugin-electron#not-bundle) -->
 - 🌱 Fully compatible with Vite and Vite's ecosystem <sub><sup>(Based on Vite)</sup></sub>
+- 🔮 Full-featured [JavaScript API](https://github.com/electron-vite/vite-plugin-electron#javascript-api), really easy to integrate with complex projects.
 - 🐣 Few APIs, easy to use
 
 <!-- ![vite-plugin-electron.gif](https://github.com/electron-vite/vite-plugin-electron/blob/main/vite-plugin-electron.gif?raw=true) -->
@@ -327,7 +328,7 @@ export default {
 
 <!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
 
----
+<!--
 
 ## Not Bundle
 
@@ -378,3 +379,4 @@ Modules in `node_modules` are not bundled during development, it's fast!
 │ const log = require('electron-log') │
 ┗—————————————————————————————————————┛
 ```
+->
