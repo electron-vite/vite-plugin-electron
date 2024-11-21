@@ -10,7 +10,9 @@ import {
   resolveInput,
   mockIndexHtml,
   withExternalBuiltins,
-  treeKillSync,
+  killTreeWin32,
+  killTree,
+  pidTree,
 } from './utils'
 
 // public utils
@@ -192,10 +194,21 @@ startup.send = (message: string) => {
 startup.hookedProcessExit = false
 startup.exit = async () => {
   if (process.electronApp) {
-    await new Promise((resolve) => {
+    const isWin32 = process.platform === 'win32'
+    const pid = process.electronApp.pid!
+    const tree = isWin32 ? null : pidTree({ pid, ppid: process.pid })
+
+    await new Promise<void>((resolve) => {
       process.electronApp.removeAllListeners()
-      process.electronApp.once('exit', resolve)
-      treeKillSync(process.electronApp.pid!)
+      process.electronApp.once('exit', () => {
+        if (isWin32) {
+          killTreeWin32(pid)
+        } else {
+          killTree(tree!)
+        }
+        resolve()
+      })
+      process.kill(pid)
     })
   }
 }
