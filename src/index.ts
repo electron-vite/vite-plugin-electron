@@ -168,8 +168,14 @@ export async function startup(
   await startup.exit()
 
   // Start Electron.app
+  const stdio =
+    process.platform === 'linux'
+      // reserve file descriptor 3 for Chromium; put Node IPC on file descriptor 4
+      ? ['inherit', 'inherit', 'inherit', 'ignore', 'ipc']
+      : ['inherit', 'inherit', 'inherit', 'ipc']
+
   process.electronApp = spawn(electronPath, argv, {
-    stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+    stdio,
     ...options,
   })
 
