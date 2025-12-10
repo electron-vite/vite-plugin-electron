@@ -1,16 +1,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { build } from 'vite'
-import {
-  describe,
-  expect,
-  it,
-} from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { notBundle } from '../dist/plugin'
 
 const pluginNotBundle = notBundle()
 pluginNotBundle.apply = undefined
-const normalizingNewLineRE = /[\r\n]+/g
+const normalizingNewLineRE = /\r\n/g
 
 describe('src/plugin', () => {
   it('notBundle', async () => {
@@ -28,11 +24,15 @@ describe('src/plugin', () => {
       plugins: [pluginNotBundle],
     })
 
-    const distMain = fs.readFileSync(path.join(__dirname, '__snapshots__/external-main.js'), 'utf-8')
-    const snapMain = fs.readFileSync(path.join(__dirname, 'dist/external-main.js'), 'utf-8')
-    const normalDistMain = distMain.replace(normalizingNewLineRE, '\n')
-    const normalSnapMain = snapMain.replace(normalizingNewLineRE, '\n')
+    const main = fs.readFileSync(
+      path.join(__dirname, 'dist/external-main.js'),
+      'utf-8',
+    )
+    const normalMain = main.replace(normalizingNewLineRE, '\n')
 
-    expect(normalDistMain).equal(normalSnapMain)
+    // Keep assertions semantic because Rolldown/Oxc codegen is intentionally different from Rollup.
+    expect(normalMain).toContain('require("vite")')
+    expect(normalMain).toContain('console.log(import("vite"))')
+    expect(normalMain).toContain('"foo"')
   })
 })

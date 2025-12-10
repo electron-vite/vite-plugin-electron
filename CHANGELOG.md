@@ -344,9 +344,7 @@ export default defineConfig(({ command }) => ({
     electron({
       entry: 'electron/main.ts',
       vite: {
-        plugins: [
-          command === 'serve' && notBundle(/* NotBundleOptions */),
-        ],
+        plugins: [command === 'serve' && notBundle(/* NotBundleOptions */)],
       },
     }),
   ],
@@ -371,9 +369,7 @@ export default {
     electron({
       entry: 'electron/main.ts',
       vite: {
-        plugins: [
-          notBundle(/* NotBundleOptions */),
-        ],
+        plugins: [notBundle(/* NotBundleOptions */)],
       },
     }),
   ],
@@ -449,7 +445,9 @@ Modules in `node_modules` are not bundled during development, it's fast!
 function build(config: Configuration | Configuration[]): Promise<void>
 
 // 0.11.0 - Same as Vite's build
-function build(config: Configuration): Promise<RollupOutput | RollupOutput[] | RollupWatcher>
+function build(
+  config: Configuration,
+): Promise<RollupOutput | RollupOutput[] | RollupWatcher>
 ```
 
 #### Features
@@ -469,23 +467,27 @@ Example:
 
 ```js
 build(
-  withExternalBuiltins( // external Node.js builtin modules
-    resolveViteConfig( // with default config
+  withExternalBuiltins(
+    // external Node.js builtin modules
+    resolveViteConfig(
+      // with default config
       {
         entry: 'foo.ts',
         vite: {
           mode: 'foo-mode', // for .env file
-          plugins: [{
-            name: 'plugin-build-done',
-            closeBundle() {
-              // Startup Electron App
-              startup()
+          plugins: [
+            {
+              name: 'plugin-build-done',
+              closeBundle() {
+                // Startup Electron App
+                startup()
+              },
             },
-          }],
+          ],
         },
-      }
-    )
-  )
+      },
+    ),
+  ),
 )
 ```
 
@@ -544,11 +546,14 @@ export type Configuration = {
    */
   entry?: import('vite').LibraryOptions['entry']
   /**
-   * Triggered when Vite is built.  
-   * If passed this parameter will not automatically start Electron App.  
-   * You can start Electron App through the `startup` function passed through the callback function.  
+   * Triggered when Vite is built.
+   * If passed this parameter will not automatically start Electron App.
+   * You can start Electron App through the `startup` function passed through the callback function.
    */
-  onstart?: (this: import('rollup').PluginContext, startup: (args?: string[]) => Promise<void>) => void
+  onstart?: (
+    this: import('rollup').PluginContext,
+    startup: (args?: string[]) => Promise<void>,
+  ) => void
   vite?: import('vite').InlineConfig
 }
 ```
@@ -559,51 +564,45 @@ For example, some common problems in the following issues.
 
 #### Multiple entry files is not support #86
 
-  Thanks to Vite@3.2.0's `lib.entry` supports multiple entries, which makes the configuration of the new version very simple. **So the `vite-plugin-electron@0.10.0` requires Vite at least `v3.2.0`**.
+Thanks to Vite@3.2.0's `lib.entry` supports multiple entries, which makes the configuration of the new version very simple. **So the `vite-plugin-electron@0.10.0` requires Vite at least `v3.2.0`**.
 
-  **e.g.**
+**e.g.**
 
-  ```ts
-  import electron from 'vite-plugin-electron'
+```ts
+import electron from 'vite-plugin-electron'
 
-  // In plugins option
-  electron({
-    entry: [
-      'electron/entry-1.ts',
-      'electron/entry-2.ts',
-    ],
-  })
+// In plugins option
+electron({
+  entry: ['electron/entry-1.ts', 'electron/entry-2.ts'],
+})
 
-  // Or use configuration array
-  electron([
-    {
-      entry: [
-        'electron/entry-1.ts',
-        'electron/entry-2.ts',
-      ],
-    },
-    {
-      entry: 'foo/bar.ts',
-    },
-  ])
-  ```
+// Or use configuration array
+electron([
+  {
+    entry: ['electron/entry-1.ts', 'electron/entry-2.ts'],
+  },
+  {
+    entry: 'foo/bar.ts',
+  },
+])
+```
 
 #### require is not defined #48, #87
 
-  `vite-plugin-electron-renderer` will change `output.format` to `cjs` format by default<sub><sup>(This is because currently Electron@21 only supports CommonJs)</sub></sup>, which will cause the built code to use `require` to import modules, if the user `nodeIntegration` is not enabled in the Electron-Main process which causes the error `require is not defined` to be thrown.
+`vite-plugin-electron-renderer` will change `output.format` to `cjs` format by default<sub><sup>(This is because currently Electron@21 only supports CommonJs)</sub></sup>, which will cause the built code to use `require` to import modules, if the user `nodeIntegration` is not enabled in the Electron-Main process which causes the error `require is not defined` to be thrown.
 
-  `vite-plugin-electron-renderer@0.10.0` provides the `nodeIntegration` option. It is up to the user to decide whether to use Node.js(CommonJs).
+`vite-plugin-electron-renderer@0.10.0` provides the `nodeIntegration` option. It is up to the user to decide whether to use Node.js(CommonJs).
 
-  **e.g.**
+**e.g.**
 
-  ```ts
-  import renderer from 'vite-plugin-electron-renderer'
+```ts
+import renderer from 'vite-plugin-electron-renderer'
 
-  // In plugins option
-  renderer({
-    nodeIntegration: true,
-  })
-  ```
+// In plugins option
+renderer({
+  nodeIntegration: true,
+})
+```
 
 #### Use `Worker` in Electron-Main or Electron-Renderer #77, #81
 
@@ -618,10 +617,7 @@ For example, some common problems in the following issues.
 
   // In plugins option
   electron({
-    entry: [
-      'electron/main.ts',
-      'electron/worker.ts',
-    ],
+    entry: ['electron/main.ts', 'electron/worker.ts'],
   })
 
   // In electron/main.ts
@@ -663,40 +659,39 @@ https://github.com/electron-vite/vite-plugin-electron/pull/89
 
 ## 0.9.3 (2022-09-10)
 
-~~*vite-plugin-electron*~~
+~~_vite-plugin-electron_~~
 
-*vite-plugin-electron-renderer*
+_vite-plugin-electron-renderer_
 
 - 191afb8 feat: proxy `ipcRenderer` in `Worker` | #69
 
 ## 0.9.2 (2022-08-29)
 
-*vite-plugin-electron*
+_vite-plugin-electron_
 
 - 715a1cd fix(electron): `VITE_DEV_SERVER_HOSTNAME` instead `VITE_DEV_SERVER_HOST`
 
-*vite-plugin-electron-renderer*
+_vite-plugin-electron-renderer_
 
 ## 0.9.1 (2022-08-24)
 
-*vite-plugin-electron*
+_vite-plugin-electron_
 
 - db61e49 feat(electron): support custom start 🌱 | #57, #58
 
-~~*vite-plugin-electron-renderer*~~
+~~_vite-plugin-electron-renderer_~~
 
 ## 0.9.0 (2022-08-12)
 
 🎉 `v0.9.0` is a stable version based on `vite@3.0.6`
 
-~~*vite-plugin-electron*~~
+~~_vite-plugin-electron_~~
 
-*vite-plugin-electron-renderer*
+_vite-plugin-electron-renderer_
 
 - ebc6a3d chore(electron-renderer): remove `renderBuiltUrl()` based on vite@3.0.6 ([vite@3.0.6-8f2065e](https://github.com/vitejs/vite/pull/9381/commits/8f2065efcb6ba664f7dce6f3c7666b29e2c56027#diff-aa53520bfd53e6c24220c44494457cc66370fd2bee513c15f9be7eb537a363e7L874))
 
 ---
-
 
 ## [2022-08-11] v0.8.8
 
@@ -715,25 +710,25 @@ ESM -> CJS
 PR: #51
 
 1. feat: add `VITE_DEV_SERVER_URL` to electron
-process env, so that it is easier to use
+   process env, so that it is easier to use
 
 2. fix(🐞): VITE_DEV_SERVER_HOSTNAME cannot be used directly when
-VITE_DEV_SERVER_HOSTNAME is a ipv6 address or
-vite config `server.host` is true
+   VITE_DEV_SERVER_HOSTNAME is a ipv6 address or
+   vite config `server.host` is true
 
 3. fix(🐞): use vite config `mode` as default build
-mode to avoid build mode not equal to vite config `mode` when
-vite config `mode` !== 'development' which would lead to render env
-not equal to electron main or preload
+   mode to avoid build mode not equal to vite config `mode` when
+   vite config `mode` !== 'development' which would lead to render env
+   not equal to electron main or preload
 
 4. fix(🐞): build electron output after render to avoid the electron
-output being deleted when the vite config emptyOutDir
-is `true` and the vite command is `build`
+   output being deleted when the vite config emptyOutDir
+   is `true` and the vite command is `build`
 
 5. fix(🐞): use `closeBundle` to replace `writeBundle`, because in
-extreme cases, an error will be reported. For example,
-`can't find preload module` will occur as an error
-when `preload` update frequently
+   extreme cases, an error will be reported. For example,
+   `can't find preload module` will occur as an error
+   when `preload` update frequently
 
 ## [2022-07-31] v0.8.4
 

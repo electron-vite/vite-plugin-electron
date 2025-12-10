@@ -86,7 +86,7 @@ app.whenReady().then(() => {
     win.loadURL(process.env.VITE_DEV_SERVER_URL)
   } else {
     // Load your file
-    win.loadFile('dist/index.html');
+    win.loadFile('dist/index.html')
   }
 })
 ```
@@ -150,7 +150,11 @@ export interface ElectronOptions {
      * @param options options for `child_process.spawn`
      * @param customElectronPkg custom electron package name (default: 'electron')
      */
-    startup: (argv?: string[], options?: import('node:child_process').SpawnOptions, customElectronPkg?: string) => Promise<void>
+    startup: (
+      argv?: string[],
+      options?: import('node:child_process').SpawnOptions,
+      customElectronPkg?: string,
+    ) => Promise<void>
     /** Reload Electron-Renderer */
     reload: () => void
   }) => void | Promise<void>
@@ -234,15 +238,17 @@ build({
       minify: isProd,
       watch: isDev ? {} : null,
     },
-    plugins: [{
-      name: 'plugin-start-electron',
-      closeBundle() {
-        if (isDev) {
-          // Startup Electron App
-          startup()
-        }
+    plugins: [
+      {
+        name: 'plugin-start-electron',
+        closeBundle() {
+          if (isDev) {
+            // Startup Electron App
+            startup()
+          }
+        },
       },
-    }],
+    ],
   },
 })
 ```
@@ -293,10 +299,7 @@ export default {
         build: {
           rollupOptions: {
             // Here are some C/C++ modules them can't be built properly
-            external: [
-              'serialport',
-              'sqlite3',
-            ],
+            external: ['serialport', 'sqlite3'],
           },
         },
       },
@@ -317,9 +320,7 @@ export default {
     electron({
       entry: 'electron/main.ts',
       vite: {
-        plugins: [
-          native(/* options */),
-        ],
+        plugins: [native(/* options */)],
       },
     }),
   ],

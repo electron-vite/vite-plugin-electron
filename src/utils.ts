@@ -57,10 +57,16 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
 }
 
 export function withExternalBuiltins(config: InlineConfig) {
-  const builtins = builtinModules.filter(e => !e.startsWith('_')); builtins.push('electron', ...builtins.map(m => `node:${m}`))
+  const builtins = builtinModules.filter((e) => !e.startsWith('_'))
+  builtins.push('electron', ...builtins.map((m) => `node:${m}`))
 
   config.build ??= {}
   config.build.rollupOptions ??= {}
+
+  // Set platform to 'node' for Rolldown (Vite 8+) to properly handle CJS interop
+  // with createRequire instead of throwing "Calling require for 'module'" errors
+  // @ts-ignore - platform is a Rolldown-specific option
+  config.build.rollupOptions.platform ??= 'node'
 
   let external = config.build.rollupOptions.external
   if (
@@ -101,7 +107,9 @@ export function resolveHostname(hostname: string) {
     '0000:0000:0000:0000:0000:0000:0000:0000',
   ])
 
-  return loopbackHosts.has(hostname) || wildcardHosts.has(hostname) ? 'localhost' : hostname
+  return loopbackHosts.has(hostname) || wildcardHosts.has(hostname)
+    ? 'localhost'
+    : hostname
 }
 
 export function resolveServerUrl(server: ViteDevServer) {
@@ -147,16 +155,16 @@ export function resolveInput(config: ResolvedConfig) {
   const resolve = (p: string) => path.resolve(root, p)
   const input = libOptions
     ? options.rollupOptions?.input ||
-    (typeof libOptions.entry === 'string'
-      ? resolve(libOptions.entry)
-      : Array.isArray(libOptions.entry)
-        ? libOptions.entry.map(resolve)
-        : Object.fromEntries(
-          Object.entries(libOptions.entry).map(([alias, file]) => [
-            alias,
-            resolve(file),
-          ]),
-        ))
+      (typeof libOptions.entry === 'string'
+        ? resolve(libOptions.entry)
+        : Array.isArray(libOptions.entry)
+          ? libOptions.entry.map(resolve)
+          : Object.fromEntries(
+              Object.entries(libOptions.entry).map(([alias, file]) => [
+                alias,
+                resolve(file),
+              ]),
+            ))
     : options.rollupOptions?.input
 
   if (input) return input
@@ -166,7 +174,7 @@ export function resolveInput(config: ResolvedConfig) {
 }
 
 /**
- * When run the `vite build` command, there must be an entry file. 
+ * When run the `vite build` command, there must be an entry file.
  * If the user does not need Renderer, we need to create a temporary entry file to avoid Vite throw error.
  * @inspired https://github.com/vitejs/vite/blob/v5.4.9/packages/vite/src/node/config.ts#L1234-L1236
  */
@@ -213,20 +221,21 @@ export function treeKillSync(pid: number) {
 }
 
 function pidTree(tree: PidTree) {
-  const command = process.platform === 'darwin'
-    ? `pgrep -P ${tree.pid}` // Mac
-    : `ps -o pid --no-headers --ppid ${tree.ppid}` // Linux
+  const command =
+    process.platform === 'darwin'
+      ? `pgrep -P ${tree.pid}` // Mac
+      : `ps -o pid --no-headers --ppid ${tree.ppid}` // Linux
 
   try {
     const childs = cp
       .execSync(command, { encoding: 'utf8' })
       .match(/\d+/g)
-      ?.map(id => +id)
+      ?.map((id) => +id)
 
     if (childs) {
-      tree.children = childs.map(cid => pidTree({ pid: cid, ppid: tree.pid }))
+      tree.children = childs.map((cid) => pidTree({ pid: cid, ppid: tree.pid }))
     }
-  } catch { }
+  } catch {}
 
   return tree
 }
@@ -240,5 +249,7 @@ function killTree(tree: PidTree) {
 
   try {
     process.kill(tree.pid) // #214
-  } catch { /* empty */ }
+  } catch {
+    /* empty */
+  }
 }

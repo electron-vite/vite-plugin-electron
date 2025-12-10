@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { builtinModules } from 'node:module'
-import { defineConfig } from 'vite'
+import { defineConfig, type UserConfig } from 'vite'
 import pkg from './package.json'
 
 const isdev = process.argv.slice(2).includes('--watch')
@@ -15,7 +15,7 @@ export default defineConfig(() => {
     }
   }
 
-  return {
+  const config = {
     build: {
       minify: false,
       emptyOutDir: false,
@@ -27,34 +27,42 @@ export default defineConfig(() => {
           simple: 'src/simple.ts',
         },
         formats: ['cjs', 'es'],
-        fileName: format => format === 'es' ? '[name].mjs' : '[name].js',
+        fileName: (format) => (format === 'es' ? '[name].mjs' : '[name].js'),
       },
       rollupOptions: {
         external: [
           'vite',
           'electron',
           ...builtinModules,
-          ...builtinModules.map(m => `node:${m}`),
-          ...Object.keys('dependencies' in pkg ? pkg.dependencies as object : {}),
-          ...Object.keys('peerDependencies' in pkg ? pkg.peerDependencies as object : {}),
+          ...builtinModules.map((m) => `node:${m}`),
+          ...Object.keys(
+            'dependencies' in pkg ? (pkg.dependencies as object) : {},
+          ),
+          ...Object.keys(
+            'peerDependencies' in pkg ? (pkg.peerDependencies as object) : {},
+          ),
         ],
         output: {
           exports: 'named',
         },
       },
     },
-    plugins: [{
-      name: 'generate-types',
-      async closeBundle() {
-        if (istest) return
+    plugins: [
+      {
+        name: 'generate-types',
+        async closeBundle() {
+          if (istest) return
 
-        removeTypes()
-        await generateTypes()
-        moveTypesToDist()
-        removeTypes()
+          removeTypes()
+          await generateTypes()
+          moveTypesToDist()
+          removeTypes()
+        },
       },
-    }],
-  }
+    ],
+  } satisfies UserConfig
+
+  return config
 })
 
 function removeTypes() {
@@ -62,13 +70,16 @@ function removeTypes() {
 }
 
 function generateTypes() {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const cp = spawn(
       process.platform === 'win32' ? 'npm.cmd' : 'npm',
       ['run', 'types'],
-      { stdio: 'inherit' },
+      {
+        stdio: 'inherit',
+        shell: true,
+      },
     )
-    cp.on('exit', code => {
+    cp.on('exit', (code) => {
       !code && console.log('[types]', 'declaration generated')
       resolve(code)
     })
@@ -79,13 +90,16 @@ function generateTypes() {
 function moveTypesToDist() {
   const types = path.join(__dirname, 'types')
   const dist = path.join(__dirname, 'dist')
-  const files = fs.readdirSync(types).filter(n => n.endsWith('.d.ts'))
+  const files = fs.readdirSync(types).filter((n) => n.endsWith('.d.ts'))
   for (const file of files) {
     const from = path.join(types, file)
     const to = path.join(dist, file)
     fs.writeFileSync(to, fs.readFileSync(from, 'utf8'))
 
     const cwd = process.cwd()
-    console.log('[types]', `${path.relative(cwd, from)} -> ${path.relative(cwd, to)}`)
+    console.log(
+      '[types]',
+      `${path.relative(cwd, from)} -> ${path.relative(cwd, to)}`,
+    )
   }
 }

@@ -4,6 +4,7 @@ import {
   type UserConfig,
   build as viteBuild,
 } from 'vite'
+import path from 'node:path'
 import {
   resolveServerUrl,
   resolveViteConfig,
@@ -14,10 +15,7 @@ import {
 } from './utils'
 
 // public utils
-export {
-  resolveViteConfig,
-  withExternalBuiltins,
-}
+export { resolveViteConfig, withExternalBuiltins }
 
 export interface ElectronOptions {
   /**
@@ -39,17 +37,23 @@ export interface ElectronOptions {
      * @param options options for `child_process.spawn`
      * @param customElectronPkg custom electron package name (default: 'electron')
      */
-    startup: (argv?: string[], options?: import('node:child_process').SpawnOptions, customElectronPkg?: string) => Promise<void>
+    startup: (
+      argv?: string[],
+      options?: import('node:child_process').SpawnOptions,
+      customElectronPkg?: string,
+    ) => Promise<void>
     /** Reload Electron-Renderer */
     reload: () => void
   }) => void | Promise<void>
 }
 
-export function build(options: ElectronOptions) {
+export function build(options: ElectronOptions): ReturnType<typeof viteBuild> {
   return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
 }
 
-export default function electron(options: ElectronOptions | ElectronOptions[]): Plugin[] {
+export default function electron(
+  options: ElectronOptions | ElectronOptions[],
+): Plugin[] {
   const optionsArray = Array.isArray(options) ? options : [options]
   let userConfig: UserConfig
   let configEnv: ConfigEnv
@@ -76,41 +80,40 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             options.vite.envPrefix ??= server.config.envPrefix
 
             options.vite.build ??= {}
-            if (!Object.keys(options.vite.build).includes('watch')) { // #252
+            if (!Object.keys(options.vite.build).includes('watch')) {
+              // #252
               options.vite.build.watch = {}
             }
             options.vite.build.minify ??= false
 
             options.vite.plugins ??= []
-            options.vite.plugins.push(
-              {
-                name: ':startup',
-                closeBundle() {
-                  if (++closeBundleCount < entryCount) return
+            options.vite.plugins.push({
+              name: ':startup',
+              closeBundle() {
+                if (++closeBundleCount < entryCount) return
 
-                  if (options.onstart) {
-                    options.onstart.call(this, {
-                      startup,
-                      // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
-                      // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
-                      // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
-                      reload() {
-                        if (process.electronApp) {
-                          (server.hot || server.ws).send({ type: 'full-reload' })
+                if (options.onstart) {
+                  options.onstart.call(this, {
+                    startup,
+                    // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
+                    // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
+                    // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
+                    reload() {
+                      if (process.electronApp) {
+                        ;(server.hot || server.ws).send({ type: 'full-reload' })
 
-                          // For Electron apps that don't need to use the renderer process.
-                          startup.send('electron-vite&type=hot-reload')
-                        } else {
-                          startup()
-                        }
-                      },
-                    })
-                  } else {
-                    startup()
-                  }
-                },
+                        // For Electron apps that don't need to use the renderer process.
+                        startup.send('electron-vite&type=hot-reload')
+                      } else {
+                        startup()
+                      }
+                    },
+                  })
+                } else {
+                  startup()
+                }
               },
-            )
+            })
             build(options)
           }
         })
@@ -143,7 +146,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           options.vite.envPrefix ??= userConfig.envPrefix
           await build(options)
         }
-      }
+      },
     },
   ]
 }
@@ -161,8 +164,42 @@ export async function startup(
   customElectronPkg?: string,
 ) {
   const { spawn } = await import('node:child_process')
-  // @ts-ignore
-  const electron = await import(customElectronPkg ?? 'electron')
+  const { createRequire } = await import('node:module')
+  const electronPackage = customElectronPkg ?? 'electron'
+  const roots = new Set<string>([
+    process.cwd(),
+    ...(typeof options?.cwd === 'string' ? [options.cwd] : []),
+    ...(process.env.INIT_CWD ? [process.env.INIT_CWD] : []),
+  ])
+
+  let electron: any
+  let resolutionError: unknown
+
+  for (const root of roots) {
+    try {
+      const requireFromRoot = createRequire(path.join(root, 'package.json'))
+      electron = requireFromRoot(electronPackage)
+      break
+    } catch (error) {
+      resolutionError = error
+    }
+  }
+
+  if (!electron) {
+    try {
+      electron = await import(electronPackage)
+    } catch (error) {
+      resolutionError = error
+    }
+  }
+
+  if (!electron) {
+    throw new Error(
+      `Unable to resolve "${electronPackage}". Install it in the app project or pass startup(..., ..., customElectronPkg).`,
+      { cause: resolutionError as Error },
+    )
+  }
+
   const electronPath = <any>(electron.default ?? electron)
 
   await startup.exit()

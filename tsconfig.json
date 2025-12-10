@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "esModuleInterop": true,
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "strict": true,
     "allowJs": true,
@@ -12,7 +12,8 @@
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "outDir": "types",
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": true,
+    "types": ["node"]
   },
   "include": ["src", "electron-env.d.ts"]
 }
