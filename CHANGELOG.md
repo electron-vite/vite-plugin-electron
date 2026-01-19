@@ -1,3 +1,11 @@
+## 0.29.1 (2026-01-19)
+
+- 3061fc9 fix: avoid file descriptor 3 for IPC on Linux to prevent Chromium collision
+
+**Contributors:**
+
+- [#283](https://github.com/electron-vite/vite-plugin-electron/pull/283)@[basil](https://github.com/basil)
+
 ## 0.29.0 (2024-11-16)
 
 - 638d0f3 feat: support main process control hot-reload
