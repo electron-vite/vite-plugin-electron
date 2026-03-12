@@ -1,7 +1,8 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`src/plugin > notBundle 1`] = `
-"var __create = Object.create;
+"//#region \\0rolldown/runtime.js
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -21,11 +22,15 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 	value: mod,
 	enumerable: true
 }) : target, mod));
+//#endregion
 let vite = require("vite");
 vite = __toESM(vite);
-const message = "foo";
+//#region test/fixtures/external-foo.ts
 console.log(import("vite"));
+//#endregion
+//#region test/fixtures/external-main.ts
 console.log(vite.default);
 console.log("foo");
+//#endregion
 "
 `;
