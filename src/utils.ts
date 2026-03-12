@@ -4,11 +4,13 @@ import cp from 'node:child_process'
 import type { AddressInfo } from 'node:net'
 import { builtinModules } from 'node:module'
 import {
+  type BuildEnvironmentOptions,
   type InlineConfig,
   type ResolvedConfig,
   type ViteDevServer,
   mergeConfig,
 } from 'vite'
+import { loadPackageJSONSync } from 'local-pkg'
 import type { ElectronOptions } from '.'
 
 export interface PidTree {
@@ -19,7 +21,7 @@ export interface PidTree {
 
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
 export function resolveViteConfig(options: ElectronOptions): InlineConfig {
-  const packageJson = resolvePackageJson() ?? {}
+  const packageJson = loadPackageJSONSync() ?? {}
   const esmodule = packageJson.type === 'module'
   const defaultConfig: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
@@ -56,13 +58,13 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
   return mergeConfig(defaultConfig, options?.vite || {})
 }
 
-export function withExternalBuiltins(config: InlineConfig) {
+export function withExternalBuiltins(config: InlineConfig): InlineConfig {
   const builtins = builtinModules.filter(e => !e.startsWith('_')); builtins.push('electron', ...builtins.map(m => `node:${m}`))
 
   config.build ??= {}
-  config.build.rollupOptions ??= {}
+  config.build.rolldownOptions ??= {}
 
-  let external = config.build.rollupOptions.external
+  let external = config.build.rolldownOptions.external
   if (
     Array.isArray(external) ||
     typeof external === 'string' ||
@@ -80,7 +82,7 @@ export function withExternalBuiltins(config: InlineConfig) {
   } else {
     external = builtins
   }
-  config.build.rollupOptions.external = external
+  config.build.rolldownOptions.external = external
 
   return config
 }
@@ -88,7 +90,7 @@ export function withExternalBuiltins(config: InlineConfig) {
 /**
  * @see https://github.com/vitejs/vite/blob/v4.0.1/packages/vite/src/node/constants.ts#L137-L147
  */
-export function resolveHostname(hostname: string) {
+export function resolveHostname(hostname: string): string {
   const loopbackHosts = new Set([
     'localhost',
     '127.0.0.1',
@@ -104,7 +106,7 @@ export function resolveHostname(hostname: string) {
   return loopbackHosts.has(hostname) || wildcardHosts.has(hostname) ? 'localhost' : hostname
 }
 
-export function resolveServerUrl(server: ViteDevServer) {
+export function resolveServerUrl(server: ViteDevServer): string | undefined {
   const addressInfo = server.httpServer?.address()
   const isAddressInfo = (x: any): x is AddressInfo => x?.address
 
@@ -125,28 +127,17 @@ export function resolveServerUrl(server: ViteDevServer) {
   }
 }
 
-export function resolvePackageJson(root = process.cwd()): {
-  type?: 'module' | 'commonjs'
-  [key: string]: any
-} | null {
-  const packageJsonPath = path.join(root, 'package.json')
-  const packageJsonStr = fs.readFileSync(packageJsonPath, 'utf8')
-  try {
-    return JSON.parse(packageJsonStr)
-  } catch {
-    return null
-  }
-}
+export type RolldownOptions = Exclude<BuildEnvironmentOptions['rolldownOptions'], undefined>
 
 /** @see https://github.com/vitejs/vite/blob/v5.4.9/packages/vite/src/node/build.ts#L489-L504 */
-export function resolveInput(config: ResolvedConfig) {
+export function resolveInput(config: ResolvedConfig): RolldownOptions['input'] | string | undefined {
   const options = config.build
   const { root } = config
   const libOptions = options.lib
 
   const resolve = (p: string) => path.resolve(root, p)
   const input = libOptions
-    ? options.rollupOptions?.input ||
+    ? options.rolldownOptions?.input ||
     (typeof libOptions.entry === 'string'
       ? resolve(libOptions.entry)
       : Array.isArray(libOptions.entry)
@@ -157,7 +148,7 @@ export function resolveInput(config: ResolvedConfig) {
             resolve(file),
           ]),
         ))
-    : options.rollupOptions?.input
+    : options.rolldownOptions?.input
 
   if (input) return input
 
@@ -166,11 +157,11 @@ export function resolveInput(config: ResolvedConfig) {
 }
 
 /**
- * When run the `vite build` command, there must be an entry file. 
+ * When run the `vite build` command, there must be an entry file.
  * If the user does not need Renderer, we need to create a temporary entry file to avoid Vite throw error.
  * @inspired https://github.com/vitejs/vite/blob/v5.4.9/packages/vite/src/node/config.ts#L1234-L1236
  */
-export async function mockIndexHtml(config: ResolvedConfig) {
+export async function mockIndexHtml(config: ResolvedConfig): Promise<{ remove(): Promise<void>; filepath: string; distpath: string }> {
   const { root, build } = config
   const output = path.resolve(root, build.outDir)
   const content = `
@@ -204,7 +195,7 @@ export async function mockIndexHtml(config: ResolvedConfig) {
  * Inspired `tree-kill`, implemented based on sync-api. #168
  * @see https://github.com/pkrumins/node-tree-kill/blob/v1.2.2/index.js
  */
-export function treeKillSync(pid: number) {
+export function treeKillSync(pid: number): void {
   if (process.platform === 'win32') {
     cp.execSync(`taskkill /pid ${pid} /T /F`)
   } else {
