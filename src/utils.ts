@@ -8,7 +8,7 @@ import {
   type ResolvedConfig,
   type ViteDevServer,
   mergeConfig,
-} from 'vite'
+} from 'vite-plus'
 import type { ElectronOptions } from '.'
 
 export interface PidTree {

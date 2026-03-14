@@ -1,3 +1,22 @@
+## 1.0.0 (2026-03-14)
+
+- feat: migrate to Vite 8 / Rolldown
+- feat: migrate package tooling to Vite+
+- feat: resolve the Electron package from the app project root before falling back to dynamic import
+- fix: set Node platform defaults for Electron/server-side builds when externalizing builtins
+- chore: switch the package itself to dual ESM/CJS output with `"type": "module"`
+- test: update assertions for Rolldown/Oxc output differences
+
+#### Migration to v1.0.0
+
+- The package now integrates with `vite-plus` instead of importing from `vite`/`vitest` directly.
+- The package now publishes from a `"type": "module"` package while still exposing both ESM and CommonJS entrypoints.
+- If you consume this package as a plugin, make sure `vite-plus` is available in your app/tooling environment.
+
+**Contributors:**
+
+- [#287](https://github.com/electron-vite/vite-plugin-electron/pull/287)@[Stanzilla](https://github.com/Stanzilla)
+
 ## 0.29.1 (2026-01-19)
 
 - 3061fc9 fix: avoid file descriptor 3 for IPC on Linux to prevent Chromium collision

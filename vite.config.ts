@@ -1,105 +1,60 @@
-import fs from 'node:fs'
-import path from 'node:path'
-import { spawn } from 'node:child_process'
 import { builtinModules } from 'node:module'
-import { defineConfig, type UserConfig } from 'vite'
-import pkg from './package.json'
+import { defineConfig } from 'vite-plus'
 
-const isdev = process.argv.slice(2).includes('--watch')
-const istest = process.env.NODE_ENV === 'test'
+const external = [
+  'electron',
+  ...builtinModules,
+  ...builtinModules.map((moduleId) => `node:${moduleId}`),
+]
 
-export default defineConfig(() => {
-  if (!isdev && !istest) {
-    for (const dir of ['dist', 'plugin']) {
-      fs.rmSync(path.join(__dirname, dir), { recursive: true, force: true })
-    }
-  }
-
-  const config = {
-    build: {
-      minify: false,
-      emptyOutDir: false,
-      outDir: 'dist',
-      lib: {
-        entry: {
-          index: 'src/index.ts',
-          plugin: 'src/plugin.ts',
-          simple: 'src/simple.ts',
-        },
-        formats: ['cjs', 'es'],
-        fileName: (format) => (format === 'es' ? '[name].mjs' : '[name].js'),
+export default defineConfig({
+  staged: {
+    '*': 'vp check --fix',
+  },
+  fmt: {
+    tabWidth: 2,
+    useTabs: false,
+    semi: false,
+    singleQuote: true,
+    printWidth: 80,
+    sortPackageJson: true,
+  },
+  pack: [
+    {
+      entry: {
+        index: 'src/index.ts',
+        plugin: 'src/plugin.ts',
+        simple: 'src/simple.ts',
       },
-      rollupOptions: {
-        external: [
-          'vite',
-          'electron',
-          ...builtinModules,
-          ...builtinModules.map((m) => `node:${m}`),
-          ...Object.keys(
-            'dependencies' in pkg ? (pkg.dependencies as object) : {},
-          ),
-          ...Object.keys(
-            'peerDependencies' in pkg ? (pkg.peerDependencies as object) : {},
-          ),
-        ],
-        output: {
-          exports: 'named',
-        },
+      outDir: 'dist',
+      format: ['cjs'],
+      dts: false,
+      platform: 'node',
+      fixedExtension: false,
+      deps: {
+        neverBundle: external,
+        skipNodeModulesBundle: true,
+      },
+      outputOptions: {
+        exports: 'named',
       },
     },
-    plugins: [
-      {
-        name: 'generate-types',
-        async closeBundle() {
-          if (istest) return
-
-          removeTypes()
-          await generateTypes()
-          moveTypesToDist()
-          removeTypes()
-        },
+    {
+      entry: {
+        index: 'src/index.ts',
+        plugin: 'src/plugin.ts',
+        simple: 'src/simple.ts',
       },
-    ],
-  } satisfies UserConfig
-
-  return config
+      outDir: 'dist',
+      format: ['esm'],
+      dts: true,
+      clean: false,
+      platform: 'node',
+      fixedExtension: false,
+      deps: {
+        neverBundle: external,
+        skipNodeModulesBundle: true,
+      },
+    },
+  ],
 })
-
-function removeTypes() {
-  fs.rmSync(path.join(__dirname, 'types'), { recursive: true, force: true })
-}
-
-function generateTypes() {
-  return new Promise((resolve) => {
-    const cp = spawn(
-      process.platform === 'win32' ? 'npm.cmd' : 'npm',
-      ['run', 'types'],
-      {
-        stdio: 'inherit',
-        shell: true,
-      },
-    )
-    cp.on('exit', (code) => {
-      !code && console.log('[types]', 'declaration generated')
-      resolve(code)
-    })
-    cp.on('error', process.exit)
-  })
-}
-
-function moveTypesToDist() {
-  const types = path.join(__dirname, 'types')
-  const dist = path.join(__dirname, 'dist')
-  const files = fs.readdirSync(types).filter((n) => n.endsWith('.d.ts'))
-  for (const file of files) {
-    const from = path.join(types, file)
-    const to = path.join(dist, file)
-    fs.writeFileSync(to, fs.readFileSync(from, 'utf8'))
-
-    const cwd = process.cwd()
-    console.log(
-      '[types]',
-      `${path.relative(cwd, from)} -> ${path.relative(cwd, to)}`,
-    )
-  }
-}

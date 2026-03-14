@@ -1,59 +1,18 @@
 {
   "name": "vite-plugin-electron",
-  "version": "0.30.0",
+  "version": "1.0.0",
   "description": "Electron 🔗 Vite",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
-    },
-    "./plugin": {
-      "types": "./dist/plugin.d.ts",
-      "import": "./dist/plugin.mjs",
-      "require": "./dist/plugin.js"
-    },
-    "./simple": {
-      "types": "./dist/simple.d.ts",
-      "import": "./dist/simple.mjs",
-      "require": "./dist/simple.js"
-    },
-    "./*": "./*"
-  },
+  "keywords": [
+    "electron",
+    "plugin",
+    "renderer",
+    "vite"
+  ],
+  "license": "MIT",
+  "author": "Leo Wang(草鞋没号) <308487730@qq.com>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/electron-vite/vite-plugin-electron.git"
-  },
-  "author": "Leo Wang(草鞋没号) <308487730@qq.com>",
-  "license": "MIT",
-  "packageManager": "pnpm@10.32.1",
-  "scripts": {
-    "dev": "vite build --watch",
-    "build": "vite build",
-    "format": "oxfmt",
-    "format:check": "oxfmt --check",
-    "types": "tsc",
-    "test": "vitest run",
-    "prepublishOnly": "pnpm run build && pnpm run test"
-  },
-  "peerDependencies": {
-    "vite-plugin-electron-renderer": "*"
-  },
-  "peerDependenciesMeta": {
-    "vite-plugin-electron-renderer": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "@types/node": "^25.5.0",
-    "oxfmt": "^0.40.0",
-    "rolldown": "^1.0.0-rc.9",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.0",
-    "vite-plugin-electron-renderer": "^0.14.6",
-    "vitest": "^4.1.0"
   },
   "files": [
     "dist",
@@ -61,10 +20,50 @@
     "plugin.d.ts",
     "simple.d.ts"
   ],
-  "keywords": [
-    "vite",
-    "plugin",
-    "electron",
-    "renderer"
-  ]
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.js",
+      "require": "./dist/plugin.cjs"
+    },
+    "./simple": {
+      "types": "./dist/simple.d.ts",
+      "import": "./dist/simple.js",
+      "require": "./dist/simple.cjs"
+    },
+    "./*": "./*"
+  },
+  "scripts": {
+    "dev": "vp pack --watch",
+    "build": "vp pack",
+    "format": "vp fmt",
+    "format:check": "vp fmt --check",
+    "test": "vp test",
+    "prepublishOnly": "vp pack && vp test",
+    "prepare": "vp config"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vite-plus": "^0.1.11"
+  },
+  "peerDependencies": {
+    "vite-plugin-electron-renderer": "*",
+    "vite-plus": "*"
+  },
+  "peerDependenciesMeta": {
+    "vite-plugin-electron-renderer": {
+      "optional": true
+    }
+  },
+  "packageManager": "pnpm@10.32.1"
 }

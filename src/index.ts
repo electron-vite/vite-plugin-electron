@@ -3,7 +3,7 @@ import {
   type ConfigEnv,
   type UserConfig,
   build as viteBuild,
-} from 'vite'
+} from 'vite-plus'
 import path from 'node:path'
 import {
   resolveServerUrl,
@@ -205,10 +205,10 @@ export async function startup(
   await startup.exit()
 
   // Start Electron.app
-  const stdio =
+  const stdio: import('node:child_process').StdioOptions =
     process.platform === 'linux'
-      // reserve file descriptor 3 for Chromium; put Node IPC on file descriptor 4
-      ? ['inherit', 'inherit', 'inherit', 'ignore', 'ipc']
+      ? // reserve file descriptor 3 for Chromium; put Node IPC on file descriptor 4
+        ['inherit', 'inherit', 'inherit', 'ignore', 'ipc']
       : ['inherit', 'inherit', 'inherit', 'ipc']
 
   process.electronApp = spawn(electronPath, argv, {

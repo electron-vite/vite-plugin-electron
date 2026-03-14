@@ -1,8 +1,11 @@
 import { builtinModules } from 'node:module'
-import { ExternalOption } from 'rolldown'
-import type { InlineConfig } from 'vite'
-import { describe, expect, it } from 'vitest'
+import type { InlineConfig } from 'vite-plus'
+import { describe, expect, it } from 'vite-plus/test'
 import { withExternalBuiltins } from '..'
+
+type ExternalOption = NonNullable<
+  NonNullable<NonNullable<InlineConfig['build']>['rollupOptions']>['external']
+>
 
 const builtins: any[] = builtinModules.filter((e) => !e.startsWith('_'))
 builtins.push('electron', ...builtins.map((m) => `node:${m}`))
