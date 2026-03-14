@@ -9,9 +9,8 @@
 
 #### Migration to v1.0.0
 
-- The package now integrates with `vite-plus` instead of importing from `vite`/`vitest` directly.
-- The package now publishes from a `"type": "module"` package while still exposing both ESM and CommonJS entrypoints.
-- If you consume this package as a plugin, make sure `vite-plus` is available in your app/tooling environment.
+- The package now targets `vite@^8` and publishes from a `"type": "module"` package while still exposing both ESM and CommonJS entrypoints.
+- `vite-plus` is only used for local tooling and publishing workflows in this fork; consumers should only need Vite itself.
 
 **Contributors:**
 

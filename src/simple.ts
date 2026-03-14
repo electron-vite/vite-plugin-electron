@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { type Plugin, type UserConfig, mergeConfig } from 'vite-plus'
+import { type Plugin, type UserConfig, mergeConfig } from 'vite'
 import electron, { type ElectronOptions } from '.'
 
 type BuildInputOption = NonNullable<

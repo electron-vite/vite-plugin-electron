@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module'
-import type { Plugin, ResolveFn } from 'vite-plus'
+import type { Plugin, ResolveFn } from 'vite'
 
 export interface NotBundleOptions {
   filter?: (id: string) => void | false

@@ -3,7 +3,7 @@ import {
   type ConfigEnv,
   type UserConfig,
   build as viteBuild,
-} from 'vite-plus'
+} from 'vite'
 import path from 'node:path'
 import {
   resolveServerUrl,

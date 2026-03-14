@@ -1,5 +1,5 @@
 import { builtinModules } from 'node:module'
-import type { InlineConfig } from 'vite-plus'
+import type { InlineConfig } from 'vite'
 import { describe, expect, it } from 'vite-plus/test'
 import { withExternalBuiltins } from '..'
 

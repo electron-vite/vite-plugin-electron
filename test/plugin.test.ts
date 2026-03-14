@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { build } from 'vite-plus'
+import { build } from 'vite'
 import { describe, expect, it } from 'vite-plus/test'
 import { notBundle } from '../dist/plugin'
 
@@ -31,7 +31,7 @@ describe('src/plugin', () => {
     const normalMain = main.replace(normalizingNewLineRE, '\n')
 
     // Keep assertions semantic because Rolldown/Oxc codegen is intentionally different from Rollup.
-    expect(normalMain).toContain('require("vite-plus")')
+    expect(normalMain).toContain('require("vite")')
     expect(normalMain).toContain('console.log(import("vite"))')
     expect(normalMain).toContain('"foo"')
   })
