@@ -11,9 +11,9 @@ export default defineConfig({
   },
   dts: { oxc: true },
   format: ['cjs', 'esm'],
-  external: [
-    'vite'
-  ],
+  deps: {
+    neverBundle: ['vite']
+  },
   exports: {
     customExports(exports) {
       exports["./electron-env"] = {
