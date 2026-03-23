@@ -249,7 +249,7 @@ build({
 
 **Hot Reload**
 
-Since `v0.29.0`, when preload scripts are rebuilt, they will send an `electron-vite&type=hot-reload` event to the main process.  
+Since `v0.29.0`, when preload scripts are rebuilt, they will send an `electron-vite&type=hot-reload` event to the main process.
 If your App doesn't need a renderer process, this will give you **hot-reload**.
 
 ```js
@@ -272,7 +272,6 @@ It just executes the `electron .` command in the Vite build completion hook and 
 ## Be aware
 
 - 🚨 By default, the files in `electron` folder will be built into the `dist-electron`
-- 🚨 Currently, `"type": "module"` is not supported in Electron
 
 ## C/C++ Native
 
@@ -291,7 +290,7 @@ export default {
       entry: 'electron/main.ts',
       vite: {
         build: {
-          rollupOptions: {
+          rolldownOptions: {
             // Here are some C/C++ modules them can't be built properly
             external: [
               'serialport',
