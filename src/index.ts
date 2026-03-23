@@ -14,6 +14,7 @@ import {
   treeKillSync,
 } from './utils'
 import type { StdioOptions, SpawnOptions } from 'node:child_process'
+import path from 'node:path'
 
 // public utils
 export {
@@ -175,19 +176,53 @@ export const startup: StartupFn = async (
   argv = ['.', '--no-sandbox'],
   options?: SpawnOptions,
   customElectronPkg?: string,
- ) => {
+) => {
   const { spawn } = await import('node:child_process')
-  // @ts-ignore
-  const electron = await import(customElectronPkg ?? 'electron')
+  const { createRequire } = await import('node:module')
+  const electronPackage = customElectronPkg ?? 'electron'
+  const roots = new Set<string>([
+    process.cwd(),
+    ...(typeof options?.cwd === 'string' ? [options.cwd] : []),
+    ...(process.env.INIT_CWD ? [process.env.INIT_CWD] : []),
+  ])
+
+  let electron: any
+  let resolutionError: unknown
+
+  for (const root of roots) {
+    try {
+      const requireFromRoot = createRequire(path.join(root, 'package.json'))
+      electron = requireFromRoot(electronPackage)
+      break
+    } catch (error) {
+      resolutionError = error
+    }
+  }
+
+  if (!electron) {
+    try {
+      electron = await import(electronPackage)
+    } catch (error) {
+      resolutionError = error
+    }
+  }
+
+  if (!electron) {
+    throw new Error(
+      `Unable to resolve "${electronPackage}". Install it in the app project or pass startup(..., ..., customElectronPkg).`,
+      { cause: resolutionError as Error },
+    )
+  }
+
   const electronPath = (electron.default ?? electron)
 
   await startup.exit()
 
   // Start Electron.app
   const stdio: StdioOptions = process.platform === 'linux'
-      // reserve file descriptor 3 for Chromium; put Node IPC on file descriptor 4
-      ? ['inherit', 'inherit', 'inherit', 'ignore', 'ipc']
-      : ['inherit', 'inherit', 'inherit', 'ipc']
+    // reserve file descriptor 3 for Chromium; put Node IPC on file descriptor 4
+    ? ['inherit', 'inherit', 'inherit', 'ignore', 'ipc']
+    : ['inherit', 'inherit', 'inherit', 'ipc']
   process.electronApp = spawn(electronPath, argv, {
     stdio,
     ...options,
