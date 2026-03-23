@@ -6,7 +6,7 @@ import {
   expect,
   it,
 } from 'vitest'
-import { notBundle } from '../dist/plugin'
+import { notBundle } from "../src/plugin";
 
 const pluginNotBundle = notBundle()
 pluginNotBundle.apply = undefined
@@ -28,11 +28,9 @@ describe('src/plugin', () => {
       plugins: [pluginNotBundle],
     })
 
-    const distMain = fs.readFileSync(path.join(__dirname, '__snapshots__/external-main.js'), 'utf-8')
     const snapMain = fs.readFileSync(path.join(__dirname, 'dist/external-main.js'), 'utf-8')
-    const normalDistMain = distMain.replace(normalizingNewLineRE, '\n')
     const normalSnapMain = snapMain.replace(normalizingNewLineRE, '\n')
 
-    expect(normalDistMain).equal(normalSnapMain)
+    expect(normalSnapMain).toMatchSnapshot()
   })
 })

@@ -3,6 +3,7 @@ import {
   type ConfigEnv,
   type UserConfig,
   build as viteBuild,
+  version,
 } from 'vite'
 import {
   resolveServerUrl,
@@ -12,12 +13,14 @@ import {
   withExternalBuiltins,
   treeKillSync,
 } from './utils'
+import type { StdioOptions, SpawnOptions } from 'node:child_process'
 
 // public utils
 export {
   resolveViteConfig,
   withExternalBuiltins,
 }
+export { loadPackageJSON, loadPackageJSONSync } from 'local-pkg'
 
 export interface ElectronOptions {
   /**
@@ -45,7 +48,7 @@ export interface ElectronOptions {
   }) => void | Promise<void>
 }
 
-export function build(options: ElectronOptions) {
+export function build(options: ElectronOptions): ReturnType<typeof viteBuild> {
   return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
 }
 
@@ -55,9 +58,15 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   let configEnv: ConfigEnv
   let mockdInput: Awaited<ReturnType<typeof mockIndexHtml>> | undefined
 
+  if (!version.startsWith('8.')) {
+    throw new Error(
+      `[vite-plugin-electron] Vite v${version} does not support \`rolldownOptions\`, please install \`vite@>=8\` or use an earlier version of \`vite-plugin-electron\`.`,
+    )
+  }
+
   return [
     {
-      name: 'vite-plugin-electron',
+      name: 'vite-plugin-electron:dev',
       apply: 'serve',
       configureServer(server) {
         server.httpServer?.once('listening', () => {
@@ -117,7 +126,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
       },
     },
     {
-      name: 'vite-plugin-electron',
+      name: 'vite-plugin-electron:prod',
       apply: 'build',
       config(config, env) {
         userConfig = config
@@ -148,6 +157,13 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   ]
 }
 
+interface StartupFn {
+  (): Promise<void>
+  send: (message: string) => void;
+  hookedProcessExit: boolean;
+  exit: () => Promise<void>;
+}
+
 /**
  * Electron App startup function.
  * It will mount the Electron App child-process to `process.electronApp`.
@@ -155,25 +171,23 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
  * @param options options for `child_process.spawn`
  * @param customElectronPkg custom electron package name (default: 'electron')
  */
-export async function startup(
+export const startup: StartupFn = async (
   argv = ['.', '--no-sandbox'],
-  options?: import('node:child_process').SpawnOptions,
+  options?: SpawnOptions,
   customElectronPkg?: string,
-) {
+ ) => {
   const { spawn } = await import('node:child_process')
   // @ts-ignore
   const electron = await import(customElectronPkg ?? 'electron')
-  const electronPath = <any>(electron.default ?? electron)
+  const electronPath = (electron.default ?? electron)
 
   await startup.exit()
 
   // Start Electron.app
-  const stdio =
-    process.platform === 'linux'
+  const stdio: StdioOptions = process.platform === 'linux'
       // reserve file descriptor 3 for Chromium; put Node IPC on file descriptor 4
       ? ['inherit', 'inherit', 'inherit', 'ignore', 'ipc']
       : ['inherit', 'inherit', 'inherit', 'ipc']
-
   process.electronApp = spawn(electronPath, argv, {
     stdio,
     ...options,

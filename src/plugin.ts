@@ -1,63 +1,60 @@
 import { createRequire } from 'node:module'
-import type {
-  Plugin,
-  ResolveFn,
-} from 'vite'
+import type { Plugin } from 'vite'
 
 export interface NotBundleOptions {
-  filter?: (id: string) => void | false
+  filter?: (id: string) => void | boolean
 }
 
 /**
  * @see https://github.com/vitejs/vite/blob/v4.4.7/packages/vite/src/node/utils.ts#L140
  */
-export const bareImportRE = /^(?![a-zA-Z]:)[\w@](?!.*:\/\/)/
+export const bareImportRE: RegExp = /^(?![a-zA-Z]:)[\w@](?!.*:\/\/)/
+const nodeModulesRE: RegExp = /\/node_modules\//
 
 /**
  * During dev, we exclude the `cjs` npm-pkg from bundle, mush like Vite :)
  */
 export function notBundle(options: NotBundleOptions = {}): Plugin {
-  let resolve: ResolveFn
-  const ids = new Map<string, string>()
+  const externalIds = new Set<string>()
 
   return {
     name: 'vite-plugin-electron:not-bundle',
     // Run before the builtin plugin 'vite:resolve'
     enforce: 'pre',
-    configResolved(config) {
-      resolve = config.createResolver({ asSrc: false })
-    },
-    async resolveId(source, importer) {
-      if (!importer) return // entry file
+    apply: 'serve',
 
-      const external = {
-        external: true,
-        id: source,
-      }
+    resolveId: {
+      filter: {
+        id: bareImportRE,
+      },
+      async handler(source, importer) {
+        if (!importer || importer.includes('node_modules/')) return
+        if (externalIds.has(source)) {
+          return { id: source, external: true }
+        }
 
-      if (ids.get(source)) {
-        return external
-      }
-
-      if (bareImportRE.test(source)) {
-        const isAlias = await resolve(source, importer, true)
-        if (isAlias) return
-
-        const id = await resolve(source, importer)
-        if (!id) return
-        if (!id.includes('/node_modules/')) return
-        if (options.filter?.(id) === false) return
+        const resolved = await this.resolve(source, importer, {
+          skipSelf: true
+        })
+        
+        const id = resolved?.id
+        if (!id || !nodeModulesRE.test(id) || options.filter?.(id) === false) return
 
         try {
           // Because we build Main process into `cjs`, so a npm-pkg can be loaded by `require()`.
-          createRequire(importer)(source)
+          createRequire(importer).resolve(source)
         } catch {
           return
         }
 
-        ids.set(source, id)
-        return external
+        externalIds.add(source)
+        
+        return { 
+          id: source, 
+          external: true,
+          moduleSideEffects: false
+        }
       }
-    },
+    }
   }
 }

@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "esModuleInterop": true,
-    "moduleResolution": "Node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "strict": true,
     "allowJs": true,
