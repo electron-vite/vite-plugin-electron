@@ -23,7 +23,17 @@ export interface ElectronSimpleOptions {
 // The simple API just like v0.9.x
 // Vite v3.x support async plugin.
 export default async function electronSimple(options: ElectronSimpleOptions): Promise<Plugin[]> {
-  const flatApiOptions = [options.main]
+  const flatApiOptions = [
+    mergeConfig<ElectronOptions, ElectronOptions>({
+      vite: {
+        build: {
+          rolldownOptions: {
+            platform: 'node'
+          }
+        }
+      }
+    }, options.main)
+  ]
   const packageJson = await loadPackageJSON() ?? {}
   const esmodule = packageJson.type === 'module'
   if (options.preload) {
@@ -45,6 +55,7 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
             // `rolldownOptions.input` has higher priority than `build.lib`.
             // @see - https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L482
             input,
+            platform: 'node',
             output: {
               // In most cases, use `cjs` format
               format: 'cjs',
