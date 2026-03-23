@@ -28,6 +28,10 @@
 
 In short, `vite-plugin-electron` makes developing Electron apps as easy as normal Vite projects.
 
+> [!important]
+> This project will drop support for `vite@<8` in the upcoming `v1` release.
+> For users needing Vite 7 compatibility, use `v0.29.1`. it is stable and production-ready.
+
 ## Features
 
 - [🔥 Hot Restart <sub><sup>(Main process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-restart)
