@@ -77,7 +77,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         if (resolveInput(config) == null) {
           const mockFilepath = path.join(config.root, 'index.html')
           config.logger.info(`[vite-plugin-electron] No entry found, writing mock ${mockFilepath}`)
-          cleanupMock = await setupMockHtml(mockFilepath)
+          cleanupMock = await setupMockHtml(mockFilepath, config.logger)
         }
       },
       configureServer(server) {
@@ -162,7 +162,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           const mockFilepath = path.join(root, 'index.html')
           distFilepath = path.resolve(root, buildConfig.outDir, 'index.html')
           config.logger.info(`[vite-plugin-electron] No entry found, writing mock ${mockFilepath}`)
-          cleanupMock = await setupMockHtml(mockFilepath)
+          cleanupMock = await setupMockHtml(mockFilepath, config.logger)
         }
       },
       async closeBundle() {

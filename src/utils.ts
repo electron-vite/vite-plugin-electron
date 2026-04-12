@@ -6,6 +6,7 @@ import { builtinModules } from 'node:module'
 import {
   type BuildEnvironmentOptions,
   type InlineConfig,
+  type Logger,
   type ResolvedConfig,
   type ViteDevServer,
   mergeConfig,
@@ -175,13 +176,13 @@ const MOCK_INDEX_HTML = `<!doctype html>
  * in the meantime, guarding against accidental removal of real HTML written in
  * parallel.
  */
-export async function setupMockHtml(filepath: string): Promise<() => Promise<void>> {
+export async function setupMockHtml(filepath: string, logger?: Logger): Promise<() => Promise<void>> {
   await fs.promises.writeFile(filepath, MOCK_INDEX_HTML)
   return async () => {
     const current = await fs.promises.readFile(filepath, 'utf-8').catch(() => null)
     if (current === MOCK_INDEX_HTML) {
       await fs.promises.unlink(filepath).catch((err) => {
-        console.warn(`[vite-plugin-electron] Failed to remove mock ${filepath}:`, err)
+        ;(logger ?? console).warn(`[vite-plugin-electron] Failed to remove mock ${filepath}:`, err)
       })
     }
   }
