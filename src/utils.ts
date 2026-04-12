@@ -157,41 +157,6 @@ export function resolveInput(config: ResolvedConfig): RolldownOptions['input'] |
 }
 
 /**
- * When run the `vite build` command, there must be an entry file.
- * If the user does not need Renderer, we need to create a temporary entry file to avoid Vite throw error.
- * @inspired https://github.com/vitejs/vite/blob/v5.4.9/packages/vite/src/node/config.ts#L1234-L1236
- */
-export async function mockIndexHtml(config: ResolvedConfig): Promise<{ remove(): Promise<void>; filepath: string; distpath: string }> {
-  const { root, build } = config
-  const output = path.resolve(root, build.outDir)
-  const content = `
-<!doctype html>
-<html lang="en">
-  <head>
-    <title>vite-plugin-electron</title>
-  </head>
-  <body>
-    <div>An entry file for electron renderer process.</div>
-  </body>
-</html>
-`.trim()
-  const index = 'index.html'
-  const filepath = path.join(root, index)
-  const distpath = path.join(output, index)
-
-  await fs.promises.writeFile(filepath, content)
-
-  return {
-    async remove() {
-      await fs.promises.unlink(filepath)
-      await fs.promises.unlink(distpath)
-    },
-    filepath,
-    distpath,
-  }
-}
-
-/**
  * Inspired `tree-kill`, implemented based on sync-api. #168
  * @see https://github.com/pkrumins/node-tree-kill/blob/v1.2.2/index.js
  */

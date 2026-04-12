@@ -24,7 +24,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 }) : target, mod));
 //#endregion
 let vite = require("vite");
-vite = __toESM(vite);
+vite = __toESM(vite, 1);
 //#region test/fixtures/external-foo.ts
 console.log(import("vite"));
 //#endregion
