@@ -176,14 +176,22 @@ const MOCK_INDEX_HTML = `<!doctype html>
  * in the meantime, guarding against accidental removal of real HTML written in
  * parallel.
  */
-export async function setupMockHtml(filepath: string, logger?: Logger): Promise<() => Promise<void>> {
-  await fs.promises.writeFile(filepath, MOCK_INDEX_HTML)
+export function setupMockHtml(config: ResolvedConfig, isBuild: boolean, logger: Logger): () => Promise<void> {
+  const { root, build: buildConfig } = config
+  const mockFilepath = path.join(root, 'index.html')
+  const distFilepath = path.resolve(root, buildConfig.outDir, 'index.html')
+  logger.info(`[vite-plugin-electron] No entry found, writing mock ${mockFilepath}`)
+  fs.writeFileSync(mockFilepath, MOCK_INDEX_HTML, 'utf-8')
   return async () => {
-    const current = await fs.promises.readFile(filepath, 'utf-8').catch(() => null)
+    const current = await fs.promises.readFile(mockFilepath, 'utf-8').catch(() => null)
     if (current === MOCK_INDEX_HTML) {
-      await fs.promises.unlink(filepath).catch((err) => {
-        ;(logger ?? console).warn(`[vite-plugin-electron] Failed to remove mock ${filepath}:`, err)
+      await fs.promises.unlink(mockFilepath).catch((err) => {
+        logger.warn(`[vite-plugin-electron] Failed to remove mock ${mockFilepath}:`, err)
       })
+    }
+    if (isBuild && distFilepath) {
+      // The dist copy was produced from our mock; remove it silently.
+      await fs.promises.unlink(distFilepath).catch(() => {})
     }
   }
 }

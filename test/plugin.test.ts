@@ -34,7 +34,9 @@ describe('src/plugin', () => {
 
     expect(normalSnapMain).toMatchSnapshot()
   })
+})
 
+describe('src/index', () => {
   it('mockHtml', async () => {
     const root = path.join(__dirname, 'fixtures/mock-html')
     const outDir = path.join(__dirname, 'dist-mock-html')

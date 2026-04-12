@@ -59,7 +59,6 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   let userConfig: UserConfig
   let configEnv: ConfigEnv
   let cleanupMock: (() => Promise<void>) | undefined
-  let distFilepath: string | undefined
 
   if (!version.startsWith('8.')) {
     throw new Error(
@@ -71,13 +70,11 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
     {
       name: 'vite-plugin-electron:dev',
       apply: 'serve',
-      async configResolved(config) {
+      configResolved(config) {
         // When there is no entry (no index.html and no configured input), write a
         // temporary mock so that Vite's dev server starts without errors.
-        if (resolveInput(config) == null) {
-          const mockFilepath = path.join(config.root, 'index.html')
-          config.logger.info(`[vite-plugin-electron] No entry found, writing mock ${mockFilepath}`)
-          cleanupMock = await setupMockHtml(mockFilepath, config.logger)
+        if (!resolveInput(config)) {
+          cleanupMock = setupMockHtml(config, false, config.logger)
         }
       },
       configureServer(server) {
@@ -154,15 +151,11 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
         config.base ??= './'
       },
-      async configResolved(config) {
+      configResolved(config) {
         // When there is no entry (no index.html and no configured input), write a
         // temporary mock so that Vite's build has a valid entry point.
-        if (resolveInput(config) == null) {
-          const { root, build: buildConfig } = config
-          const mockFilepath = path.join(root, 'index.html')
-          distFilepath = path.resolve(root, buildConfig.outDir, 'index.html')
-          config.logger.info(`[vite-plugin-electron] No entry found, writing mock ${mockFilepath}`)
-          cleanupMock = await setupMockHtml(mockFilepath, config.logger)
+        if (!resolveInput(config)) {
+          cleanupMock = setupMockHtml(config, true, config.logger)
         }
       },
       async closeBundle() {
@@ -170,11 +163,6 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         if (cleanupMock) {
           await cleanupMock()
           cleanupMock = undefined
-        }
-        if (distFilepath) {
-          // The dist copy was produced from our mock; remove it silently.
-          await fs.promises.unlink(distFilepath).catch(() => {})
-          distFilepath = undefined
         }
 
         for (const options of optionsArray) {

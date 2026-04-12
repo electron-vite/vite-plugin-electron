@@ -53,12 +53,11 @@
   "devDependencies": {
     "@types/node": "^24.12.0",
     "bumpp": "^11.0.1",
-    "local-pkg": "^1.1.2",
-    "tsdown": "^0.21.4",
+    "tsdown": "^0.21.7",
     "typescript": "^5.9.3",
-    "vite": "^8.0.1",
+    "vite": "^8.0.8",
     "vite-plugin-electron-renderer": "^0.14.6",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.4"
   },
   "files": [
     "dist",
