@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import {
   type Plugin,
   type ConfigEnv,
@@ -8,12 +9,22 @@ import {
 import {
   resolveServerUrl,
   resolveViteConfig,
+  resolveInput,
   withExternalBuiltins,
   treeKillSync,
 } from './utils'
-import { mockHtml } from './plugin'
 import type { StdioOptions, SpawnOptions } from 'node:child_process'
 import path from 'node:path'
+
+const MOCK_INDEX_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <title>vite-plugin-electron</title>
+  </head>
+  <body>
+    <div>An entry file for electron renderer process.</div>
+  </body>
+</html>`
 
 // public utils
 export {
@@ -56,6 +67,8 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   const optionsArray = Array.isArray(options) ? options : [options]
   let userConfig: UserConfig
   let configEnv: ConfigEnv
+  let mockFilepath: string | undefined
+  let distFilepath: string | undefined
 
   if (!version.startsWith('8.')) {
     throw new Error(
@@ -64,11 +77,25 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   }
 
   return [
-    mockHtml(),
     {
       name: 'vite-plugin-electron:dev',
       apply: 'serve',
+      async configResolved(config) {
+        // When there is no entry (no index.html and no configured input), write a
+        // temporary mock so that Vite's dev server starts without errors.
+        if (resolveInput(config) == null) {
+          mockFilepath = path.join(config.root, 'index.html')
+          await fs.promises.writeFile(mockFilepath, MOCK_INDEX_HTML)
+        }
+      },
       configureServer(server) {
+        server.httpServer?.once('close', async () => {
+          if (mockFilepath) {
+            await fs.promises.unlink(mockFilepath).catch(() => {})
+            mockFilepath = undefined
+          }
+        })
+
         server.httpServer?.once('listening', () => {
           Object.assign(process.env, {
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
@@ -135,16 +162,39 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
         config.base ??= './'
       },
-      async closeBundle() {
-        for (const options of optionsArray) {
-          options.vite ??= {}
-          options.vite.mode ??= configEnv.mode
-          options.vite.root ??= userConfig.root
-          options.vite.envDir ??= userConfig.envDir
-          options.vite.envPrefix ??= userConfig.envPrefix
-          await build(options)
+      async configResolved(config) {
+        // When there is no entry (no index.html and no configured input), write a
+        // temporary mock so that Vite's build has a valid entry point.
+        if (resolveInput(config) == null) {
+          const { root, build } = config
+          mockFilepath = path.join(root, 'index.html')
+          distFilepath = path.resolve(root, build.outDir, 'index.html')
+          await fs.promises.writeFile(mockFilepath, MOCK_INDEX_HTML)
         }
-      }
+      },
+      closeBundle: {
+        sequential: true,
+        async handler() {
+          // Remove mock files created in configResolved before building Electron.
+          if (mockFilepath) {
+            await fs.promises.unlink(mockFilepath).catch(() => {})
+            mockFilepath = undefined
+          }
+          if (distFilepath) {
+            await fs.promises.unlink(distFilepath).catch(() => {})
+            distFilepath = undefined
+          }
+
+          for (const options of optionsArray) {
+            options.vite ??= {}
+            options.vite.mode ??= configEnv.mode
+            options.vite.root ??= userConfig.root
+            options.vite.envDir ??= userConfig.envDir
+            options.vite.envPrefix ??= userConfig.envPrefix
+            await build(options)
+          }
+        },
+      },
     },
   ]
 }

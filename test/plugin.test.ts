@@ -6,7 +6,8 @@ import {
   expect,
   it,
 } from 'vitest'
-import { mockHtml, notBundle } from "../src/plugin";
+import { notBundle } from "../src/plugin";
+import electron from "../src/index";
 
 const pluginNotBundle = notBundle()
 pluginNotBundle.apply = undefined
@@ -43,6 +44,8 @@ describe('src/plugin', () => {
     // Ensure no index.html exists before the test
     expect(fs.existsSync(htmlPath)).toBe(false)
 
+    // electron([]) returns the inlined plugins with an empty options array so
+    // closeBundle will clean up mock files without triggering any Electron builds.
     await build({
       configFile: false,
       root,
@@ -51,7 +54,7 @@ describe('src/plugin', () => {
         emptyOutDir: true,
         minify: false,
       },
-      plugins: [mockHtml()],
+      plugins: electron([]),
       logLevel: 'silent',
     })
 
