@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import {
   type Plugin,
   type ConfigEnv,
@@ -9,7 +10,7 @@ import {
   resolveServerUrl,
   resolveViteConfig,
   resolveInput,
-  mockIndexHtml,
+  setupMockHtml,
   withExternalBuiltins,
   treeKillSync,
 } from './utils'
@@ -57,7 +58,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   const optionsArray = Array.isArray(options) ? options : [options]
   let userConfig: UserConfig
   let configEnv: ConfigEnv
-  let mockdInput: Awaited<ReturnType<typeof mockIndexHtml>> | undefined
+  let cleanupMock: (() => Promise<void>) | undefined
 
   if (!version.startsWith('8.')) {
     throw new Error(
@@ -69,7 +70,21 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
     {
       name: 'vite-plugin-electron:dev',
       apply: 'serve',
+      configResolved(config) {
+        // When there is no entry (no index.html and no configured input), write a
+        // temporary mock so that Vite's dev server starts without errors.
+        if (!resolveInput(config)) {
+          cleanupMock = setupMockHtml(config, false, config.logger)
+        }
+      },
       configureServer(server) {
+        server.httpServer?.once('close', async () => {
+          if (cleanupMock) {
+            await cleanupMock()
+            cleanupMock = undefined
+          }
+        })
+
         server.httpServer?.once('listening', () => {
           Object.assign(process.env, {
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
@@ -136,14 +151,19 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
         config.base ??= './'
       },
-      async configResolved(config) {
-        const input = resolveInput(config)
-        if (input == null) {
-          mockdInput = await mockIndexHtml(config)
+      configResolved(config) {
+        // When there is no entry (no index.html and no configured input), write a
+        // temporary mock so that Vite's build has a valid entry point.
+        if (!resolveInput(config)) {
+          cleanupMock = setupMockHtml(config, true, config.logger)
         }
       },
       async closeBundle() {
-        mockdInput?.remove()
+        // Remove mock files created in configResolved before building Electron.
+        if (cleanupMock) {
+          await cleanupMock()
+          cleanupMock = undefined
+        }
 
         for (const options of optionsArray) {
           options.vite ??= {}
@@ -153,7 +173,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           options.vite.envPrefix ??= userConfig.envPrefix
           await build(options)
         }
-      }
+      },
     },
   ]
 }

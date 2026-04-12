@@ -6,6 +6,7 @@ import { builtinModules } from 'node:module'
 import {
   type BuildEnvironmentOptions,
   type InlineConfig,
+  type Logger,
   type ResolvedConfig,
   type ViteDevServer,
   mergeConfig,
@@ -156,16 +157,7 @@ export function resolveInput(config: ResolvedConfig): RolldownOptions['input'] |
   return fs.existsSync(indexHtml) ? indexHtml : undefined
 }
 
-/**
- * When run the `vite build` command, there must be an entry file.
- * If the user does not need Renderer, we need to create a temporary entry file to avoid Vite throw error.
- * @inspired https://github.com/vitejs/vite/blob/v5.4.9/packages/vite/src/node/config.ts#L1234-L1236
- */
-export async function mockIndexHtml(config: ResolvedConfig): Promise<{ remove(): Promise<void>; filepath: string; distpath: string }> {
-  const { root, build } = config
-  const output = path.resolve(root, build.outDir)
-  const content = `
-<!doctype html>
+const MOCK_INDEX_HTML = `<!doctype html>
 <html lang="en">
   <head>
     <title>vite-plugin-electron</title>
@@ -173,21 +165,34 @@ export async function mockIndexHtml(config: ResolvedConfig): Promise<{ remove():
   <body>
     <div>An entry file for electron renderer process.</div>
   </body>
-</html>
-`.trim()
-  const index = 'index.html'
-  const filepath = path.join(root, index)
-  const distpath = path.join(output, index)
+</html>`
 
-  await fs.promises.writeFile(filepath, content)
-
-  return {
-    async remove() {
-      await fs.promises.unlink(filepath)
-      await fs.promises.unlink(distpath)
-    },
-    filepath,
-    distpath,
+/**
+ * Write a temporary mock `index.html` at `filepath` so that Vite has a valid
+ * entry point when no real `index.html` and no configured input exist.
+ *
+ * Returns an async cleanup function.  Before removing the file it re-reads the
+ * content and skips deletion when another plugin or tool has replaced the file
+ * in the meantime, guarding against accidental removal of real HTML written in
+ * parallel.
+ */
+export function setupMockHtml(config: ResolvedConfig, isBuild: boolean, logger: Logger): () => Promise<void> {
+  const { root, build: buildConfig } = config
+  const mockFilepath = path.join(root, 'index.html')
+  const distFilepath = path.resolve(root, buildConfig.outDir, 'index.html')
+  logger.info(`[vite-plugin-electron] No entry found, writing mock ${mockFilepath}`)
+  fs.writeFileSync(mockFilepath, MOCK_INDEX_HTML, 'utf-8')
+  return async () => {
+    const current = await fs.promises.readFile(mockFilepath, 'utf-8').catch(() => null)
+    if (current === MOCK_INDEX_HTML) {
+      await fs.promises.unlink(mockFilepath).catch((err) => {
+        logger.warn(`[vite-plugin-electron] Failed to remove mock ${mockFilepath}:`, err)
+      })
+    }
+    if (isBuild && distFilepath) {
+      // The dist copy was produced from our mock; remove it silently.
+      await fs.promises.unlink(distFilepath).catch(() => {})
+    }
   }
 }
 
