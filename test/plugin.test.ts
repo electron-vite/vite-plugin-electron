@@ -44,8 +44,8 @@ describe('src/plugin', () => {
     // Ensure no index.html exists before the test
     expect(fs.existsSync(htmlPath)).toBe(false)
 
-    // electron([]) returns the inlined plugins with an empty options array so
-    // closeBundle will clean up mock files without triggering any Electron builds.
+    // Pass an empty array so closeBundle cleans up the mock without triggering
+    // any Electron sub-builds, letting us test the mock HTML lifecycle in isolation.
     await build({
       configFile: false,
       root,

@@ -91,6 +91,8 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
       configureServer(server) {
         server.httpServer?.once('close', async () => {
           if (mockFilepath) {
+            // The file is gone once the dev server writes it; silently ignore
+            // the case where it was already removed (e.g. after a crash).
             await fs.promises.unlink(mockFilepath).catch(() => {})
             mockFilepath = undefined
           }
@@ -176,6 +178,8 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         sequential: true,
         async handler() {
           // Remove mock files created in configResolved before building Electron.
+          // Silently ignore failures: the file may already be gone if the build
+          // was aborted or if Vite skipped writing the output HTML.
           if (mockFilepath) {
             await fs.promises.unlink(mockFilepath).catch(() => {})
             mockFilepath = undefined
