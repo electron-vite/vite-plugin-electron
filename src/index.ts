@@ -10,21 +10,12 @@ import {
   resolveServerUrl,
   resolveViteConfig,
   resolveInput,
+  setupMockHtml,
   withExternalBuiltins,
   treeKillSync,
 } from './utils'
 import type { StdioOptions, SpawnOptions } from 'node:child_process'
 import path from 'node:path'
-
-const MOCK_INDEX_HTML = `<!doctype html>
-<html lang="en">
-  <head>
-    <title>vite-plugin-electron</title>
-  </head>
-  <body>
-    <div>An entry file for electron renderer process.</div>
-  </body>
-</html>`
 
 // public utils
 export {
@@ -67,7 +58,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   const optionsArray = Array.isArray(options) ? options : [options]
   let userConfig: UserConfig
   let configEnv: ConfigEnv
-  let mockFilepath: string | undefined
+  let cleanupMock: (() => Promise<void>) | undefined
   let distFilepath: string | undefined
 
   if (!version.startsWith('8.')) {
@@ -84,17 +75,16 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         // When there is no entry (no index.html and no configured input), write a
         // temporary mock so that Vite's dev server starts without errors.
         if (resolveInput(config) == null) {
-          mockFilepath = path.join(config.root, 'index.html')
-          await fs.promises.writeFile(mockFilepath, MOCK_INDEX_HTML)
+          const mockFilepath = path.join(config.root, 'index.html')
+          config.logger.info(`[vite-plugin-electron] No entry found, writing mock ${mockFilepath}`)
+          cleanupMock = await setupMockHtml(mockFilepath)
         }
       },
       configureServer(server) {
         server.httpServer?.once('close', async () => {
-          if (mockFilepath) {
-            // The file is gone once the dev server writes it; silently ignore
-            // the case where it was already removed (e.g. after a crash).
-            await fs.promises.unlink(mockFilepath).catch(() => {})
-            mockFilepath = undefined
+          if (cleanupMock) {
+            await cleanupMock()
+            cleanupMock = undefined
           }
         })
 
@@ -168,36 +158,33 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         // When there is no entry (no index.html and no configured input), write a
         // temporary mock so that Vite's build has a valid entry point.
         if (resolveInput(config) == null) {
-          const { root, build } = config
-          mockFilepath = path.join(root, 'index.html')
-          distFilepath = path.resolve(root, build.outDir, 'index.html')
-          await fs.promises.writeFile(mockFilepath, MOCK_INDEX_HTML)
+          const { root, build: buildConfig } = config
+          const mockFilepath = path.join(root, 'index.html')
+          distFilepath = path.resolve(root, buildConfig.outDir, 'index.html')
+          config.logger.info(`[vite-plugin-electron] No entry found, writing mock ${mockFilepath}`)
+          cleanupMock = await setupMockHtml(mockFilepath)
         }
       },
-      closeBundle: {
-        sequential: true,
-        async handler() {
-          // Remove mock files created in configResolved before building Electron.
-          // Silently ignore failures: the file may already be gone if the build
-          // was aborted or if Vite skipped writing the output HTML.
-          if (mockFilepath) {
-            await fs.promises.unlink(mockFilepath).catch(() => {})
-            mockFilepath = undefined
-          }
-          if (distFilepath) {
-            await fs.promises.unlink(distFilepath).catch(() => {})
-            distFilepath = undefined
-          }
+      async closeBundle() {
+        // Remove mock files created in configResolved before building Electron.
+        if (cleanupMock) {
+          await cleanupMock()
+          cleanupMock = undefined
+        }
+        if (distFilepath) {
+          // The dist copy was produced from our mock; remove it silently.
+          await fs.promises.unlink(distFilepath).catch(() => {})
+          distFilepath = undefined
+        }
 
-          for (const options of optionsArray) {
-            options.vite ??= {}
-            options.vite.mode ??= configEnv.mode
-            options.vite.root ??= userConfig.root
-            options.vite.envDir ??= userConfig.envDir
-            options.vite.envPrefix ??= userConfig.envPrefix
-            await build(options)
-          }
-        },
+        for (const options of optionsArray) {
+          options.vite ??= {}
+          options.vite.mode ??= configEnv.mode
+          options.vite.root ??= userConfig.root
+          options.vite.envDir ??= userConfig.envDir
+          options.vite.envPrefix ??= userConfig.envPrefix
+          await build(options)
+        }
       },
     },
   ]

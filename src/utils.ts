@@ -156,6 +156,37 @@ export function resolveInput(config: ResolvedConfig): RolldownOptions['input'] |
   return fs.existsSync(indexHtml) ? indexHtml : undefined
 }
 
+const MOCK_INDEX_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <title>vite-plugin-electron</title>
+  </head>
+  <body>
+    <div>An entry file for electron renderer process.</div>
+  </body>
+</html>`
+
+/**
+ * Write a temporary mock `index.html` at `filepath` so that Vite has a valid
+ * entry point when no real `index.html` and no configured input exist.
+ *
+ * Returns an async cleanup function.  Before removing the file it re-reads the
+ * content and skips deletion when another plugin or tool has replaced the file
+ * in the meantime, guarding against accidental removal of real HTML written in
+ * parallel.
+ */
+export async function setupMockHtml(filepath: string): Promise<() => Promise<void>> {
+  await fs.promises.writeFile(filepath, MOCK_INDEX_HTML)
+  return async () => {
+    const current = await fs.promises.readFile(filepath, 'utf-8').catch(() => null)
+    if (current === MOCK_INDEX_HTML) {
+      await fs.promises.unlink(filepath).catch((err) => {
+        console.warn(`[vite-plugin-electron] Failed to remove mock ${filepath}:`, err)
+      })
+    }
+  }
+}
+
 /**
  * Inspired `tree-kill`, implemented based on sync-api. #168
  * @see https://github.com/pkrumins/node-tree-kill/blob/v1.2.2/index.js
