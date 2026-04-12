@@ -46,10 +46,13 @@ export function mockHtml(): Plugin {
       sequential: true,
       async handler() {
         if (mockFilepath) {
+          // The file might already be gone if the build failed before writing it.
           await fs.promises.unlink(mockFilepath).catch(() => {})
           mockFilepath = undefined
         }
         if (distFilepath) {
+          // Vite may skip writing this file (e.g. when the build is aborted),
+          // so silently ignore the error if it does not exist.
           await fs.promises.unlink(distFilepath).catch(() => {})
           distFilepath = undefined
         }
