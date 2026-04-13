@@ -1,4 +1,4 @@
-import { defineConfig } from "tsdown";
+import { defineConfig } from 'tsdown'
 
 export default defineConfig({
   entry: {
@@ -7,19 +7,19 @@ export default defineConfig({
     simple: 'src/simple.ts',
   },
   outputOptions: {
-    exports: 'named'
+    exports: 'named',
   },
   dts: { oxc: true },
   format: ['cjs', 'esm'],
   deps: {
-    neverBundle: ['vite']
+    neverBundle: ['vite'],
   },
   exports: {
     customExports(exports) {
-      exports["./electron-env"] = {
-        types: "./electron-env.d.ts"
+      exports['./electron-env'] = {
+        types: './electron-env.d.ts',
       }
       return exports
     },
-  }
+  },
 })

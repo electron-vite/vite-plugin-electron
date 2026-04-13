@@ -1,13 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
+
 import { build } from 'vite'
-import {
-  describe,
-  expect,
-  it,
-} from 'vitest'
-import { notBundle } from "../src/plugin";
-import electron from "../src/index";
+import { describe, expect, it } from 'vitest'
+
+import electron from '../src/index'
+import { notBundle } from '../src/plugin'
 
 const pluginNotBundle = notBundle()
 pluginNotBundle.apply = undefined

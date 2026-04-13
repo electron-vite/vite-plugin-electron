@@ -2,6 +2,24 @@
   "name": "vite-plugin-electron",
   "version": "1.0.0-beta.2",
   "description": "Electron 🔗 Vite",
+  "keywords": [
+    "electron",
+    "plugin",
+    "renderer",
+    "vite"
+  ],
+  "license": "MIT",
+  "author": "Leo Wang(草鞋没号) <308487730@qq.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/electron-vite/vite-plugin-electron.git"
+  },
+  "files": [
+    "dist",
+    "electron-env.d.ts",
+    "plugin.d.ts",
+    "simple.d.ts"
+  ],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -24,20 +42,30 @@
       "types": "./electron-env.d.ts"
     }
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/electron-vite/vite-plugin-electron.git"
-  },
-  "author": "Leo Wang(草鞋没号) <308487730@qq.com>",
-  "license": "MIT",
-  "packageManager": "pnpm@10.26.1",
   "scripts": {
     "dev": "tsdown --watch",
     "build": "tsdown",
     "types": "tsc",
     "test": "vitest run",
-    "release": "pnpm run prepublishOnly && bumpp --all",
+    "lint": "oxlint --fix",
+    "format": "oxfmt",
+    "release": "pnpm run lint && pnpm run format && pnpm run prepublishOnly && bumpp --all",
     "prepublishOnly": "pnpm run build && pnpm run test"
+  },
+  "dependencies": {
+    "local-pkg": "^1.1.2"
+  },
+  "devDependencies": {
+    "@subf/config": "^0.2.1",
+    "@types/node": "^24.12.0",
+    "bumpp": "^11.0.1",
+    "oxfmt": "^0.45.0",
+    "oxlint": "^1.60.0",
+    "tsdown": "^0.21.7",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.8",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^4.1.4"
   },
   "peerDependencies": {
     "vite-plugin-electron-renderer": "*"
@@ -47,28 +75,5 @@
       "optional": true
     }
   },
-  "dependencies": {
-    "local-pkg": "^1.1.2"
-  },
-  "devDependencies": {
-    "@types/node": "^24.12.0",
-    "bumpp": "^11.0.1",
-    "tsdown": "^0.21.7",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.8",
-    "vite-plugin-electron-renderer": "^0.14.6",
-    "vitest": "^4.1.4"
-  },
-  "files": [
-    "dist",
-    "electron-env.d.ts",
-    "plugin.d.ts",
-    "simple.d.ts"
-  ],
-  "keywords": [
-    "vite",
-    "plugin",
-    "electron",
-    "renderer"
-  ]
+  "packageManager": "pnpm@10.26.1"
 }
