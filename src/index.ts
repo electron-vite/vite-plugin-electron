@@ -298,7 +298,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
       configResolved(config) {
         resolvedConfig = config
 
-        for (const plugin of config.plugins) {
+        for (const [index, plugin] of config.plugins.entries()) {
           if (
             plugin.name.startsWith('vite:') ||
             plugin.name.startsWith('native:') ||
@@ -309,12 +309,18 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           }
 
           const applyToEnvironment = plugin.applyToEnvironment
-          plugin.applyToEnvironment = async (environment) => {
-            if (electronEnvironmentNames.has(environment.name)) {
-              return false
-            }
-            return applyToEnvironment ? applyToEnvironment(environment) : true
-          }
+          config.plugins[index] = Object.assign(
+            Object.create(Object.getPrototypeOf(plugin)),
+            plugin,
+            {
+              applyToEnvironment: async (environment) => {
+                if (electronEnvironmentNames.has(environment.name)) {
+                  return false
+                }
+                return applyToEnvironment ? applyToEnvironment(environment) : true
+              },
+            },
+          )
         }
 
         // When there is no entry (no index.html and no configured input), write a
