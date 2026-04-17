@@ -29,7 +29,7 @@ vite = __toESM(vite, 1);
 console.log(import("vite"));
 //#endregion
 //#region test/fixtures/external-main.ts
-console.log(vite.default);
+console.log(vite);
 console.log("foo");
 //#endregion
 "
