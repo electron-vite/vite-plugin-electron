@@ -2,7 +2,7 @@ import type { StdioOptions, SpawnOptions } from 'node:child_process'
 import path from 'node:path'
 
 import { build as viteBuild, version } from 'vite'
-import type { EnvironmentOptions, Plugin, PluginOption } from 'vite'
+import type { EnvironmentOptions, Plugin, PluginOption, ResolvedConfig } from 'vite'
 
 import {
   resolveServerUrl,
@@ -148,7 +148,7 @@ const electronEnvironmentNamePrefix = 'vite_plugin_electron_'
 const internalPluginNamePrefix = 'vite-plugin-electron:'
 
 function resolveElectronEnvironmentName(index: number) {
-  return `${electronEnvironmentNamePrefix}-${index}`
+  return `${electronEnvironmentNamePrefix}${index}`
 }
 
 function resolveElectronEnvironmentConfig(options: ElectronOptions): EnvironmentOptions {
@@ -174,6 +174,7 @@ function electronEnvironmentPlugin(name: string, plugins: PluginOption[] | undef
   return {
     name: `${internalPluginNamePrefix}${name}:plugins`,
     apply: 'build',
+    sharedDuringBuild: true,
     applyToEnvironment(environment) {
       return environment.name === name && plugins?.length ? plugins : false
     },
@@ -192,6 +193,8 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   }))
   const electronEnvironmentNames = new Set(electronEnvironments.map(({ name }) => name))
   let cleanupMock: (() => Promise<void>) | undefined
+  let resolvedConfig: ResolvedConfig | undefined
+  let usingEnvironmentBuildApp = false
 
   if (!version.startsWith('8.')) {
     throw new Error(
@@ -281,6 +284,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
     {
       name: 'vite-plugin-electron:prod',
       apply: 'build',
+      sharedDuringBuild: true,
       config(config) {
         // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
         config.base ??= './'
@@ -292,6 +296,8 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         }
       },
       configResolved(config) {
+        resolvedConfig = config
+
         for (const plugin of config.plugins) {
           if (
             plugin.name.startsWith('vite:') ||
@@ -317,21 +323,51 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           cleanupMock = setupMockHtml(config, true, config.logger)
         }
       },
+      async closeBundle() {
+        if (usingEnvironmentBuildApp) {
+          return
+        }
+
+        // Remove mock files created in configResolved before building Electron.
+        if (cleanupMock) {
+          await cleanupMock()
+          cleanupMock = undefined
+        }
+
+        if (!resolvedConfig) {
+          return
+        }
+
+        for (const options of optionsArray) {
+          options.vite ??= {}
+          options.vite.mode ??= resolvedConfig.mode
+          options.vite.root ??= resolvedConfig.root
+          options.vite.envDir ??= resolvedConfig.envDir
+          options.vite.envPrefix ??= resolvedConfig.envPrefix
+          await build(options)
+        }
+      },
+    },
+    {
+      name: 'vite-plugin-electron:build-app',
+      apply: 'build',
+      sharedDuringBuild: true,
+      buildApp() {
+        usingEnvironmentBuildApp = true
+      },
+    },
+    {
+      name: 'vite-plugin-electron:build-app-cleanup',
+      apply: 'build',
+      sharedDuringBuild: true,
       buildApp: {
         order: 'post',
         async handler() {
-          // Remove mock files created in configResolved before building Electron.
           if (cleanupMock) {
             await cleanupMock()
             cleanupMock = undefined
           }
         },
-      },
-      async closeBundle() {
-        if (cleanupMock) {
-          await cleanupMock()
-          cleanupMock = undefined
-        }
       },
     },
   ]

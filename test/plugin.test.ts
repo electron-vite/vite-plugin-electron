@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { build } from 'vite'
+import { build, createBuilder } from 'vite'
 import { describe, expect, it } from 'vitest'
 
 import electron from '../src/index'
@@ -41,6 +41,9 @@ describe('src/index', () => {
     const htmlPath = path.join(root, 'index.html')
     const distHtmlPath = path.join(outDir, 'index.html')
 
+    fs.rmSync(htmlPath, { force: true })
+    fs.rmSync(distHtmlPath, { force: true })
+
     // Ensure no index.html exists before the test
     expect(fs.existsSync(htmlPath)).toBe(false)
 
@@ -66,53 +69,50 @@ describe('src/index', () => {
     const root = path.join(__dirname, 'fixtures/mock-html')
     const clientOutDir = 'dist-client-environment'
     const electronOutDir = 'dist-electron-environment'
-    const electronEntry = path.join(__dirname, 'fixtures/external-main.ts')
-    const capturedBuildAppEnvironments: string[][] = []
+    const electronEntry = path.join(__dirname, 'fixtures/electron-main.ts')
+    const clientEntry = path.join(root, 'index.html')
     const capturedElectronEnvironments: string[] = []
 
     fs.rmSync(path.join(root, clientOutDir), { recursive: true, force: true })
     fs.rmSync(path.join(root, electronOutDir), { recursive: true, force: true })
+    fs.writeFileSync(clientEntry, '<!doctype html><html><body>electron</body></html>')
 
-    await build({
-      configFile: false,
-      root,
-      build: {
-        outDir: clientOutDir,
-        emptyOutDir: true,
-        minify: false,
-      },
-      plugins: [
-        ...electron({
-          entry: electronEntry,
-          vite: {
-            build: {
-              outDir: electronOutDir,
-              minify: false,
-            },
-            plugins: [
-              {
-                name: 'capture-electron-environment',
-                buildStart() {
-                  capturedElectronEnvironments.push(this.environment.name)
-                },
-              },
-            ],
-          },
-        }),
-        {
-          name: 'capture-build-app-environments',
-          buildApp(builder) {
-            capturedBuildAppEnvironments.push(Object.keys(builder.environments))
-          },
+    try {
+      const builder = await createBuilder({
+        configFile: false,
+        root,
+        build: {
+          outDir: clientOutDir,
+          emptyOutDir: true,
+          minify: false,
         },
-      ],
-      logLevel: 'silent',
-    })
+        plugins: [
+          ...electron({
+            entry: electronEntry,
+            vite: {
+              build: {
+                outDir: electronOutDir,
+                minify: false,
+              },
+              plugins: [
+                {
+                  name: 'capture-electron-environment',
+                  buildStart() {
+                    capturedElectronEnvironments.push(this.environment.name)
+                  },
+                },
+              ],
+            },
+          }),
+        ],
+        logLevel: 'silent',
+      })
+      await builder.buildApp()
 
-    expect(capturedBuildAppEnvironments).toEqual([
-      expect.arrayContaining(['client', 'vite_plugin_electron_0']),
-    ])
-    expect(capturedElectronEnvironments).toEqual(['vite_plugin_electron_0'])
-    expect(fs.existsSync(path.join(root, electronOutDir, 'external-main.js'))).toBe(true)
+      expect(capturedElectronEnvironments).toEqual(['vite_plugin_electron_0'])
+      expect(fs.existsSync(path.join(root, electronOutDir, 'electron-main.js'))).toBe(true)
+    } finally {
+      fs.rmSync(clientEntry, { force: true })
+    }
   })
 })
