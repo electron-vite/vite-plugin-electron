@@ -2,7 +2,7 @@ import type { StdioOptions, SpawnOptions } from 'node:child_process'
 import path from 'node:path'
 
 import { build as viteBuild, version } from 'vite'
-import type { Plugin, ConfigEnv, UserConfig } from 'vite'
+import type { EnvironmentOptions, Plugin, PluginOption } from 'vite'
 
 import {
   resolveServerUrl,
@@ -144,14 +144,52 @@ export interface ElectronOptions {
   }) => void | Promise<void>
 }
 
+const electronEnvironmentNamePrefix = 'vite-plugin-electron'
+
+function resolveElectronEnvironmentName(index: number) {
+  return `${electronEnvironmentNamePrefix}-${index}`
+}
+
+function resolveElectronEnvironmentConfig(options: ElectronOptions): EnvironmentOptions {
+  const {
+    build,
+    define,
+    keepProcessEnv,
+    optimizeDeps,
+    resolve,
+  } = withExternalBuiltins(resolveViteConfig(options))
+
+  return {
+    consumer: 'server',
+    build,
+    define,
+    keepProcessEnv,
+    optimizeDeps,
+    resolve,
+  }
+}
+
+function electronEnvironmentPlugin(name: string, plugins: PluginOption[] | undefined): Plugin {
+  return {
+    name: `${name}:plugins`,
+    apply: 'build',
+    applyToEnvironment(environment) {
+      return environment.name === name && plugins?.length ? plugins : false
+    },
+  }
+}
+
 export function build(options: ElectronOptions): ReturnType<typeof viteBuild> {
   return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
 }
 
 export default function electron(options: ElectronOptions | ElectronOptions[]): Plugin[] {
   const optionsArray = Array.isArray(options) ? options : [options]
-  let userConfig: UserConfig
-  let configEnv: ConfigEnv
+  const electronEnvironments = optionsArray.map((options, index) => ({
+    name: resolveElectronEnvironmentName(index),
+    options,
+  }))
+  const electronEnvironmentNames = new Set(electronEnvironments.map(({ name }) => name))
   let cleanupMock: (() => Promise<void>) | undefined
 
   if (!version.startsWith('8.')) {
@@ -161,6 +199,9 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   }
 
   return [
+    ...electronEnvironments.map(({ name, options }) =>
+      electronEnvironmentPlugin(name, options.vite?.plugins),
+    ),
     {
       name: 'vite-plugin-electron:dev',
       apply: 'serve',
@@ -239,34 +280,56 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
     {
       name: 'vite-plugin-electron:prod',
       apply: 'build',
-      config(config, env) {
-        userConfig = config
-        configEnv = env
-
+      config(config) {
         // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
         config.base ??= './'
+        config.builder ??= {}
+        config.environments ??= {}
+
+        for (const { name, options } of electronEnvironments) {
+          config.environments[name] = resolveElectronEnvironmentConfig(options)
+        }
       },
       configResolved(config) {
+        for (const plugin of config.plugins) {
+          if (
+            plugin.name.startsWith('vite:') ||
+            plugin.name.startsWith('native:') ||
+            plugin.name.startsWith('builtin:') ||
+            plugin.name.startsWith(electronEnvironmentNamePrefix)
+          ) {
+            continue
+          }
+
+          const applyToEnvironment = plugin.applyToEnvironment
+          plugin.applyToEnvironment = async (environment) => {
+            if (electronEnvironmentNames.has(environment.name)) {
+              return false
+            }
+            return applyToEnvironment ? applyToEnvironment(environment) : true
+          }
+        }
+
         // When there is no entry (no index.html and no configured input), write a
         // temporary mock so that Vite's build has a valid entry point.
         if (!resolveInput(config)) {
           cleanupMock = setupMockHtml(config, true, config.logger)
         }
       },
+      buildApp: {
+        order: 'post',
+        async handler() {
+          // Remove mock files created in configResolved before building Electron.
+          if (cleanupMock) {
+            await cleanupMock()
+            cleanupMock = undefined
+          }
+        },
+      },
       async closeBundle() {
-        // Remove mock files created in configResolved before building Electron.
         if (cleanupMock) {
           await cleanupMock()
           cleanupMock = undefined
-        }
-
-        for (const options of optionsArray) {
-          options.vite ??= {}
-          options.vite.mode ??= configEnv.mode
-          options.vite.root ??= userConfig.root
-          options.vite.envDir ??= userConfig.envDir
-          options.vite.envPrefix ??= userConfig.envPrefix
-          await build(options)
         }
       },
     },
