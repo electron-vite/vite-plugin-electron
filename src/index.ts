@@ -144,7 +144,8 @@ export interface ElectronOptions {
   }) => void | Promise<void>
 }
 
-const electronEnvironmentNamePrefix = 'vite-plugin-electron'
+const electronEnvironmentNamePrefix = 'vite_plugin_electron_'
+const internalPluginNamePrefix = 'vite-plugin-electron:'
 
 function resolveElectronEnvironmentName(index: number) {
   return `${electronEnvironmentNamePrefix}-${index}`
@@ -171,7 +172,7 @@ function resolveElectronEnvironmentConfig(options: ElectronOptions): Environment
 
 function electronEnvironmentPlugin(name: string, plugins: PluginOption[] | undefined): Plugin {
   return {
-    name: `${name}:plugins`,
+    name: `${internalPluginNamePrefix}${name}:plugins`,
     apply: 'build',
     applyToEnvironment(environment) {
       return environment.name === name && plugins?.length ? plugins : false
@@ -296,7 +297,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             plugin.name.startsWith('vite:') ||
             plugin.name.startsWith('native:') ||
             plugin.name.startsWith('builtin:') ||
-            plugin.name.startsWith(electronEnvironmentNamePrefix)
+            plugin.name.startsWith(internalPluginNamePrefix)
           ) {
             continue
           }

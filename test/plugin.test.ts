@@ -110,9 +110,9 @@ describe('src/index', () => {
     })
 
     expect(capturedBuildAppEnvironments).toEqual([
-      expect.arrayContaining(['client', 'vite-plugin-electron-0']),
+      expect.arrayContaining(['client', 'vite_plugin_electron_0']),
     ])
-    expect(capturedElectronEnvironments).toEqual(['vite-plugin-electron-0'])
+    expect(capturedElectronEnvironments).toEqual(['vite_plugin_electron_0'])
     expect(fs.existsSync(path.join(root, electronOutDir, 'external-main.js'))).toBe(true)
   })
 })
