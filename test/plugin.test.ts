@@ -63,6 +63,8 @@ describe('src/index', () => {
     // Both the source mock and its built copy must be cleaned up
     expect(fs.existsSync(htmlPath)).toBe(false)
     expect(fs.existsSync(distHtmlPath)).toBe(false)
+
+    fs.rmSync(outDir, { recursive: true, force: true })
   })
 
   it('builds electron entries as custom environments', async () => {
@@ -113,6 +115,8 @@ describe('src/index', () => {
       expect(fs.existsSync(path.join(root, electronOutDir, 'electron-main.js'))).toBe(true)
     } finally {
       fs.rmSync(clientEntry, { force: true })
+      fs.rmSync(path.join(root, clientOutDir), { recursive: true, force: true })
+      fs.rmSync(path.join(root, electronOutDir), { recursive: true, force: true })
     }
   })
 })
