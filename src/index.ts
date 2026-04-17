@@ -311,6 +311,10 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           }
 
           const applyToEnvironment = plugin.applyToEnvironment
+          if (!applyToEnvironment) {
+            continue
+          }
+
           config.plugins[index] = Object.assign(
             Object.create(Object.getPrototypeOf(plugin)),
             plugin,
@@ -319,7 +323,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                 if (electronEnvironmentNames.has(environment.name)) {
                   return false
                 }
-                return applyToEnvironment ? await applyToEnvironment(environment) : true
+                return await applyToEnvironment(environment)
               },
             },
           )
