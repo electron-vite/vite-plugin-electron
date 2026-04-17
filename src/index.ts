@@ -298,7 +298,9 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
       configResolved(config) {
         resolvedConfig = config
 
-        for (const [index, plugin] of config.plugins.entries()) {
+        for (let index = 0; index < config.plugins.length; index++) {
+          const plugin = config.plugins[index]
+
           if (
             plugin.name.startsWith('vite:') ||
             plugin.name.startsWith('native:') ||
@@ -317,7 +319,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                 if (electronEnvironmentNames.has(environment.name)) {
                   return false
                 }
-                return applyToEnvironment ? applyToEnvironment(environment) : true
+                return applyToEnvironment ? await applyToEnvironment(environment) : true
               },
             },
           )
