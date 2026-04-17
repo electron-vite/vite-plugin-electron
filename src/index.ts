@@ -2,7 +2,7 @@ import type { StdioOptions, SpawnOptions } from 'node:child_process'
 import path from 'node:path'
 
 import { build as viteBuild, perEnvironmentPlugin, version } from 'vite'
-import type { EnvironmentOptions, Plugin, PluginOption, UserConfig } from 'vite'
+import type { EnvironmentOptions, Plugin, PluginOption } from 'vite'
 
 import {
   resolveServerUrl,
@@ -146,22 +146,26 @@ export interface ElectronOptions {
 
 const electronEnvironmentNamePrefix = 'vite_plugin_electron_'
 const internalPluginNamePrefix = 'vite-plugin-electron:'
+type PluginEnvironment = Parameters<NonNullable<Plugin['applyToEnvironment']>>[0]
 
 function resolveElectronEnvironmentName(index: number) {
   return `${electronEnvironmentNamePrefix}${index}`
 }
 
 function resolveElectronEnvironmentConfig(options: ElectronOptions): EnvironmentOptions {
-  const { build, define, optimizeDeps, resolve } = withExternalBuiltins(
-    resolveViteConfig(options),
-  ) as UserConfig
+  const config = withExternalBuiltins(resolveViteConfig(options))
+  const keepProcessEnv =
+    'keepProcessEnv' in config && typeof config.keepProcessEnv === 'boolean'
+      ? config.keepProcessEnv
+      : undefined
 
   return {
     consumer: 'server',
-    build,
-    define,
-    optimizeDeps,
-    resolve,
+    build: config.build,
+    define: config.define,
+    optimizeDeps: config.optimizeDeps,
+    resolve: config.resolve,
+    keepProcessEnv,
   }
 }
 
@@ -286,12 +290,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
       configResolved(config) {
         const plugins = config.plugins as Plugin[]
 
-        for (let index = 0; index < plugins.length; index++) {
-          const plugin = plugins[index]
-          if (!plugin) {
-            continue
-          }
-
+        for (const [index, plugin] of plugins.entries()) {
           if (
             plugin.name.startsWith('vite:') ||
             plugin.name.startsWith('native:') ||
@@ -307,9 +306,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           }
 
           plugins[index] = Object.assign(Object.create(Object.getPrototypeOf(plugin)), plugin, {
-            applyToEnvironment: async (
-              environment: Parameters<NonNullable<Plugin['applyToEnvironment']>>[0],
-            ) => {
+            applyToEnvironment: async (environment: PluginEnvironment) => {
               if (electronEnvironmentNames.has(environment.name)) {
                 return false
               }
