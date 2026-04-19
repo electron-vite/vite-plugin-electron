@@ -3,7 +3,7 @@ import { builtinModules } from 'node:module'
 import type { InlineConfig } from 'vite'
 import { describe, expect, it } from 'vitest'
 
-import { withExternalBuiltins } from '..'
+import { withExternalBuiltins } from '../src/index'
 import type { RolldownOptions } from '../src/utils'
 
 type ExternalOption = RolldownOptions['external']

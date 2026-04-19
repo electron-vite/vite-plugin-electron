@@ -4,7 +4,7 @@ import path from 'node:path'
 import { build } from 'vite'
 import { describe, expect, it } from 'vitest'
 
-import electron from '../src/index'
+import electron from '../src/legacy'
 import { notBundle } from '../src/plugin'
 
 const pluginNotBundle = notBundle()

@@ -1,176 +1,213 @@
-import type { StdioOptions, SpawnOptions } from 'node:child_process'
-import path from 'node:path'
+import { builtinModules } from 'node:module'
 
-import { build as viteBuild, version } from 'vite'
-import type { Plugin, ConfigEnv, UserConfig } from 'vite'
+import { createBuilder, mergeConfig, version } from 'vite'
+import type { EnvironmentOptions, Plugin } from 'vite'
 
-import {
-  resolveServerUrl,
-  resolveViteConfig,
-  resolveInput,
-  setupMockHtml,
-  withExternalBuiltins,
-  treeKillSync,
-} from './utils'
+import { loadPackageJSON } from 'local-pkg'
+
+import type { RolldownOptions } from './utils'
+import { resolveInput, resolveServerUrl, setupMockHtml, withExternalBuiltins } from './utils'
+import { startup } from './legacy'
 
 // public utils
-export { resolveViteConfig, withExternalBuiltins }
+export { startup, withExternalBuiltins }
 export { loadPackageJSON, loadPackageJSONSync } from 'local-pkg'
-interface StartupFn {
-  (): Promise<void>
-  send: (message: string) => void
-  hookedProcessExit: boolean
-  exit: () => Promise<void>
+
+export interface OnstartArgs {
+  /**
+   * Electron App startup function.
+   * It will mount the Electron App child-process to `process.electronApp`.
+   * @param argv default value `['.', '--no-sandbox']`
+   * @param options options for `child_process.spawn`
+   * @param customElectronPkg custom electron package name (default: 'electron')
+   */
+  startup: typeof startup
+  /** Reload Electron-Renderer */
+  reload: () => void
+}
+
+export interface ElectronSimpleOptions {
+  main: {
+    /** Shortcut of `build.lib.entry` */
+    entry: import('vite').LibraryOptions['entry']
+    /** Additional Vite environment options for the main process */
+    vite?: EnvironmentOptions
+    /**
+     * Triggered when Vite builds the main process -- `vite serve` command only.
+     *
+     * If this `onstart` is passed, Electron App will not start automatically.
+     * However, you can start Electron App via `startup` function.
+     */
+    onstart?: (args: OnstartArgs) => void | Promise<void>
+  }
+  preload?: {
+    /**
+     * Shortcut of `build.rolldownOptions.input`.
+     *
+     * Preload scripts may contain Web assets, so use `build.rolldownOptions.input`
+     * instead of `build.lib.entry`.
+     */
+    input: RolldownOptions['input']
+    /** Additional Vite environment options for the preload scripts */
+    vite?: EnvironmentOptions
+    /**
+     * Triggered when Vite builds the preload scripts -- `vite serve` command only.
+     * Defaults to reloading the renderer.
+     */
+    onstart?: (args: OnstartArgs) => void | Promise<void>
+  }
+  /**
+   * Support use Node.js API in Electron-Renderer.
+   * @see https://github.com/electron-vite/vite-plugin-electron-renderer
+   */
+  renderer?: import('vite-plugin-electron-renderer').RendererOptions
+}
+
+function getBuiltins(): string[] {
+  const builtins = builtinModules.filter((e) => !e.startsWith('_'))
+  builtins.push('electron', ...builtins.map((m) => `node:${m}`))
+  return builtins
 }
 
 /**
- * Electron App startup function.
- * It will mount the Electron App child-process to `process.electronApp`.
- * @param argv default value `['.', '--no-sandbox']`
- * @param options options for `child_process.spawn`
- * @param customElectronPkg custom electron package name (default: 'electron')
+ * Simple Electron plugin for Vite using the environment API.
+ *
+ * Configures the Electron main process and preload scripts as named Vite
+ * environments (`electron-main`, `electron-preload`), so they are built as
+ * part of the same Vite pipeline instead of spawning separate `vite.build()`
+ * processes.
  */
-export const startup: StartupFn = async (
-  argv = ['.', '--no-sandbox'],
-  options?: SpawnOptions,
-  customElectronPkg?: string,
-) => {
-  const { spawn } = await import('node:child_process')
-  const { createRequire } = await import('node:module')
-  const electronPackage = customElectronPkg ?? 'electron'
-  const roots = new Set<string>([
-    process.cwd(),
-    ...(typeof options?.cwd === 'string' ? [options.cwd] : []),
-    ...(process.env.INIT_CWD ? [process.env.INIT_CWD] : []),
-  ])
-
-  let electron: any
-  let resolutionError: unknown
-
-  for (const root of roots) {
-    try {
-      const requireFromRoot = createRequire(path.join(root, 'package.json'))
-      electron = requireFromRoot(electronPackage)
-      break
-    } catch (error) {
-      resolutionError = error
-    }
-  }
-
-  if (!electron) {
-    try {
-      electron = await import(electronPackage)
-    } catch (error) {
-      resolutionError = error
-    }
-  }
-
-  if (!electron) {
-    throw new Error(
-      `Unable to resolve "${electronPackage}". Install it in the app project or pass startup(..., ..., customElectronPkg).`,
-      { cause: resolutionError as Error },
-    )
-  }
-
-  const electronPath = electron.default ?? electron
-
-  await startup.exit()
-
-  // Start Electron.app
-  const stdio: StdioOptions =
-    process.platform === 'linux'
-      ? // reserve file descriptor 3 for Chromium; put Node IPC on file descriptor 4
-        ['inherit', 'inherit', 'inherit', 'ignore', 'ipc']
-      : ['inherit', 'inherit', 'inherit', 'ipc']
-  process.electronApp = spawn(electronPath, argv, {
-    stdio,
-    ...options,
-  })
-
-  // Exit command after Electron.app exits
-  process.electronApp.once('exit', process.exit)
-
-  if (!startup.hookedProcessExit) {
-    startup.hookedProcessExit = true
-    process.once('exit', startup.exit)
-  }
-}
-
-startup.send = (message: string) => {
-  if (process.electronApp) {
-    // Based on { stdio: [,,, 'ipc'] }
-    process.electronApp.send?.(message)
-  }
-}
-
-startup.hookedProcessExit = false
-startup.exit = async () => {
-  if (process.electronApp) {
-    await new Promise((resolve) => {
-      process.electronApp.removeAllListeners()
-      process.electronApp.once('exit', resolve)
-      treeKillSync(process.electronApp.pid!)
-    })
-  }
-}
-
-export interface ElectronOptions {
-  /**
-   * Shortcut of `build.lib.entry`
-   */
-  entry?: import('vite').LibraryOptions['entry']
-  vite?: import('vite').InlineConfig
-  /**
-   * Triggered when Vite is built every time -- `vite serve` command only.
-   *
-   * If this `onstart` is passed, Electron App will not start automatically.
-   * However, you can start Electroo App via `startup` function.
-   */
-  onstart?: (args: {
-    /**
-     * Electron App startup function.
-     * It will mount the Electron App child-process to `process.electronApp`.
-     * @param argv default value `['.', '--no-sandbox']`
-     * @param options options for `child_process.spawn`
-     * @param customElectronPkg custom electron package name (default: 'electron')
-     */
-    startup: (
-      argv?: string[],
-      options?: import('node:child_process').SpawnOptions,
-      customElectronPkg?: string,
-    ) => Promise<void>
-    /** Reload Electron-Renderer */
-    reload: () => void
-  }) => void | Promise<void>
-}
-
-export function build(options: ElectronOptions): ReturnType<typeof viteBuild> {
-  return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
-}
-
-export default function electron(options: ElectronOptions | ElectronOptions[]): Plugin[] {
-  const optionsArray = Array.isArray(options) ? options : [options]
-  let userConfig: UserConfig
-  let configEnv: ConfigEnv
-  let cleanupMock: (() => Promise<void>) | undefined
-
+export default async function electronSimple(options: ElectronSimpleOptions): Promise<Plugin[]> {
   if (!version.startsWith('8.')) {
     throw new Error(
       `[vite-plugin-electron] Vite v${version} does not support \`rolldownOptions\`, please install \`vite@>=8\` or use an earlier version of \`vite-plugin-electron\`.`,
     )
   }
 
-  return [
+  const packageJson = (await loadPackageJSON()) ?? {}
+  const esmodule = packageJson.type === 'module'
+  const builtins = getBuiltins()
+
+  /** Build the EnvironmentOptions for the Electron main process. */
+  function makeMainEnv(isDev: boolean): EnvironmentOptions {
+    return mergeConfig(
+      {
+        consumer: 'server',
+        keepProcessEnv: true,
+        build: {
+          lib: {
+            entry: options.main.entry,
+            formats: esmodule ? ['es'] : ['cjs'],
+            fileName: () => '[name].js',
+          },
+          outDir: 'dist-electron',
+          emptyOutDir: false,
+          minify: isDev ? false : undefined,
+          watch: isDev ? {} : null,
+          rolldownOptions: {
+            platform: 'node',
+            external: builtins,
+          },
+        },
+      } as EnvironmentOptions,
+      options.main.vite ?? {},
+    )
+  }
+
+  /** Build the EnvironmentOptions for the Electron preload scripts. */
+  function makePreloadEnv(isDev: boolean): EnvironmentOptions | null {
+    if (!options.preload) return null
+    const { input, vite: preloadVite = {} } = options.preload
+    return mergeConfig(
+      {
+        consumer: 'server',
+        keepProcessEnv: true,
+        build: {
+          rolldownOptions: {
+            // `rolldownOptions.input` has higher priority than `build.lib`.
+            input,
+            platform: 'node',
+            output: {
+              // In most cases, use `cjs` format
+              format: 'cjs',
+              // `require()` can usable matrix
+              //  @see - https://github.com/electron/electron/blob/v30.0.0-nightly.20240104/docs/tutorial/esm.md#preload-scripts
+              //  ┏———————————————————————————————————┳——————————┳———————————┓
+              //  │ webPreferences: { }               │  import  │  require  │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: false(undefined) │    ✘     │     ✔     │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: true             │    ✔     │     ✔     │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ sandbox: true(undefined)          │    ✘     │     ✔     │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ sandbox: false                    │    ✔     │     ✘     │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: false            │    ✘     │     ✔     │
+              //  │ sandbox: true                     │          │           │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: false            │    ✔     │     ✘     │
+              //  │ sandbox: false                    │          │           │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: true             │    ✘     │     ✔     │
+              //  │ sandbox: true                     │          │           │
+              //  ┠———————————————————————————————————╂——————————╂———————————┨
+              //  │ nodeIntegration: true             │    ✔     │     ✔     │
+              //  │ sandbox: false                    │          │           │
+              //  ┗———————————————————————————————————┸——————————┸———————————┛
+              //  - import(✘): SyntaxError: Cannot use import statement outside a module
+              //  - require(✘): ReferenceError: require is not defined in ES module scope
+              inlineDynamicImports: true,
+              entryFileNames: `[name].${esmodule ? 'mjs' : 'js'}`,
+              chunkFileNames: `[name].${esmodule ? 'mjs' : 'js'}`,
+              assetFileNames: '[name].[ext]',
+            },
+            external: builtins,
+          },
+          outDir: 'dist-electron',
+          emptyOutDir: false,
+          minify: isDev ? false : undefined,
+          watch: isDev ? {} : null,
+        },
+      } as EnvironmentOptions,
+      preloadVite,
+    )
+  }
+
+  let cleanupMock: (() => Promise<void>) | undefined
+
+  const plugins: Plugin[] = [
     {
-      name: 'vite-plugin-electron:dev',
-      apply: 'serve',
-      configResolved(config) {
-        // When there is no entry (no index.html and no configured input), write a
-        // temporary mock so that Vite's dev server starts without errors.
-        if (!resolveInput(config)) {
-          cleanupMock = setupMockHtml(config, false, config.logger)
+      name: 'vite-plugin-electron',
+
+      config(userConfig, { command }) {
+        const isDev = command === 'serve'
+
+        const environments: Record<string, EnvironmentOptions> = {
+          'electron-main': makeMainEnv(isDev),
+        }
+        const preloadEnv = makePreloadEnv(isDev)
+        if (preloadEnv) {
+          environments['electron-preload'] = preloadEnv
+        }
+
+        return {
+          // Make sure that Electron can be loaded from a local file using `loadFile` after packaging.
+          base: './',
+          environments,
+          // Opt into the Vite builder so all environments are built in one pipeline.
+          builder: {},
         }
       },
+
+      configResolved(config) {
+        // When there is no entry (no index.html and no configured input), write a
+        // temporary mock so that Vite has a valid entry point.
+        if (!resolveInput(config)) {
+          cleanupMock = setupMockHtml(config, config.command === 'build', config.logger)
+        }
+      },
+
       configureServer(server) {
         server.httpServer?.once('close', async () => {
           if (cleanupMock) {
@@ -179,96 +216,124 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           }
         })
 
-        server.httpServer?.once('listening', () => {
+        server.httpServer?.once('listening', async () => {
           Object.assign(process.env, {
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
 
-          const entryCount = optionsArray.length
-          let closeBundleCount = 0
-
-          for (const options of optionsArray) {
-            options.vite ??= {}
-            options.vite.mode ??= server.config.mode
-            options.vite.root ??= server.config.root
-            options.vite.envDir ??= server.config.envDir
-            options.vite.envPrefix ??= server.config.envPrefix
-
-            options.vite.build ??= {}
-            if (!Object.keys(options.vite.build).includes('watch')) {
-              // #252
-              options.vite.build.watch = {}
+          // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
+          // Because Vite only inserts `/@vite/client` into the `*.html` entry file;
+          // preload scripts are usually a `*.js` file.
+          // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
+          const reload = () => {
+            if (process.electronApp) {
+              ;(server.hot || server.ws).send({ type: 'full-reload' })
+              // For Electron apps that don't use the renderer process.
+              startup.send('electron-vite&type=hot-reload')
+            } else {
+              startup()
             }
-            options.vite.build.minify ??= false
+          }
 
-            options.vite.plugins ??= []
-            options.vite.plugins.push({
-              name: ':startup',
-              closeBundle() {
-                if (++closeBundleCount < entryCount) {
-                  return
-                }
+          // Coordinate startup: start Electron only after all environments
+          // complete their initial build (main + preload must both be ready).
+          const hasPreload = !!options.preload
+          const totalInitial = hasPreload ? 2 : 1
+          let initialCount = 0
+          let electronStarted = false
 
-                if (options.onstart) {
-                  options.onstart.call(this, {
-                    startup,
-                    // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
-                    // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
-                    // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
-                    reload() {
-                      if (process.electronApp) {
-                        ;(server.hot || server.ws).send({ type: 'full-reload' })
+          // Use the environment API (createBuilder) to build and watch the
+          // Electron environments instead of calling vite.build() separately.
+          const builder = await createBuilder({
+            configFile: false,
+            root: server.config.root,
+            mode: server.config.mode,
+            envDir: server.config.envDir,
+            envPrefix: server.config.envPrefix,
+            logLevel: server.config.logLevel,
+            plugins: [
+              {
+                name: 'vite-plugin-electron:lifecycle',
+                closeBundle() {
+                  const envName = this.environment?.name
 
-                        // For Electron apps that don't need to use the renderer process.
-                        startup.send('electron-vite&type=hot-reload')
+                  if (envName !== 'electron-main' && envName !== 'electron-preload') return
+
+                  if (!electronStarted) {
+                    // Wait for all environments to complete their initial build.
+                    initialCount++
+                    if (initialCount >= totalInitial) {
+                      electronStarted = true
+                      if (options.main.onstart) {
+                        options.main.onstart({ startup, reload })
                       } else {
                         startup()
                       }
-                    },
-                  })
-                } else {
-                  startup()
-                }
+                    }
+                  } else {
+                    // Subsequent watch rebuilds.
+                    if (envName === 'electron-main') {
+                      if (options.main.onstart) {
+                        options.main.onstart({ startup, reload })
+                      } else {
+                        startup()
+                      }
+                    } else {
+                      // electron-preload
+                      if (options.preload?.onstart) {
+                        options.preload.onstart({ startup, reload })
+                      } else {
+                        reload()
+                      }
+                    }
+                  }
+                },
               },
-            })
-            build(options)
+            ],
+            // Define the electron environments with watch mode enabled.
+            environments: {
+              'electron-main': makeMainEnv(true),
+              ...(options.preload ? { 'electron-preload': makePreloadEnv(true)! } : {}),
+            },
+          })
+
+          // Kick off watch builds for all electron environments.
+          for (const env of Object.values(builder.environments)) {
+            if (env.name !== 'client') {
+              builder.build(env)
+            }
           }
         })
       },
-    },
-    {
-      name: 'vite-plugin-electron:prod',
-      apply: 'build',
-      config(config, env) {
-        userConfig = config
-        configEnv = env
 
-        // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
-        config.base ??= './'
-      },
-      configResolved(config) {
-        // When there is no entry (no index.html and no configured input), write a
-        // temporary mock so that Vite's build has a valid entry point.
-        if (!resolveInput(config)) {
-          cleanupMock = setupMockHtml(config, true, config.logger)
-        }
-      },
       async closeBundle() {
-        // Remove mock files created in configResolved before building Electron.
+        // During `vite build`, clean up the mock entry only after the client
+        // environment finishes; the electron environments are built automatically
+        // by the Vite builder pipeline.
+        if (this.environment?.name !== 'client') return
+
         if (cleanupMock) {
           await cleanupMock()
           cleanupMock = undefined
         }
-
-        for (const options of optionsArray) {
-          options.vite ??= {}
-          options.vite.mode ??= configEnv.mode
-          options.vite.root ??= userConfig.root
-          options.vite.envDir ??= userConfig.envDir
-          options.vite.envPrefix ??= userConfig.envPrefix
-          await build(options)
-        }
       },
     },
   ]
+
+  if (options.renderer) {
+    try {
+      const renderer = await import('vite-plugin-electron-renderer')
+      plugins.push(renderer.default(options.renderer))
+    } catch (error: any) {
+      if (error.code === 'ERR_MODULE_NOT_FOUND') {
+        throw new Error(
+          `\`renderer\` option depends on "vite-plugin-electron-renderer". Did you install it? Try \`npm i -D vite-plugin-electron-renderer\`.`,
+        )
+      }
+
+      throw error
+    }
+  }
+
+  return plugins
 }

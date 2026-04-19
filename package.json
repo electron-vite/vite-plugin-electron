@@ -17,8 +17,7 @@
   "files": [
     "dist",
     "electron-env.d.ts",
-    "plugin.d.ts",
-    "simple.d.ts"
+    "plugin.d.ts"
   ],
   "type": "module",
   "main": "./dist/index.cjs",
@@ -29,13 +28,13 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     },
+    "./legacy": {
+      "import": "./dist/legacy.mjs",
+      "require": "./dist/legacy.cjs"
+    },
     "./plugin": {
       "import": "./dist/plugin.mjs",
       "require": "./dist/plugin.cjs"
-    },
-    "./simple": {
-      "import": "./dist/simple.mjs",
-      "require": "./dist/simple.cjs"
     },
     "./package.json": "./package.json",
     "./electron-env": {

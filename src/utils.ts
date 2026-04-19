@@ -14,7 +14,28 @@ import type {
   ViteDevServer,
 } from 'vite'
 
-import type { ElectronOptions } from '.'
+/** Options for a single Electron build entry (main process or preload). */
+export interface ElectronOptions {
+  /**
+   * Shortcut of `build.lib.entry`
+   */
+  entry?: import('vite').LibraryOptions['entry']
+  vite?: import('vite').InlineConfig
+  /**
+   * Triggered when Vite is built every time -- `vite serve` command only.
+   *
+   * If this `onstart` is passed, Electron App will not start automatically.
+   * However, you can start Electron App via `startup` function.
+   */
+  onstart?: (args: {
+    startup: (
+      argv?: string[],
+      options?: import('node:child_process').SpawnOptions,
+      customElectronPkg?: string,
+    ) => Promise<void>
+    reload: () => void
+  }) => void | Promise<void>
+}
 
 export interface PidTree {
   pid: number
