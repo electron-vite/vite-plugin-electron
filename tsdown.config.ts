@@ -3,7 +3,7 @@ import { defineConfig } from 'tsdown'
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
-    legacy: 'src/legacy.ts',
+    simple: 'src/simple.ts',
     plugin: 'src/plugin.ts',
   },
   outputOptions: {
