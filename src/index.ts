@@ -108,11 +108,23 @@ startup.exit = async () => {
   if (process.electronApp) {
     await new Promise((resolve) => {
       process.electronApp.removeAllListeners()
+      
+      if (process.electronApp.exitCode !== null) {
+        resolve(undefined)
+        return
+      }
       process.electronApp.once('exit', resolve)
-      treeKillSync(process.electronApp.pid!)
+
+       try {
+        treeKillSync(process.electronApp.pid!)
+      } catch (_) {
+        // Windows: taskkill exit code 128 = process already gone
+        resolve(undefined)
+      }
     })
   }
 }
+
 
 export interface ElectronOptions {
   /**
