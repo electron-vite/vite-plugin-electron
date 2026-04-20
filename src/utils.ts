@@ -24,8 +24,7 @@ export interface PidTree {
 
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
 export function resolveViteConfig(options: ElectronOptions): InlineConfig {
-  const packageJson = loadPackageJSONSync() ?? {}
-  const esmodule = packageJson.type === 'module'
+  const esmodule = loadPackageJSONSync(options.vite?.root)?.type === 'module'
   const defaultConfig: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
     configFile: false,
