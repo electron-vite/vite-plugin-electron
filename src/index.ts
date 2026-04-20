@@ -97,10 +97,8 @@ export const startup: StartupFn = async (
 }
 
 startup.send = (message: string) => {
-  if (process.electronApp) {
-    // Based on { stdio: [,,, 'ipc'] }
-    process.electronApp.send?.(message)
-  }
+  // Based on { stdio: [,,, 'ipc'] }
+  process.electronApp?.send?.(message)
 }
 
 startup.hookedProcessExit = false
@@ -188,17 +186,12 @@ function collectElectronEnvironmentEntries(
   optionsArray: ElectronOptions[],
   defaults: BuildDefaults,
 ): ElectronEnvironmentEntry[] {
-  return optionsArray.map((options, index) => {
-    const resolvedOption: ElectronOptions = {
-      ...options,
-      vite: resolveElectronViteConfig(options, defaults),
-    }
-
-    return {
-      name: resolveEnvironmentName(index),
-      config: withExternalBuiltins(resolveViteConfig(resolvedOption)),
-    }
-  })
+  return optionsArray.map((options, index) => ({
+    name: resolveEnvironmentName(index),
+    config: withExternalBuiltins(
+      resolveViteConfig({ ...options, vite: resolveElectronViteConfig(options, defaults) }),
+    ),
+  }))
 }
 
 function createEnvironmentOptionsMap(entries: ElectronEnvironmentEntry[]) {
@@ -217,19 +210,13 @@ function createEnvironmentOptionsMap(entries: ElectronEnvironmentEntry[]) {
 }
 
 function createPerEnvironmentPlugins(entries: ElectronEnvironmentEntry[]): Plugin[] {
-  const plugins: Plugin[] = []
-
-  entries.forEach(({ name, config }) => {
-    config.plugins?.forEach((plugin, pluginIndex) => {
-      plugins.push(
-        perEnvironmentPlugin(`${name}:${pluginIndex}`, (environment) =>
-          environment.name === name ? plugin : false,
-        ),
-      )
-    })
-  })
-
-  return plugins
+  return entries.flatMap(({ name, config }) =>
+    (config.plugins ?? []).map((plugin, pluginIndex) =>
+      perEnvironmentPlugin(`${name}:${pluginIndex}`, (environment) =>
+        environment.name === name ? plugin : false,
+      ),
+    ),
+  )
 }
 
 function createDevConfig(
@@ -237,7 +224,6 @@ function createDevConfig(
   defaults: BuildDefaults,
   startupPlugin?: Plugin,
 ): InlineConfig {
-  const envDir = typeof defaults.envDir === 'string' ? defaults.envDir : undefined
   const entries = collectElectronEnvironmentEntries(optionsArray, defaults)
 
   for (const entry of entries) {
@@ -259,7 +245,7 @@ function createDevConfig(
     publicDir: false,
     mode: defaults.mode,
     root: defaults.root,
-    envDir,
+    envDir: typeof defaults.envDir === 'string' ? defaults.envDir : undefined,
     envPrefix: defaults.envPrefix,
     environments: createEnvironmentOptionsMap(entries),
     builder: {
@@ -281,7 +267,6 @@ function createBuildConfig(
   defaults: BuildDefaults,
   userConfig: UserConfig,
 ): UserConfig {
-  const envDir = typeof defaults.envDir === 'string' ? defaults.envDir : undefined
   const entries = collectElectronEnvironmentEntries(optionsArray, defaults)
 
   return {
@@ -295,7 +280,7 @@ function createBuildConfig(
         userConfig.builder?.buildApp?.call(this, builder)
       },
     },
-    envDir,
+    envDir: typeof defaults.envDir === 'string' ? defaults.envDir : undefined,
     envPrefix: defaults.envPrefix,
     mode: defaults.mode,
     root: defaults.root,
@@ -416,20 +401,12 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
               return environmentNames.has(environment.name)
             },
             buildStart() {
-              if (!environmentNames.has(this.environment.name)) {
-                return
-              }
-
               runningBuilds.add(this.environment.name)
               if (initialPendingBuildCount === 0) {
                 changedEnvironments.add(this.environment.name)
               }
             },
             buildEnd(error) {
-              if (!environmentNames.has(this.environment.name)) {
-                return
-              }
-
               if (initialPendingBuildCount === 0) {
                 runningBuilds.delete(this.environment.name)
                 if (error) {
@@ -439,10 +416,6 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
               }
             },
             async closeBundle() {
-              if (!environmentNames.has(this.environment.name)) {
-                return
-              }
-
               runningBuilds.delete(this.environment.name)
               if (initialPendingBuildCount > 0) {
                 initialPendingBuildCount -= 1
