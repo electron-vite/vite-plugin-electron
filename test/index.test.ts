@@ -100,7 +100,7 @@ describe('createEnvironmentOptionsMap — per-environment config overrides', () 
   })
 
   it('allows overriding build.outDir via vite.build', () => {
-    const result = applyBuildConfig([{ vite: { build: { outDir: 'my-dist' } } }])
+    const result = applyBuildConfig([{ entry: 'main.ts', vite: { build: { outDir: 'my-dist' } } }])
     expect((result?.environments?.electron_0 as any)?.build?.outDir).toBe('my-dist')
   })
 
