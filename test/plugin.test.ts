@@ -76,8 +76,8 @@ describe('src/index > build()', () => {
       },
     })
 
-    const snap = fs.readFileSync(path.join(outDir, 'electron-main.js'), 'utf-8')
-    expect(snap.replace(normalizingNewLineRE, '\n')).toMatchSnapshot()
+    const output = fs.readFileSync(path.join(outDir, 'electron-main.js'), 'utf-8')
+    expect(output.replace(normalizingNewLineRE, '\n')).toMatchSnapshot()
   })
 })
 
@@ -110,8 +110,8 @@ describe('src/index > electron() plugin (build mode)', () => {
     })
     await viteBuilder.buildApp()
 
-    const snap = fs.readFileSync(path.join(electronOutDir, 'electron-main.js'), 'utf-8')
-    expect(snap.replace(normalizingNewLineRE, '\n')).toMatchSnapshot()
+    const output = fs.readFileSync(path.join(electronOutDir, 'electron-main.js'), 'utf-8')
+    expect(output.replace(normalizingNewLineRE, '\n')).toMatchSnapshot()
   })
 })
 
@@ -156,7 +156,7 @@ describe('src/index > electron() plugin (dev mode / createBuilder)', () => {
     })
     await builder.buildApp()
 
-    const snap = fs.readFileSync(path.join(outDir, 'electron-main.js'), 'utf-8')
-    expect(snap.replace(normalizingNewLineRE, '\n')).toMatchSnapshot()
+    const output = fs.readFileSync(path.join(outDir, 'electron-main.js'), 'utf-8')
+    expect(output.replace(normalizingNewLineRE, '\n')).toMatchSnapshot()
   })
 })
