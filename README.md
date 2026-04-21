@@ -216,6 +216,10 @@ This is just the default behavior, and you can modify them at any time through c
 
 There are many cases here 👉 [electron-vite-samples](https://github.com/caoxiemeihao/electron-vite-samples)
 
+## Playground
+
+The local demo suite lives in [playground/](playground/README.md) and includes separate flat and simple modes that import the plugin source directly from this repo.
+
 ## JavaScript API
 
 `vite-plugin-electron`'s JavaScript APIs are fully typed, and it's recommended to use TypeScript or enable JS type checking in VS Code to leverage the intellisense and validation.

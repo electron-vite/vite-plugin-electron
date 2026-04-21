@@ -49,6 +49,10 @@
     "test": "vitest run",
     "lint": "oxlint --fix",
     "format": "oxfmt",
+    "play": "pnpm --dir playground/flat dev",
+    "play:simple": "pnpm --dir playground/simple dev",
+    "play:build": "pnpm --dir playground/flat build",
+    "play:build:simple": "pnpm --dir playground/simple build",
     "release": "pnpm run lint && pnpm run format && pnpm run prepublishOnly && bumpp --all",
     "prepublishOnly": "pnpm run build && pnpm run test"
   },

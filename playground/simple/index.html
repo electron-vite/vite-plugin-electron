@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simple playground</title>
+  </head>
+  <body>
+    <main class="shell">
+      <p class="eyebrow">vite-plugin-electron / simple API</p>
+      <h1>Reload the renderer by editing preload.</h1>
+      <section class="card">
+        <div class="row">
+          <span class="label">Preload PID</span>
+          <strong id="pid">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Loaded at</span>
+          <strong id="loaded-at">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Electron version</span>
+          <strong id="electron-version">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Ping</span>
+          <strong id="ping">Waiting...</strong>
+        </div>
+        <button id="refresh" type="button">Refresh bridge state</button>
+      </section>
+      <p class="note">
+        This demo uses <code>src/simple.ts</code> with preload hot reload and the
+        <code>electron-vite&type=hot-reload</code> message.
+      </p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

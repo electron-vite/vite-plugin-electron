@@ -110,3 +110,5 @@ package-lock.json
 yarn.lock
 
 /types
+
+dist-electron

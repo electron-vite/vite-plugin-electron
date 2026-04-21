@@ -1,0 +1,12 @@
+{
+  "name": "electron-playground-flat",
+  "private": true,
+  "main": "./dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "electron": "catalog:"
+  }
+}
