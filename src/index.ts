@@ -97,10 +97,8 @@ export const startup: StartupFn = async (
 }
 
 startup.send = (message: string) => {
-  if (process.electronApp) {
-    // Based on { stdio: [,,, 'ipc'] }
-    process.electronApp.send?.(message)
-  }
+  // Based on { stdio: [,,, 'ipc'] }
+  process.electronApp?.send?.(message)
 }
 
 startup.hookedProcessExit = false
@@ -188,17 +186,12 @@ function collectElectronEnvironmentEntries(
   optionsArray: ElectronOptions[],
   defaults: BuildDefaults,
 ): ElectronEnvironmentEntry[] {
-  return optionsArray.map((options, index) => {
-    const resolvedOption: ElectronOptions = {
-      ...options,
-      vite: resolveElectronViteConfig(options, defaults),
-    }
-
-    return {
-      name: resolveEnvironmentName(index),
-      config: withExternalBuiltins(resolveViteConfig(resolvedOption)),
-    }
-  })
+  return optionsArray.map((options, index) => ({
+    name: resolveEnvironmentName(index),
+    config: withExternalBuiltins(
+      resolveViteConfig({ ...options, vite: resolveElectronViteConfig(options, defaults) }),
+    ),
+  }))
 }
 
 function createEnvironmentOptionsMap(entries: ElectronEnvironmentEntry[]) {
@@ -217,19 +210,23 @@ function createEnvironmentOptionsMap(entries: ElectronEnvironmentEntry[]) {
 }
 
 function createPerEnvironmentPlugins(entries: ElectronEnvironmentEntry[]): Plugin[] {
-  const plugins: Plugin[] = []
+  return entries.flatMap(({ name, config }) =>
+    (config.plugins ?? []).map((plugin, pluginIndex) =>
+      perEnvironmentPlugin(`${name}:${pluginIndex}`, (environment) =>
+        environment.name === name ? plugin : false,
+      ),
+    ),
+  )
+}
 
-  entries.forEach(({ name, config }) => {
-    config.plugins?.forEach((plugin, pluginIndex) => {
-      plugins.push(
-        perEnvironmentPlugin(`${name}:${pluginIndex}`, (environment) =>
-          environment.name === name ? plugin : false,
-        ),
-      )
-    })
-  })
-
-  return plugins
+function resolveSharedConfig(defaults: BuildDefaults, entries: ElectronEnvironmentEntry[]) {
+  return {
+    mode: defaults.mode,
+    root: defaults.root,
+    envDir: typeof defaults.envDir === 'string' ? defaults.envDir : undefined,
+    envPrefix: defaults.envPrefix,
+    environments: createEnvironmentOptionsMap(entries),
+  }
 }
 
 function createDevConfig(
@@ -237,7 +234,6 @@ function createDevConfig(
   defaults: BuildDefaults,
   startupPlugin?: Plugin,
 ): InlineConfig {
-  const envDir = typeof defaults.envDir === 'string' ? defaults.envDir : undefined
   const entries = collectElectronEnvironmentEntries(optionsArray, defaults)
 
   for (const entry of entries) {
@@ -248,31 +244,23 @@ function createDevConfig(
     }
   }
 
-  const plugins = createPerEnvironmentPlugins(entries)
-
-  if (startupPlugin) {
-    plugins.push(startupPlugin)
-  }
-
   return {
+    ...resolveSharedConfig(defaults, entries),
     configFile: false,
     publicDir: false,
-    mode: defaults.mode,
-    root: defaults.root,
-    envDir,
-    envPrefix: defaults.envPrefix,
-    environments: createEnvironmentOptionsMap(entries),
     builder: {
       async buildApp(builder) {
-        const environments = Object.entries(builder.environments)
-        for (const [name, environment] of environments) {
+        for (const [name, environment] of Object.entries(builder.environments)) {
           if (name.startsWith(ELECTRON_ENV_PREFIX)) {
             await builder.build(environment)
           }
         }
       },
     },
-    plugins,
+    plugins: [
+      ...createPerEnvironmentPlugins(entries),
+      ...(startupPlugin ? [startupPlugin] : []),
+    ],
   }
 }
 
@@ -281,11 +269,10 @@ function createBuildConfig(
   defaults: BuildDefaults,
   userConfig: UserConfig,
 ): UserConfig {
-  const envDir = typeof defaults.envDir === 'string' ? defaults.envDir : undefined
   const entries = collectElectronEnvironmentEntries(optionsArray, defaults)
 
   return {
-    environments: createEnvironmentOptionsMap(entries),
+    ...resolveSharedConfig(defaults, entries),
     builder: {
       ...userConfig.builder,
       async buildApp(builder) {
@@ -295,10 +282,6 @@ function createBuildConfig(
         userConfig.builder?.buildApp?.call(this, builder)
       },
     },
-    envDir,
-    envPrefix: defaults.envPrefix,
-    mode: defaults.mode,
-    root: defaults.root,
   }
 }
 
@@ -344,27 +327,22 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             return
           }
 
-          const environmentNames = new Set(
-            optionsArray.map((_, index) => resolveEnvironmentName(index)),
+          const environmentConfigs = new Map(
+            optionsArray.map((options, index) => [
+              resolveEnvironmentName(index),
+              {
+                defaultArgs: [options.vite?.root || server.config.root || '.', '--no-sandbox'],
+                onstart: options.onstart,
+              },
+            ]),
           )
-          let initialPendingBuildCount = environmentNames.size
+
+          let initialPendingBuildCount = environmentConfigs.size
           const startupEnvironmentName = resolveEnvironmentName(optionsArray.length - 1)
           const runningBuilds = new Set<string>()
           const changedEnvironments = new Set<string>()
           let hasFailedWatchBuild = false
           let onstartQueue = Promise.resolve()
-
-          const environmentConfigs = new Map(
-            optionsArray.map((options, index) => {
-              return [
-                resolveEnvironmentName(index),
-                {
-                  defaultArgs: [options.vite?.root || server.config.root || '.', '--no-sandbox'],
-                  onstart: options.onstart,
-                },
-              ]
-            }),
-          )
 
           const enqueueOnstart = (pluginContext: StartupPluginContext, environmentName: string) => {
             onstartQueue = onstartQueue
@@ -413,23 +391,15 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           const startupHook: Plugin = {
             name: 'vite-plugin-electron:startup',
             applyToEnvironment(environment) {
-              return environmentNames.has(environment.name)
+              return environmentConfigs.has(environment.name)
             },
             buildStart() {
-              if (!environmentNames.has(this.environment.name)) {
-                return
-              }
-
               runningBuilds.add(this.environment.name)
               if (initialPendingBuildCount === 0) {
                 changedEnvironments.add(this.environment.name)
               }
             },
             buildEnd(error) {
-              if (!environmentNames.has(this.environment.name)) {
-                return
-              }
-
               if (initialPendingBuildCount === 0) {
                 runningBuilds.delete(this.environment.name)
                 if (error) {
@@ -439,10 +409,6 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
               }
             },
             async closeBundle() {
-              if (!environmentNames.has(this.environment.name)) {
-                return
-              }
-
               runningBuilds.delete(this.environment.name)
               if (initialPendingBuildCount > 0) {
                 initialPendingBuildCount -= 1
