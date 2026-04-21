@@ -219,6 +219,16 @@ function createPerEnvironmentPlugins(entries: ElectronEnvironmentEntry[]): Plugi
   )
 }
 
+function resolveSharedConfig(defaults: BuildDefaults, entries: ElectronEnvironmentEntry[]) {
+  return {
+    mode: defaults.mode,
+    root: defaults.root,
+    envDir: typeof defaults.envDir === 'string' ? defaults.envDir : undefined,
+    envPrefix: defaults.envPrefix,
+    environments: createEnvironmentOptionsMap(entries),
+  }
+}
+
 function createDevConfig(
   optionsArray: ElectronOptions[],
   defaults: BuildDefaults,
@@ -234,31 +244,23 @@ function createDevConfig(
     }
   }
 
-  const plugins = createPerEnvironmentPlugins(entries)
-
-  if (startupPlugin) {
-    plugins.push(startupPlugin)
-  }
-
   return {
+    ...resolveSharedConfig(defaults, entries),
     configFile: false,
     publicDir: false,
-    mode: defaults.mode,
-    root: defaults.root,
-    envDir: typeof defaults.envDir === 'string' ? defaults.envDir : undefined,
-    envPrefix: defaults.envPrefix,
-    environments: createEnvironmentOptionsMap(entries),
     builder: {
       async buildApp(builder) {
-        const environments = Object.entries(builder.environments)
-        for (const [name, environment] of environments) {
+        for (const [name, environment] of Object.entries(builder.environments)) {
           if (name.startsWith(ELECTRON_ENV_PREFIX)) {
             await builder.build(environment)
           }
         }
       },
     },
-    plugins,
+    plugins: [
+      ...createPerEnvironmentPlugins(entries),
+      ...(startupPlugin ? [startupPlugin] : []),
+    ],
   }
 }
 
@@ -270,7 +272,7 @@ function createBuildConfig(
   const entries = collectElectronEnvironmentEntries(optionsArray, defaults)
 
   return {
-    environments: createEnvironmentOptionsMap(entries),
+    ...resolveSharedConfig(defaults, entries),
     builder: {
       ...userConfig.builder,
       async buildApp(builder) {
@@ -280,10 +282,6 @@ function createBuildConfig(
         userConfig.builder?.buildApp?.call(this, builder)
       },
     },
-    envDir: typeof defaults.envDir === 'string' ? defaults.envDir : undefined,
-    envPrefix: defaults.envPrefix,
-    mode: defaults.mode,
-    root: defaults.root,
   }
 }
 
@@ -329,27 +327,22 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             return
           }
 
-          const environmentNames = new Set(
-            optionsArray.map((_, index) => resolveEnvironmentName(index)),
+          const environmentConfigs = new Map(
+            optionsArray.map((options, index) => [
+              resolveEnvironmentName(index),
+              {
+                defaultArgs: [options.vite?.root || server.config.root || '.', '--no-sandbox'],
+                onstart: options.onstart,
+              },
+            ]),
           )
-          let initialPendingBuildCount = environmentNames.size
+
+          let initialPendingBuildCount = environmentConfigs.size
           const startupEnvironmentName = resolveEnvironmentName(optionsArray.length - 1)
           const runningBuilds = new Set<string>()
           const changedEnvironments = new Set<string>()
           let hasFailedWatchBuild = false
           let onstartQueue = Promise.resolve()
-
-          const environmentConfigs = new Map(
-            optionsArray.map((options, index) => {
-              return [
-                resolveEnvironmentName(index),
-                {
-                  defaultArgs: [options.vite?.root || server.config.root || '.', '--no-sandbox'],
-                  onstart: options.onstart,
-                },
-              ]
-            }),
-          )
 
           const enqueueOnstart = (pluginContext: StartupPluginContext, environmentName: string) => {
             onstartQueue = onstartQueue
@@ -398,7 +391,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           const startupHook: Plugin = {
             name: 'vite-plugin-electron:startup',
             applyToEnvironment(environment) {
-              return environmentNames.has(environment.name)
+              return environmentConfigs.has(environment.name)
             },
             buildStart() {
               runningBuilds.add(this.environment.name)
