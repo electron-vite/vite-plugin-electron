@@ -1,5 +1,38 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`src/index > build() > builds electron entry via build() helper and matches snapshot 1`] = `
+"import path from "node:path";
+//#region test/fixtures/electron-main.ts
+function getAppPath() {
+	return path.join("app", "resources");
+}
+//#endregion
+export { getAppPath };
+"
+`;
+
+exports[`src/index > electron() plugin (build mode) > builds electron entry through environment API and matches snapshot 1`] = `
+"import path from "node:path";
+//#region test/fixtures/electron-main.ts
+function getAppPath() {
+	return path.join("app", "resources");
+}
+//#endregion
+export { getAppPath };
+"
+`;
+
+exports[`src/index > electron() plugin (dev mode / createBuilder) > builds electron entry via createBuilder (dev path) and matches snapshot 1`] = `
+"import path from "node:path";
+//#region test/fixtures/electron-main.ts
+function getAppPath() {
+	return path.join("app", "resources");
+}
+//#endregion
+export { getAppPath };
+"
+`;
+
 exports[`src/plugin > notBundle 1`] = `
 "//#region \\0rolldown/runtime.js
 var __create = Object.create;

@@ -1,10 +1,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { build } from 'vite'
+import { build, createBuilder } from 'vite'
 import { describe, expect, it } from 'vitest'
 
-import electron from '../src/index'
+import electron, { build as electronBuild, resolveViteConfig, withExternalBuiltins } from '../src/index'
 import { notBundle } from '../src/plugin'
 
 const pluginNotBundle = notBundle()
@@ -60,5 +60,103 @@ describe('src/index', () => {
     // Both the source mock and its built copy must be cleaned up
     expect(fs.existsSync(htmlPath)).toBe(false)
     expect(fs.existsSync(distHtmlPath)).toBe(false)
+  })
+})
+
+describe('src/index > build()', () => {
+  it('builds electron entry via build() helper and matches snapshot', async () => {
+    const outDir = path.join(__dirname, 'dist-electron-simple')
+    await electronBuild({
+      entry: 'fixtures/electron-main.ts',
+      vite: {
+        configFile: false,
+        root: __dirname,
+        build: { outDir, emptyOutDir: true, minify: false },
+        logLevel: 'silent',
+      },
+    })
+
+    const snap = fs.readFileSync(path.join(outDir, 'electron-main.js'), 'utf-8')
+    expect(snap.replace(normalizingNewLineRE, '\n')).toMatchSnapshot()
+  })
+})
+
+describe('src/index > electron() plugin (build mode)', () => {
+  it('builds electron entry through environment API and matches snapshot', async () => {
+    const root = path.join(__dirname, 'fixtures/mock-html')
+    const electronOutDir = path.join(__dirname, 'dist-electron-env')
+
+    // createBuilder (not build()) is needed here: Vite's build() does not invoke builder.buildApp
+    // that is returned by the plugin's config hook; createBuilder does.
+    // The entry must be an absolute path because it is resolved relative to the builder root
+    // (fixtures/mock-html), not the electron vite root.
+    const viteBuilder = await createBuilder({
+      configFile: false,
+      root,
+      build: {
+        outDir: path.join(__dirname, 'dist-renderer-env'),
+        emptyOutDir: true,
+        minify: false,
+      },
+      plugins: electron([
+        {
+          entry: path.resolve(__dirname, 'fixtures/electron-main.ts'),
+          vite: {
+            build: { outDir: electronOutDir, emptyOutDir: true, minify: false },
+          },
+        },
+      ]),
+      logLevel: 'silent',
+    })
+    await viteBuilder.buildApp()
+
+    const snap = fs.readFileSync(path.join(electronOutDir, 'electron-main.js'), 'utf-8')
+    expect(snap.replace(normalizingNewLineRE, '\n')).toMatchSnapshot()
+  })
+})
+
+describe('src/index > electron() plugin (dev mode / createBuilder)', () => {
+  it('builds electron entry via createBuilder (dev path) and matches snapshot', async () => {
+    const outDir = path.join(__dirname, 'dist-electron-dev')
+
+    // Construct the per-entry config the same way createDevConfig / collectElectronEnvironmentEntries do,
+    // then pass it to createBuilder – mirroring exactly what the dev plugin does inside configureServer.
+    const entryConfig = withExternalBuiltins(
+      resolveViteConfig({
+        entry: 'fixtures/electron-main.ts',
+        vite: {
+          root: __dirname,
+          // watch: null disables the file-watcher so the build completes in tests
+          build: { outDir, emptyOutDir: true, minify: false, watch: null },
+        },
+      }),
+    )
+
+    const builder = await createBuilder({
+      configFile: false,
+      publicDir: false,
+      root: __dirname,
+      environments: {
+        electron_0: {
+          consumer: 'server',
+          build: entryConfig.build,
+          define: entryConfig.define,
+          resolve: entryConfig.resolve,
+        },
+      },
+      builder: {
+        async buildApp(b) {
+          for (const [name, env] of Object.entries(b.environments)) {
+            if (name.startsWith('electron_')) {
+              await b.build(env)
+            }
+          }
+        },
+      },
+    })
+    await builder.buildApp()
+
+    const snap = fs.readFileSync(path.join(outDir, 'electron-main.js'), 'utf-8')
+    expect(snap.replace(normalizingNewLineRE, '\n')).toMatchSnapshot()
   })
 })
