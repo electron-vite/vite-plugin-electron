@@ -1,2 +1,9 @@
+packages:
+  - .
+  - playground/*
+
 onlyBuiltDependencies:
-  - esbuild
+  - electron
+
+catalog:
+  electron: 40.9.1

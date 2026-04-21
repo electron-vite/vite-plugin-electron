@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flat playground</title>
+  </head>
+  <body>
+    <main class="shell">
+      <p class="eyebrow">vite-plugin-electron / flat API</p>
+      <h1>Restart the app by editing the main process.</h1>
+      <p>
+        <code>NodeIntegration</code> is enabled. See the <em>console</em> for Electron versions and
+        other info.
+      </p>
+      <section class="card">
+        <div class="row">
+          <span class="label">Process ID</span>
+          <strong id="pid">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Started at</span>
+          <strong id="started-at">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Mode</span>
+          <strong>flat</strong>
+        </div>
+        <button id="refresh" type="button">Refresh state</button>
+      </section>
+      <p class="note">
+        This demo uses <code>src/index.ts</code> with <code>onstart</code> and restarts Electron on
+        rebuild.
+      </p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

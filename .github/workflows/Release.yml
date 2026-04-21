@@ -23,7 +23,7 @@ jobs:
           node-version: 24
           cache: 'pnpm'
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --dir . --frozen-lockfile
 
       # Ensure npm 11.5.1 or later is installed
       - name: Update npm

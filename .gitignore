@@ -111,3 +111,5 @@ yarn.lock
 
 /types
 test/dist-*/
+
+dist-electron
