@@ -114,6 +114,15 @@ startup.exit = async () => {
 
 export interface ElectronOptions {
   /**
+   * Optional name for the Electron environment.
+   *
+   * By default, the plugin will generate environment names like `electron_0`, `electron_1`, etc. based on the order of the options provided.
+   * You can specify a custom name for each environment using this `name` property, which will be used in the Vite environment configuration and plugin application.
+   *
+   * For example, if you have two Electron environments and you set `name: 'main'` for the first one and `name: 'preload'` for the second one, the plugin will create environments named `electron_main` and `electron_preload` instead of `electron_0` and `electron_1`.
+   */
+  name?: string
+  /**
    * Shortcut of `build.lib.entry`
    */
   entry?: import('vite').LibraryOptions['entry']
@@ -153,8 +162,8 @@ type StartupPluginContext = ThisParameterType<NonNullable<Plugin['closeBundle']>
 
 const ELECTRON_ENV_PREFIX = 'electron'
 
-function resolveEnvironmentName(index: number) {
-  return `${ELECTRON_ENV_PREFIX}_${index}`
+function resolveEnvironmentName(indexOrName: number | string) {
+  return `${ELECTRON_ENV_PREFIX}_${indexOrName}`
 }
 
 interface ElectronEnvironmentEntry {
@@ -162,53 +171,25 @@ interface ElectronEnvironmentEntry {
   config: InlineConfig
 }
 
-function resolveElectronViteConfig(
-  options: ElectronOptions,
-  defaults: BuildDefaults,
-): InlineConfig {
-  const viteConfig: InlineConfig = {
-    ...options.vite,
-    mode: options.vite?.mode ?? defaults.mode,
-    root: options.vite?.root ?? defaults.root,
-    envPrefix: options.vite?.envPrefix ?? defaults.envPrefix,
-  }
-
-  if (typeof defaults.envDir === 'string') {
-    viteConfig.envDir = options.vite?.envDir ?? defaults.envDir
-  } else if (options.vite?.envDir !== undefined) {
-    viteConfig.envDir = options.vite.envDir
-  }
-
-  return viteConfig
-}
-
 function collectElectronEnvironmentEntries(
   optionsArray: ElectronOptions[],
   defaults: BuildDefaults,
 ): ElectronEnvironmentEntry[] {
-  return optionsArray.map((options, index) => ({
-    name: resolveEnvironmentName(index),
-    config: withExternalBuiltins(
-      resolveViteConfig({ ...options, vite: resolveElectronViteConfig(options, defaults) }),
-    ),
-  }))
-}
+  return optionsArray.map((options, index) => {
+    options.vite ??= {}
+    options.vite.mode ??= defaults.mode
+    options.vite.root ??= defaults.root
+    if (typeof defaults.envDir === 'string') {
+      options.vite.envDir ??= defaults.envDir
+    }
+    options.vite.envPrefix ??= defaults.envPrefix
 
-function createEnvironmentOptionsMap(entries: ElectronEnvironmentEntry[]) {
-  return Object.fromEntries(
-    entries.map(({ name, config }) => [
-      name,
-      {
-        consumer: 'server',
-        build: config.build,
-        define: config.define,
-        resolve: config.resolve,
-        optimizeDeps: config.optimizeDeps,
-      } satisfies EnvironmentOptions,
-    ]),
-  )
+    return {
+      name: resolveEnvironmentName(options.name ?? index),
+      config: withExternalBuiltins(resolveViteConfig(options)),
+    }
+  })
 }
-
 function createPerEnvironmentPlugins(entries: ElectronEnvironmentEntry[]): Plugin[] {
   return entries.flatMap(({ name, config }) =>
     (config.plugins ?? []).map((plugin, pluginIndex) =>
@@ -225,7 +206,18 @@ function resolveSharedConfig(defaults: BuildDefaults, entries: ElectronEnvironme
     root: defaults.root,
     envDir: typeof defaults.envDir === 'string' ? defaults.envDir : undefined,
     envPrefix: defaults.envPrefix,
-    environments: createEnvironmentOptionsMap(entries),
+    environments: Object.fromEntries(
+      entries.map(({ name, config }) => [
+        name,
+        {
+          consumer: 'server',
+          build: config.build,
+          define: config.define,
+          resolve: config.resolve,
+          optimizeDeps: config.optimizeDeps,
+        } satisfies EnvironmentOptions,
+      ]),
+    ),
   }
 }
 
@@ -257,10 +249,7 @@ function createDevConfig(
         }
       },
     },
-    plugins: [
-      ...createPerEnvironmentPlugins(entries),
-      ...(startupPlugin ? [startupPlugin] : []),
-    ],
+    plugins: [...createPerEnvironmentPlugins(entries), ...(startupPlugin ? [startupPlugin] : [])],
   }
 }
 
@@ -329,7 +318,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
 
           const environmentConfigs = new Map(
             optionsArray.map((options, index) => [
-              resolveEnvironmentName(index),
+              resolveEnvironmentName(options.name ?? index),
               {
                 defaultArgs: [options.vite?.root || server.config.root || '.', '--no-sandbox'],
                 onstart: options.onstart,
@@ -338,7 +327,9 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           )
 
           let initialPendingBuildCount = environmentConfigs.size
-          const startupEnvironmentName = resolveEnvironmentName(optionsArray.length - 1)
+          const startupEnvironmentName = resolveEnvironmentName(
+            optionsArray[optionsArray.length - 1]!.name ?? optionsArray.length - 1,
+          )
           const runningBuilds = new Set<string>()
           const changedEnvironments = new Set<string>()
           let hasFailedWatchBuild = false

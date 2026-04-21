@@ -30,6 +30,7 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
   const flatApiOptions = [
     mergeConfig<ElectronOptions, ElectronOptions>(
       {
+        name: 'main',
         vite: {
           build: {
             rolldownOptions: {
@@ -46,6 +47,7 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
   if (options.preload) {
     const { input, vite: viteConfig = {}, ...preloadOptions } = options.preload
     const preload: ElectronOptions = {
+      name: 'preload',
       onstart(args) {
         // Notify the Renderer-Process to reload the page when the Preload-Scripts build is complete,
         // instead of restarting the entire Electron App.
