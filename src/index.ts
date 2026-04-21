@@ -268,7 +268,7 @@ function createBuildConfig(
         for (const environment of Object.values(builder.environments)) {
           await builder.build(environment)
         }
-        userConfig.builder?.buildApp?.call(this, builder)
+        await userConfig.builder?.buildApp?.call(this, builder)
       },
     },
   }
@@ -282,7 +282,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   const optionsArray = Array.isArray(options) ? options : [options]
   let cleanupMock: (() => Promise<void>) | undefined
 
-  if (!version.startsWith('8.')) {
+  if (Number.parseInt(version) < 8) {
     throw new Error(
       `[vite-plugin-electron] Vite v${version} does not support \`rolldownOptions\`, please install \`vite@>=8\` or use an earlier version of \`vite-plugin-electron\`.`,
     )
