@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`createPerEnvironmentPlugins — vite plugin overrides > applies vite plugin overrides during a real electron build 1`] = `
+{
+  "electron_0": "import path from "node:path";
+//#region test/fixtures/electron-main.ts
+function getAppPath() {
+	return path.join("main", "resources");
+}
+//#endregion
+export { getAppPath };
+",
+  "electron_1": "import path from "node:path";
+//#region test/fixtures/electron-main.ts
+function getAppPath() {
+	return path.join("preload", "resources");
+}
+//#endregion
+export { getAppPath };
+",
+}
+`;

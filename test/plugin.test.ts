@@ -2,14 +2,48 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { build, createBuilder } from 'vite'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import electron, { build as electronBuild, resolveViteConfig, withExternalBuiltins } from '../src/index'
+import electron, {
+  build as electronBuild,
+  resolveViteConfig,
+  withExternalBuiltins,
+} from '../src/index'
 import { notBundle } from '../src/plugin'
 
 const pluginNotBundle = notBundle()
 pluginNotBundle.apply = undefined
 const normalizingNewLineRE = /[\r\n]+/g
+const generatedDirs = [
+  'dist',
+  'dist-renderer-env',
+  'dist-mock-html',
+  'dist-electron-simple',
+  'dist-electron-env',
+  'dist-electron-dev',
+]
+const generatedFiles = [path.join(__dirname, 'fixtures/mock-html/index.html')]
+
+function cleanupGeneratedDirs() {
+  for (const dirName of generatedDirs) {
+    fs.rmSync(path.join(__dirname, dirName), { recursive: true, force: true })
+  }
+}
+
+function cleanupGeneratedFiles() {
+  for (const filePath of generatedFiles) {
+    fs.rmSync(filePath, { force: true })
+  }
+}
+
+beforeAll(() => {
+  cleanupGeneratedDirs()
+  cleanupGeneratedFiles()
+})
+afterEach(() => {
+  cleanupGeneratedDirs()
+  cleanupGeneratedFiles()
+})
 
 describe('src/plugin', () => {
   it('notBundle', async () => {

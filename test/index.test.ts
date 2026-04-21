@@ -1,14 +1,37 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
+import { createBuilder } from 'vite'
 import type { ConfigEnv, Plugin, UserConfig } from 'vite'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import electron from '../src/index'
 import type { ElectronOptions } from '../src/index'
 
 const buildEnv: ConfigEnv = { command: 'build', mode: 'production', isPreview: false }
+const normalizingNewLineRE = /[\r\n]+/g
+const generatedDirs = [
+  'dist-renderer-override',
+  'dist-electron-override-a',
+  'dist-electron-override-b',
+]
 
 function getElectronPlugins(options: ElectronOptions | ElectronOptions[]) {
   return electron(options) as Plugin[]
 }
+
+function readNormalizedFile(filePath: string) {
+  return fs.readFileSync(filePath, 'utf-8').replace(normalizingNewLineRE, '\n')
+}
+
+function cleanupGeneratedDirs() {
+  for (const dirName of generatedDirs) {
+    fs.rmSync(path.join(__dirname, dirName), { recursive: true, force: true })
+  }
+}
+
+beforeAll(cleanupGeneratedDirs)
+afterEach(cleanupGeneratedDirs)
 
 /**
  * Call the `vite-plugin-electron:prod` config hook directly and return the
@@ -22,7 +45,10 @@ function applyBuildConfig(
 ): UserConfig | null | undefined {
   const plugins = getElectronPlugins(options)
   const prodPlugin = plugins.find((p) => p.name === 'vite-plugin-electron:prod')!
-  const configFn = prodPlugin.config as (config: UserConfig, env: ConfigEnv) => UserConfig | null | undefined
+  const configFn = prodPlugin.config as (
+    config: UserConfig,
+    env: ConfigEnv,
+  ) => UserConfig | null | undefined
   return configFn({ base: './', ...userConfig }, env)
 }
 
@@ -114,9 +140,7 @@ describe('createEnvironmentOptionsMap — per-environment config overrides', () 
   })
 
   it('merges vite.define with the default define', () => {
-    const result = applyBuildConfig([
-      { entry: 'main.ts', vite: { define: { MY_VAR: '"hello"' } } },
-    ])
+    const result = applyBuildConfig([{ entry: 'main.ts', vite: { define: { MY_VAR: '"hello"' } } }])
     const env0 = result?.environments?.electron_0 as any
     expect(env0?.define?.['process.env']).toBe('process.env') // default
     expect(env0?.define?.MY_VAR).toBe('"hello"') // override
@@ -135,9 +159,7 @@ describe('createEnvironmentOptionsMap — per-environment config overrides', () 
     const result = applyBuildConfig([
       { entry: 'main.ts', vite: { optimizeDeps: { exclude: ['heavy-dep'] } } },
     ])
-    expect(
-      (result?.environments?.electron_0 as any)?.optimizeDeps?.exclude,
-    ).toContain('heavy-dep')
+    expect((result?.environments?.electron_0 as any)?.optimizeDeps?.exclude).toContain('heavy-dep')
   })
 
   it('per-option root override does not affect the shared root', () => {
@@ -150,46 +172,57 @@ describe('createEnvironmentOptionsMap — per-environment config overrides', () 
 })
 
 describe('createPerEnvironmentPlugins — vite plugin overrides', () => {
-  it('wraps a single vite plugin as a per-environment plugin', () => {
-    const testPlugin: Plugin = { name: 'test-plugin' }
-    const plugins = getElectronPlugins([{ entry: 'main.ts', vite: { plugins: [testPlugin] } }])
-    const wrapped = plugins.filter((p) => p.name?.match(/^electron_0:\d+$/))
-    expect(wrapped).toHaveLength(1)
-  })
+  it('applies vite plugin overrides during a real electron build', async () => {
+    const root = path.join(__dirname, 'fixtures/mock-html')
+    const fixtureEntry = path.resolve(__dirname, 'fixtures/electron-main.ts')
 
-  it('wraps each vite plugin with a separate per-environment entry', () => {
-    const p1: Plugin = { name: 'plugin-a' }
-    const p2: Plugin = { name: 'plugin-b' }
-    const plugins = getElectronPlugins([{ entry: 'main.ts', vite: { plugins: [p1, p2] } }])
-    const wrapped = plugins.filter((p) => p.name?.match(/^electron_0:\d+$/))
-    expect(wrapped).toHaveLength(2)
-  })
+    const makeOverridePlugin = (replacement: string): Plugin => ({
+      name: `override-${replacement}`,
+      renderChunk(code) {
+        return code.includes('path.join("app", "resources")')
+          ? code.replace(
+              'path.join("app", "resources")',
+              `path.join("${replacement}", "resources")`,
+            )
+          : undefined
+      },
+    })
 
-  it('wraps plugins independently for multiple options', () => {
-    const p: Plugin = { name: 'shared-plugin' }
-    const plugins = getElectronPlugins([
-      { entry: 'main.ts', vite: { plugins: [p] } },
-      { entry: 'preload.ts', vite: { plugins: [p] } },
-    ])
-    expect(plugins.filter((pl) => pl.name?.match(/^electron_0:\d+$/))).toHaveLength(1)
-    expect(plugins.filter((pl) => pl.name?.match(/^electron_1:\d+$/))).toHaveLength(1)
-  })
+    const electronOutDirA = path.join(__dirname, 'dist-electron-override-a')
+    const electronOutDirB = path.join(__dirname, 'dist-electron-override-b')
 
-  it('produces no per-environment plugins when vite.plugins is not provided', () => {
-    const plugins = getElectronPlugins([{ entry: 'main.ts' }])
-    const perEnv = plugins.filter((p) => p.name?.match(/^electron_\d+:\d+$/))
-    expect(perEnv).toHaveLength(0)
-  })
+    const builder = await createBuilder({
+      configFile: false,
+      root,
+      build: {
+        outDir: path.join(__dirname, 'dist-renderer-override'),
+        emptyOutDir: true,
+        minify: false,
+      },
+      plugins: electron([
+        {
+          entry: fixtureEntry,
+          vite: {
+            build: { outDir: electronOutDirA, emptyOutDir: true, minify: false },
+            plugins: [makeOverridePlugin('main')],
+          },
+        },
+        {
+          entry: fixtureEntry,
+          vite: {
+            build: { outDir: electronOutDirB, emptyOutDir: true, minify: false },
+            plugins: [makeOverridePlugin('preload')],
+          },
+        },
+      ]),
+      logLevel: 'silent',
+    })
 
-  it('per-environment plugin is scoped to its own environment', async () => {
-    const testPlugin: Plugin = { name: 'scoped-plugin' }
-    const plugins = getElectronPlugins([{ entry: 'main.ts', vite: { plugins: [testPlugin] } }])
-    const wrapped = plugins.find((p) => p.name?.match(/^electron_0:\d+$/)) as Plugin & {
-      applyToEnvironment?: (env: { name: string }) => boolean | Plugin | null
-    }
-    expect(wrapped).toBeDefined()
-    // The wrapper returns the inner plugin only for the correct environment
-    expect(wrapped.applyToEnvironment?.({ name: 'electron_0' })).toBeTruthy()
-    expect(wrapped.applyToEnvironment?.({ name: 'electron_1' })).toBeFalsy()
+    await builder.buildApp()
+
+    expect({
+      electron_0: readNormalizedFile(path.join(electronOutDirA, 'electron-main.js')),
+      electron_1: readNormalizedFile(path.join(electronOutDirB, 'electron-main.js')),
+    }).toMatchSnapshot()
   })
 })
