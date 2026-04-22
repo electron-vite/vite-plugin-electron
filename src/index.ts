@@ -1,12 +1,21 @@
 import type { StdioOptions, SpawnOptions } from 'node:child_process'
 import path from 'node:path'
 
-import { build as viteBuild, version } from 'vite'
-import type { Plugin, ConfigEnv, UserConfig } from 'vite'
+import { build as viteBuild, createBuilder, perEnvironmentPlugin, version } from 'vite'
+import type {
+  ConfigEnv,
+  EnvironmentOptions,
+  InlineConfig,
+  Plugin,
+  PluginOption,
+  UserConfig,
+  ViteDevServer,
+} from 'vite'
 
 import {
   resolveServerUrl,
   resolveViteConfig,
+  resolveViteEnvironmentConfig,
   resolveInput,
   setupMockHtml,
   withExternalBuiltins,
@@ -16,8 +25,28 @@ import {
 // public utils
 export { resolveViteConfig, withExternalBuiltins }
 export { loadPackageJSON, loadPackageJSONSync } from 'local-pkg'
+
+export interface ElectronOnstartArgs {
+  /**
+   * Electron App startup function.
+   * It will mount the Electron App child-process to `process.electronApp`.
+   * @param argv default value `['.', '--no-sandbox']`
+   * @param options options for `child_process.spawn`
+   * @param customElectronPkg custom electron package name (default: 'electron')
+   */
+  startup: (
+    argv?: string[],
+    options?: import('node:child_process').SpawnOptions,
+    customElectronPkg?: string,
+  ) => Promise<void>
+  /** Reload Electron-Renderer */
+  reload: () => void
+}
+
+export type ElectronOnstart = (args: ElectronOnstartArgs) => void | Promise<void>
+
 interface StartupFn {
-  (): Promise<void>
+  (argv?: string[], options?: SpawnOptions, customElectronPkg?: string): Promise<void>
   send: (message: string) => void
   hookedProcessExit: boolean
   exit: () => Promise<void>
@@ -127,6 +156,13 @@ startup.exit = async () => {
 
 export interface ElectronOptions {
   /**
+   * Optional name for the Electron environment.
+   *
+   * By default, the plugin will generate environment names like `electron_0`,
+   * `electron_1`, etc. based on the order of the options provided.
+   */
+  name?: string
+  /**
    * Shortcut of `build.lib.entry`
    */
   entry?: import('vite').LibraryOptions['entry']
@@ -137,27 +173,182 @@ export interface ElectronOptions {
    * If this `onstart` is passed, Electron App will not start automatically.
    * However, you can start Electroo App via `startup` function.
    */
-  onstart?: (args: {
-    /**
-     * Electron App startup function.
-     * It will mount the Electron App child-process to `process.electronApp`.
-     * @param argv default value `['.', '--no-sandbox']`
-     * @param options options for `child_process.spawn`
-     * @param customElectronPkg custom electron package name (default: 'electron')
-     */
-    startup: (
-      argv?: string[],
-      options?: import('node:child_process').SpawnOptions,
-      customElectronPkg?: string,
-    ) => Promise<void>
-    /** Reload Electron-Renderer */
-    reload: () => void
-  }) => void | Promise<void>
+  onstart?: ElectronOnstart
+}
+
+type ElectronFlatEnvironmentConfig = {
+  /**
+   * Shortcut of `options.build.lib.entry`
+   */
+  entry?: import('vite').LibraryOptions['entry']
+  /**
+   * Vite environment options for this Electron build target.
+   */
+  options?: EnvironmentOptions
+  /**
+   * Plugins scoped to this environment only.
+   */
+  plugins?: PluginOption
+  /**
+   * Triggered when this environment finishes building in `vite serve`.
+   */
+  onstart?: ElectronOnstart
+}
+
+type ElectronFlatSharedConfig = Pick<InlineConfig, 'envDir' | 'envPrefix' | 'mode' | 'root'>
+
+type ElectronFlatNormalizedOptions = {
+  vite?: ElectronFlatSharedConfig
+  environments: Record<string, ElectronFlatEnvironmentConfig>
+}
+
+type ElectronFlatEnvironmentContext = {
+  entries: Array<[string, ElectronFlatEnvironmentConfig]>
+  names: string[]
+}
+
+function resolveElectronEnvironmentBuildConfig(
+  environment: ElectronFlatEnvironmentConfig,
+  command: 'serve' | 'build',
+): EnvironmentOptions {
+  const config = resolveViteEnvironmentConfig(environment)
+
+  if (command === 'serve') {
+    config.build ??= {}
+    if (!Object.keys(config.build).includes('watch')) {
+      config.build.watch = {}
+    }
+    config.build.minify ??= false
+  }
+
+  return config
+}
+
+function createElectronEnvironmentScopedPlugins(
+  environmentContext: ElectronFlatEnvironmentContext,
+  pluginPrefix: string,
+): PluginOption[] {
+  return environmentContext.entries.map(([environmentName, environment]) => {
+    if (!environment.plugins) {
+      return undefined
+    }
+
+    return perEnvironmentPlugin(
+      `${pluginPrefix}:plugins:${environmentName}`,
+      (currentEnvironment) => {
+        if (currentEnvironment.name !== environmentName) {
+          return false
+        }
+
+        return environment.plugins
+      },
+    )
+  })
+}
+
+function createElectronEnvironmentStartupPlugins(
+  environmentContext: ElectronFlatEnvironmentContext,
+  server: ViteDevServer,
+  pluginPrefix: string,
+): Plugin[] {
+  const entryCount = environmentContext.names.length
+  let closeBundleCount = 0
+  const startupWithRoot = () => startup(['.', '--no-sandbox'], { cwd: server.config.root })
+
+  return environmentContext.entries.map(([environmentName, environment]) => {
+    return perEnvironmentPlugin(
+      `${pluginPrefix}:startup:${environmentName}`,
+      (currentEnvironment) => {
+        if (currentEnvironment.name !== environmentName) {
+          return false
+        }
+
+        return {
+          name: `${pluginPrefix}:startup-hook:${environmentName}`,
+          closeBundle() {
+            if (++closeBundleCount < entryCount) {
+              return
+            }
+
+            if (environment.onstart) {
+              environment.onstart.call(this, {
+                startup: startupWithRoot,
+                reload() {
+                  if (process.electronApp) {
+                    ;(server.hot || server.ws).send({ type: 'full-reload' })
+                    startup.send('electron-vite&type=hot-reload')
+                  } else {
+                    startupWithRoot()
+                  }
+                },
+              })
+            } else {
+              startupWithRoot()
+            }
+          },
+        }
+      },
+    )
+  })
+}
+
+async function buildElectronWithEnvironmentApi(
+  normalizedOptions: ElectronFlatNormalizedOptions,
+  environmentContext: ElectronFlatEnvironmentContext,
+  command: 'serve' | 'build',
+  inheritedConfig: Pick<InlineConfig, 'envDir' | 'envPrefix' | 'mode' | 'root'>,
+  pluginPrefix: string,
+  startupPlugins: Plugin[] = [],
+): Promise<void> {
+  if (environmentContext.names.length === 0) {
+    return
+  }
+
+  const builder = await createBuilder(
+    withExternalBuiltins({
+      configFile: false,
+      publicDir: false,
+      ...normalizedOptions.vite,
+      ...inheritedConfig,
+      builder: {
+        async buildApp(builder) {
+          for (const environmentName of environmentContext.names) {
+            const environment = builder.environments[environmentName]
+            if (!environment) {
+              throw new Error(
+                `[vite-plugin-electron] Unable to resolve build environment "${environmentName}".`,
+              )
+            }
+
+            if (environment.isBuilt) {
+              continue
+            }
+
+            await builder.build(environment)
+          }
+        },
+      },
+      environments: Object.fromEntries(
+        environmentContext.entries.map(([environmentName, environment]) => [
+          environmentName,
+          resolveElectronEnvironmentBuildConfig(environment, command),
+        ]),
+      ),
+      plugins: [
+        ...createElectronEnvironmentScopedPlugins(environmentContext, pluginPrefix),
+        ...startupPlugins,
+      ],
+    }),
+  )
+
+  await builder.buildApp()
 }
 
 export function build(options: ElectronOptions): ReturnType<typeof viteBuild> {
   return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
 }
+
+const pluginPrefix = 'vite-plugin-electron'
 
 export default function electron(options: ElectronOptions | ElectronOptions[]): Plugin[] {
   const optionsArray = Array.isArray(options) ? options : [options]
@@ -171,9 +362,117 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
     )
   }
 
+  const areEnvPrefixesEqual = (
+    left: ElectronFlatSharedConfig['envPrefix'],
+    right: ElectronFlatSharedConfig['envPrefix'],
+  ): boolean => {
+    if (Array.isArray(left) || Array.isArray(right)) {
+      return (
+        Array.isArray(left) &&
+        Array.isArray(right) &&
+        left.length === right.length &&
+        left.every((value, index) => value === right[index])
+      )
+    }
+
+    return left === right
+  }
+
+  const resolveSharedFlatValue = <K extends keyof ElectronFlatSharedConfig>(
+    key: K,
+    isEqual: (
+      left: Exclude<ElectronFlatSharedConfig[K], undefined>,
+      right: Exclude<ElectronFlatSharedConfig[K], undefined>,
+    ) => boolean = (left, right) => left === right,
+  ): ElectronFlatSharedConfig[K] | undefined => {
+    const values = optionsArray
+      .map((entry) => entry.vite?.[key])
+      .filter(
+        (value): value is Exclude<ElectronFlatSharedConfig[K], undefined> => value !== undefined,
+      )
+
+    if (values.length === 0) {
+      return undefined
+    }
+
+    const firstValue = values[0]!
+    const restValues = values.slice(1)
+    const hasConflict = restValues.some((value) => !isEqual(firstValue, value))
+
+    if (hasConflict) {
+      throw new Error(
+        `[vite-plugin-electron] electron() requires all \`${key}\` values to match when building multiple Electron entries with Vite environments.`,
+      )
+    }
+
+    return firstValue
+  }
+
+  const sharedConfig: ElectronFlatSharedConfig = {}
+
+  const root = resolveSharedFlatValue('root')
+  if (root !== undefined) {
+    sharedConfig.root = root
+  }
+
+  const mode = resolveSharedFlatValue('mode')
+  if (mode !== undefined) {
+    sharedConfig.mode = mode
+  }
+
+  const envDir = resolveSharedFlatValue('envDir')
+  if (envDir !== undefined) {
+    sharedConfig.envDir = envDir
+  }
+
+  const envPrefix = resolveSharedFlatValue('envPrefix', areEnvPrefixesEqual)
+  if (envPrefix !== undefined) {
+    sharedConfig.envPrefix = envPrefix
+  }
+
+  const environments = new Map<string, ElectronFlatEnvironmentConfig>()
+
+  for (const [index, optionsEntry] of optionsArray.entries()) {
+    const environmentName = `electron_${optionsEntry.name ?? index}`
+    if (environments.has(environmentName)) {
+      throw new Error(
+        `[vite-plugin-electron] Duplicate Electron environment name "${environmentName}".`,
+      )
+    }
+
+    const { plugins, define, resolve, optimizeDeps, build } = optionsEntry.vite ?? {}
+    const environmentOptions: EnvironmentOptions = {
+      define,
+      resolve,
+      optimizeDeps,
+      build,
+    }
+    const hasOptions = Object.values(environmentOptions).some((value) => value !== undefined)
+
+    environments.set(environmentName, {
+      entry: optionsEntry.entry,
+      options: hasOptions ? environmentOptions : undefined,
+      plugins,
+      onstart: optionsEntry.onstart,
+    })
+  }
+
+  const normalizedOptions: ElectronFlatNormalizedOptions = {
+    vite: Object.keys(sharedConfig).length > 0 ? sharedConfig : undefined,
+    environments: Object.fromEntries(environments),
+  }
+
+  const environmentEntries = Object.entries(normalizedOptions.environments) as Array<
+    [string, ElectronFlatEnvironmentConfig]
+  >
+  const environmentContext: ElectronFlatEnvironmentContext = {
+    entries: environmentEntries,
+    names: environmentEntries.map(([environmentName]) => environmentName),
+  }
+
   return [
     {
-      name: 'vite-plugin-electron:dev',
+      name: `${pluginPrefix}:dev`,
       apply: 'serve',
       configResolved(config) {
         // When there is no entry (no index.html and no configured input), write a
@@ -190,65 +489,29 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           }
         })
 
-        server.httpServer?.once('listening', () => {
+        server.httpServer?.once('listening', async () => {
           Object.assign(process.env, {
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
 
-          const entryCount = optionsArray.length
-          let closeBundleCount = 0
-
-          for (const options of optionsArray) {
-            options.vite ??= {}
-            options.vite.mode ??= server.config.mode
-            options.vite.root ??= server.config.root
-            options.vite.envDir ??= server.config.envDir
-            options.vite.envPrefix ??= server.config.envPrefix
-
-            options.vite.build ??= {}
-            if (!Object.keys(options.vite.build).includes('watch')) {
-              // #252
-              options.vite.build.watch = {}
-            }
-            options.vite.build.minify ??= false
-
-            options.vite.plugins ??= []
-            options.vite.plugins.push({
-              name: ':startup',
-              closeBundle() {
-                if (++closeBundleCount < entryCount) {
-                  return
-                }
-
-                if (options.onstart) {
-                  options.onstart.call(this, {
-                    startup,
-                    // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
-                    // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
-                    // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
-                    reload() {
-                      if (process.electronApp) {
-                        ;(server.hot || server.ws).send({ type: 'full-reload' })
-
-                        // For Electron apps that don't need to use the renderer process.
-                        startup.send('electron-vite&type=hot-reload')
-                      } else {
-                        startup()
-                      }
-                    },
-                  })
-                } else {
-                  startup()
-                }
-              },
-            })
-            build(options)
-          }
+          await buildElectronWithEnvironmentApi(
+            normalizedOptions,
+            environmentContext,
+            'serve',
+            {
+              mode: server.config.mode,
+              root: server.config.root,
+              envDir: server.config.envDir,
+              envPrefix: server.config.envPrefix,
+            },
+            pluginPrefix,
+            createElectronEnvironmentStartupPlugins(environmentContext, server, pluginPrefix),
+          )
         })
       },
     },
     {
-      name: 'vite-plugin-electron:prod',
+      name: `${pluginPrefix}:prod`,
       apply: 'build',
       config(config, env) {
         userConfig = config
@@ -271,14 +534,18 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           cleanupMock = undefined
         }
 
-        for (const options of optionsArray) {
-          options.vite ??= {}
-          options.vite.mode ??= configEnv.mode
-          options.vite.root ??= userConfig.root
-          options.vite.envDir ??= userConfig.envDir
-          options.vite.envPrefix ??= userConfig.envPrefix
-          await build(options)
-        }
+        await buildElectronWithEnvironmentApi(
+          normalizedOptions,
+          environmentContext,
+          'build',
+          {
+            mode: configEnv.mode,
+            root: userConfig.root,
+            envDir: userConfig.envDir,
+            envPrefix: userConfig.envPrefix,
+          },
+          pluginPrefix,
+        )
       },
     },
   ]

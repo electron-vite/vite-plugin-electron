@@ -136,6 +136,13 @@ export default {
 ```ts
 export interface ElectronOptions {
   /**
+   * Optional name for the Electron environment.
+   *
+   * By default, the plugin generates names like `electron_0`, `electron_1`, etc.
+   * If you set `name: 'main'`, the generated Vite environment becomes `electron_main`.
+   */
+  name?: string
+  /**
    * Shortcut of `build.lib.entry`
    */
   entry?: import('vite').LibraryOptions['entry']
@@ -164,6 +171,8 @@ export interface ElectronOptions {
   }) => void | Promise<void>
 }
 ```
+
+When you pass an array to `electron()`, each entry is now built through Vite environments internally. Use `name` when you want stable environment identifiers for plugin hooks such as `configEnvironment()`.
 
 ## Recommend Structure
 
@@ -218,7 +227,7 @@ There are many cases here 👉 [electron-vite-samples](https://github.com/caoxie
 
 ## Playground
 
-The local demo suite lives in [playground/](playground/README.md) and includes separate flat and simple modes that import the plugin source directly from this repo.
+The local demo suite lives in [playground/](playground/README.md) and includes flat and simple modes that import the plugin source directly from this repo.
 
 ## JavaScript API
 

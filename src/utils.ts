@@ -8,18 +8,42 @@ import { loadPackageJSONSync } from 'local-pkg'
 import { mergeConfig } from 'vite'
 import type {
   BuildEnvironmentOptions,
+  EnvironmentOptions,
   InlineConfig,
   Logger,
   ResolvedConfig,
   ViteDevServer,
 } from 'vite'
 
-import type { ElectronOptions } from '.'
+import type { ElectronOptions } from './index'
 
 export interface PidTree {
   pid: number
   ppid: number
   children?: PidTree[]
+}
+
+function resolveBuiltinExternals(
+  external: RolldownOptions['external'],
+): RolldownOptions['external'] {
+  const builtins = builtinModules.filter((e) => !e.startsWith('_'))
+  builtins.push('electron', ...builtins.map((m) => `node:${m}`))
+
+  if (Array.isArray(external) || typeof external === 'string' || external instanceof RegExp) {
+    return builtins.concat(external as string[])
+  }
+
+  if (typeof external === 'function') {
+    const original = external
+    return function (source, importer, isResolved) {
+      if (builtins.includes(source)) {
+        return true
+      }
+      return original(source, importer, isResolved)
+    }
+  }
+
+  return builtins
 }
 
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
@@ -60,28 +84,54 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
   return mergeConfig(defaultConfig, options?.vite || {})
 }
 
-export function withExternalBuiltins(config: InlineConfig): InlineConfig {
-  const builtins = builtinModules.filter((e) => !e.startsWith('_'))
-  builtins.push('electron', ...builtins.map((m) => `node:${m}`))
+/** Resolve the default Vite `EnvironmentOptions` for a named Electron build environment. */
+export function resolveViteEnvironmentConfig(options: {
+  entry?: import('vite').LibraryOptions['entry']
+  options?: EnvironmentOptions
+}): EnvironmentOptions {
+  const packageJson = loadPackageJSONSync() ?? {}
+  const esmodule = packageJson.type === 'module'
+  const defaultConfig: EnvironmentOptions = {
+    consumer: 'server',
+    build: {
+      lib: options.entry
+        ? {
+            entry: options.entry,
+            formats: esmodule ? ['es'] : ['cjs'],
+            fileName: () => '[name].js',
+          }
+        : undefined,
+      outDir: 'dist-electron',
+      emptyOutDir: false,
+    },
+    resolve: {
+      conditions: ['node'],
+      mainFields: ['module', 'jsnext:main', 'jsnext'],
+    },
+    define: {
+      'process.env': 'process.env',
+    },
+  }
 
+  return mergeConfig(defaultConfig, options.options || {})
+}
+
+export function withExternalBuiltins(config: InlineConfig): InlineConfig {
   config.build ??= {}
   config.build.rolldownOptions ??= {}
+  config.build.rolldownOptions.external = resolveBuiltinExternals(
+    config.build.rolldownOptions.external,
+  )
 
-  let external = config.build.rolldownOptions.external
-  if (Array.isArray(external) || typeof external === 'string' || external instanceof RegExp) {
-    external = builtins.concat(external as string[])
-  } else if (typeof external === 'function') {
-    const original = external
-    external = function (source, importer, isResolved) {
-      if (builtins.includes(source)) {
-        return true
-      }
-      return original(source, importer, isResolved)
+  if (config.environments) {
+    for (const environment of Object.values(config.environments)) {
+      environment.build ??= {}
+      environment.build.rolldownOptions ??= {}
+      environment.build.rolldownOptions.external = resolveBuiltinExternals(
+        environment.build.rolldownOptions.external,
+      )
     }
-  } else {
-    external = builtins
   }
-  config.build.rolldownOptions.external = external
 
   return config
 }

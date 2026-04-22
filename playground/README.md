@@ -55,5 +55,5 @@ pnpm build
 
 ## What Each Demo Covers
 
-- `flat/` exercises the flat API with `onstart` and full app restart behavior.
+- `flat/` exercises the flat API with `onstart`, full app restart behavior, and array-based Electron entries.
 - `simple/` exercises the simple API with preload rebuild hot reload behavior.

@@ -27,6 +27,8 @@
   }),
   ```
 
+flat API 里的每个 `ElectronOptions` 现在也支持可选的 `name`。传入数组给 `electron()` 时，如果设置了 `name: 'main'`，内部生成的 Vite environment 名会是 `electron_main`，便于在 `configEnvironment()` 这类 hook 里拿到稳定名称。
+
 ## 🍵 🍰 🍣 🍟
 
 <img width="270" src="https://github.com/caoxiemeihao/blog/blob/main/assets/$qrcode/$.png?raw=true">

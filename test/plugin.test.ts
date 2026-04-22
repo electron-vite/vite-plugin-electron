@@ -61,4 +61,88 @@ describe('src/index', () => {
     expect(fs.existsSync(htmlPath)).toBe(false)
     expect(fs.existsSync(distHtmlPath)).toBe(false)
   })
+
+  it('electron flat api uses named environments', async () => {
+    const root = path.join(__dirname, 'fixtures')
+    const appOutDir = path.join(__dirname, 'dist-electron-flat-app')
+    const electronOutDir = path.join(__dirname, 'dist-electron-flat')
+
+    await fs.promises.rm(appOutDir, { recursive: true, force: true })
+    await fs.promises.rm(electronOutDir, { recursive: true, force: true })
+
+    try {
+      await build({
+        configFile: false,
+        root,
+        build: {
+          outDir: appOutDir,
+          emptyOutDir: true,
+          minify: false,
+        },
+        plugins: electron([
+          {
+            name: 'main',
+            entry: 'env-main.ts',
+            vite: {
+              define: {
+                __ENV_NAME__: JSON.stringify('flat-main'),
+              },
+              build: {
+                minify: false,
+                outDir: electronOutDir,
+              },
+              plugins: [
+                {
+                  name: 'flat-main-plugin',
+                  renderChunk(code) {
+                    return `/* ${this.environment.name}:flat-main */\n${code}`
+                  },
+                },
+              ],
+            },
+          },
+          {
+            name: 'preload',
+            entry: 'env-preload.ts',
+            vite: {
+              define: {
+                __ENV_NAME__: JSON.stringify('flat-preload'),
+              },
+              build: {
+                minify: false,
+                outDir: electronOutDir,
+              },
+              plugins: [
+                {
+                  name: 'flat-preload-plugin',
+                  renderChunk(code) {
+                    return `/* ${this.environment.name}:flat-preload */\n${code}`
+                  },
+                },
+              ],
+            },
+          },
+        ]),
+        logLevel: 'silent',
+      })
+
+      const mainCode = fs
+        .readFileSync(path.join(electronOutDir, 'env-main.js'), 'utf-8')
+        .replace(normalizingNewLineRE, '\n')
+      const preloadCode = fs
+        .readFileSync(path.join(electronOutDir, 'env-preload.js'), 'utf-8')
+        .replace(normalizingNewLineRE, '\n')
+
+      expect(mainCode).toContain('electron_main:flat-main')
+      expect(mainCode).toContain('"flat-main"')
+      expect(mainCode).not.toContain('electron_preload:flat-preload')
+
+      expect(preloadCode).toContain('electron_preload:flat-preload')
+      expect(preloadCode).toContain('"flat-preload"')
+      expect(preloadCode).not.toContain('electron_main:flat-main')
+    } finally {
+      await fs.promises.rm(appOutDir, { recursive: true, force: true })
+      await fs.promises.rm(electronOutDir, { recursive: true, force: true })
+    }
+  })
 })
