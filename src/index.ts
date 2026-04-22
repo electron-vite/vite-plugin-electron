@@ -2,7 +2,15 @@ import type { StdioOptions, SpawnOptions } from 'node:child_process'
 import path from 'node:path'
 
 import { build as viteBuild, createBuilder, perEnvironmentPlugin, version } from 'vite'
-import type { EnvironmentOptions, InlineConfig, Plugin, UserConfig, ViteDevServer } from 'vite'
+import type {
+  ConfigEnv,
+  ConfigPluginContext,
+  EnvironmentOptions,
+  InlineConfig,
+  Plugin,
+  UserConfig,
+  ViteDevServer,
+} from 'vite'
 
 import {
   resolveServerUrl,
@@ -182,6 +190,97 @@ interface ElectronEnvironmentEntry {
   config: InlineConfig
 }
 
+async function resolvePlugins(plugins: InlineConfig['plugins']): Promise<Plugin[]> {
+  const resolvedPlugins: Plugin[] = []
+  const stack: unknown[] = [...(plugins ?? [])].reverse()
+
+  while (stack.length > 0) {
+    const pluginOption = await stack.pop()
+    if (!pluginOption) {
+      continue
+    }
+
+    if (Array.isArray(pluginOption)) {
+      for (let index = pluginOption.length - 1; index >= 0; index -= 1) {
+        stack.push(pluginOption[index])
+      }
+      continue
+    }
+
+    resolvedPlugins.push(pluginOption as Plugin)
+  }
+
+  return resolvedPlugins
+}
+
+function createScopedConfigPlugin(
+  name: string,
+  plugin: Plugin,
+  pluginIndex: number,
+): Plugin | undefined {
+  if (!plugin.config) {
+    return
+  }
+
+  const configHook = plugin.config
+  const configHandler = typeof configHook === 'object' ? configHook.handler : configHook
+  const handler = async function (this: ConfigPluginContext, config: UserConfig, env: ConfigEnv) {
+    const environmentConfig = (config.environments?.[name] ?? {}) as UserConfig
+    const result = await configHandler.call(this, environmentConfig, env)
+
+    return result ? { environments: { [name]: result } } : undefined
+  }
+
+  return {
+    name: `${name}:${pluginIndex}:config`,
+    apply: plugin.apply,
+    config: typeof configHook === 'object' ? { order: configHook.order, handler } : handler,
+  }
+}
+
+function createScopedConfigEnvironmentPlugin(
+  name: string,
+  plugin: Plugin,
+  pluginIndex: number,
+): Plugin | undefined {
+  if (!plugin.configEnvironment) {
+    return
+  }
+
+  const configEnvironmentHook = plugin.configEnvironment
+  const configEnvironmentHandler =
+    typeof configEnvironmentHook === 'object'
+      ? configEnvironmentHook.handler
+      : configEnvironmentHook
+  const handler = async function (
+    this: ConfigPluginContext,
+    environmentName: string,
+    config: EnvironmentOptions,
+    env: ConfigEnv & { isSsrTargetWebworker?: boolean },
+  ) {
+    if (environmentName !== name) {
+      return
+    }
+
+    return await configEnvironmentHandler.call(this, environmentName, config, env)
+  }
+
+  return {
+    name: `${name}:${pluginIndex}:config-environment`,
+    apply: plugin.apply,
+    configEnvironment:
+      typeof configEnvironmentHook === 'object'
+        ? { order: configEnvironmentHook.order, handler }
+        : handler,
+  }
+}
+
+function stripScopedConfigHooks(plugin: Plugin): Plugin {
+  const { config: _config, configEnvironment: _configEnvironment, ...environmentPlugin } = plugin
+
+  return environmentPlugin
+}
+
 function collectElectronEnvironmentEntries(
   optionsArray: ElectronOptions[],
   defaults: BuildDefaults = {},
@@ -209,109 +308,25 @@ function collectElectronEnvironmentEntries(
 }
 
 async function createPerEnvironmentPlugins(entries: ElectronEnvironmentEntry[]): Promise<Plugin[]> {
-  const plugins: Plugin[] = []
+  const scopedPluginGroups = await Promise.all(
+    entries.map(async ({ name, config }) => {
+      const resolvedPlugins = await resolvePlugins(config.plugins)
 
-  for (const { name, config } of entries) {
-    let pluginIndex = 0
-    const pluginStack = [...(config.plugins ?? [])].reverse()
+      return resolvedPlugins.flatMap((plugin, pluginIndex) => {
+        const scopedPlugins = [
+          createScopedConfigPlugin(name, plugin, pluginIndex),
+          createScopedConfigEnvironmentPlugin(name, plugin, pluginIndex),
+          perEnvironmentPlugin(`${name}:${pluginIndex}`, (environment) =>
+            environment.name === name ? stripScopedConfigHooks(plugin) : false,
+          ),
+        ]
 
-    while (pluginStack.length > 0) {
-      const pluginOption = pluginStack.pop()
-      if (!pluginOption) {
-        continue
-      }
+        return scopedPlugins.filter((scopedPlugin): scopedPlugin is Plugin => !!scopedPlugin)
+      })
+    }),
+  )
 
-      if (Array.isArray(pluginOption)) {
-        for (let index = pluginOption.length - 1; index >= 0; index -= 1) {
-          pluginStack.push(pluginOption[index])
-        }
-        continue
-      }
-
-      const plugin = (await pluginOption) as Plugin
-
-      if (plugin.config) {
-        const configHook = plugin.config
-        const configHandler = typeof configHook === 'object' ? configHook.handler : configHook
-
-        plugins.push({
-          name: `${name}:${pluginIndex}:config`,
-          apply: plugin.apply,
-          config:
-            typeof configHook === 'object'
-              ? {
-                  order: configHook.order,
-                  async handler(config, env) {
-                    const environmentConfig = (config.environments?.[name] ?? {}) as UserConfig
-                    const result = await configHandler.call(this, environmentConfig, env)
-
-                    if (!result) {
-                      return undefined
-                    }
-                    return { environments: { [name]: result } }
-                  },
-                }
-              : async function (config, env) {
-                  const result = await configHandler.call(
-                    this,
-                    config.environments?.[name] ?? {},
-                    env,
-                  )
-
-                  return result ? { environments: { [name]: result } } : undefined
-                },
-        })
-      }
-
-      if (plugin.configEnvironment) {
-        const configEnvironmentHook = plugin.configEnvironment
-        const configEnvironmentHandler =
-          typeof configEnvironmentHook === 'object'
-            ? configEnvironmentHook.handler
-            : configEnvironmentHook
-
-        plugins.push({
-          name: `${name}:${pluginIndex}:config-environment`,
-          apply: plugin.apply,
-          configEnvironment:
-            typeof configEnvironmentHook === 'object'
-              ? {
-                  order: configEnvironmentHook.order,
-                  async handler(environmentName, config, env) {
-                    if (environmentName !== name) {
-                      return
-                    }
-
-                    return await configEnvironmentHandler.call(this, environmentName, config, env)
-                  },
-                }
-              : async function (environmentName, config, env) {
-                  if (environmentName !== name) {
-                    return
-                  }
-
-                  return await configEnvironmentHandler.call(this, environmentName, config, env)
-                },
-        })
-      }
-
-      const {
-        config: _config,
-        configEnvironment: _configEnvironment,
-        ...environmentPlugin
-      } = plugin
-
-      plugins.push(
-        perEnvironmentPlugin(`${name}:${pluginIndex}`, (environment) =>
-          environment.name === name ? environmentPlugin : false,
-        ),
-      )
-
-      pluginIndex += 1
-    }
-  }
-
-  return plugins
+  return scopedPluginGroups.flat()
 }
 
 interface ElectronConfigSetup {
@@ -529,7 +544,7 @@ export function build(options: ElectronOptions): ReturnType<typeof viteBuild> {
 
 export default function electron(
   options: ElectronOptions | ElectronOptions[],
-): UserConfig['plugins'] {
+): NonNullable<UserConfig['plugins']> {
   const optionsArray = Array.isArray(options) ? options : [options]
   let cleanupMock: (() => Promise<void>) | undefined
 

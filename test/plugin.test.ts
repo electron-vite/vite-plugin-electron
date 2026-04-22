@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { build, createBuilder } from 'vite'
+import type { Plugin } from 'vite'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import electron, {
@@ -21,13 +22,25 @@ const generatedDirs = [
   'dist-electron-simple',
   'dist-electron-env',
   'dist-electron-env-define',
+  'dist-electron-env-transform-main',
+  'dist-electron-env-transform-preload',
+  'dist-electron-env-close-main',
+  'dist-electron-env-close-preload',
   'dist-electron-dev',
+]
+const generatedAbsoluteDirs = [
+  path.resolve(__dirname, '../playground/flat/dist'),
+  path.resolve(__dirname, '../playground/flat/dist-electron'),
 ]
 const generatedFiles = [path.join(__dirname, 'fixtures/mock-html/index.html')]
 
 function cleanupGeneratedDirs() {
   for (const dirName of generatedDirs) {
     fs.rmSync(path.join(__dirname, dirName), { recursive: true, force: true })
+  }
+
+  for (const dirPath of generatedAbsoluteDirs) {
+    fs.rmSync(dirPath, { recursive: true, force: true })
   }
 }
 
@@ -152,13 +165,41 @@ describe('src/index > electron() plugin (build mode)', () => {
   it('applies nested electron vite plugins to the target environment config', async () => {
     const root = path.join(__dirname, 'fixtures/mock-html')
     const electronOutDir = path.join(__dirname, 'dist-electron-env-define')
+    const VIRTUAL_MAIN_STATUS_ID = 'virtual:test/main-status'
+    const RESOLVED_VIRTUAL_MAIN_STATUS_ID = `\0${VIRTUAL_MAIN_STATUS_ID}`
 
     const createMainStatusPlugin = (status: string) => ({
       name: `test:main-status-${status}`,
+      configResolved() {
+        return undefined
+      },
+      resolveId(id: string) {
+        if (id === VIRTUAL_MAIN_STATUS_ID) {
+          return RESOLVED_VIRTUAL_MAIN_STATUS_ID
+        }
+      },
+      load(id: string) {
+        if (id !== RESOLVED_VIRTUAL_MAIN_STATUS_ID) {
+          return
+        }
+
+        if (status !== 'override') {
+          return
+        }
+
+        return `export const mainLoadedStatus = ${JSON.stringify(`${status}-resolved`)}`
+      },
       config() {
         return {
           define: {
             __TEST_MAIN_STATUS__: JSON.stringify(status),
+          },
+        }
+      },
+      configEnvironment() {
+        return {
+          define: {
+            __TEST_MAIN_ENV_STATUS__: JSON.stringify(status),
           },
         }
       },
@@ -187,7 +228,115 @@ describe('src/index > electron() plugin (build mode)', () => {
 
     const output = fs.readFileSync(path.join(electronOutDir, 'electron-define.js'), 'utf-8')
     expect(output).toContain('"override"')
+    expect(output).toContain('"override-resolved"')
     expect(output).not.toContain('__TEST_MAIN_STATUS__')
+    expect(output).not.toContain('__TEST_MAIN_ENV_STATUS__')
+  })
+
+  it('isolates nested transform hooks per electron environment', async () => {
+    const root = path.join(__dirname, 'fixtures/mock-html')
+    const mainOutDir = path.join(__dirname, 'dist-electron-env-transform-main')
+    const preloadOutDir = path.join(__dirname, 'dist-electron-env-transform-preload')
+
+    const createTransformStatusPlugin = (status: string): Plugin => ({
+      name: `test:transform-status-${status}`,
+      transform(code, id) {
+        if (!id.includes('electron-transform.ts')) {
+          return
+        }
+
+        return code.replace(/['"]__TEST_TRANSFORM_STATUS__['"]/, JSON.stringify(status))
+      },
+    })
+
+    const viteBuilder = await createBuilder({
+      configFile: false,
+      root,
+      build: {
+        outDir: path.join(__dirname, 'dist-renderer-env'),
+        emptyOutDir: true,
+        minify: false,
+      },
+      plugins: electron([
+        {
+          name: 'main',
+          entry: path.resolve(__dirname, 'fixtures/electron-transform.ts'),
+          vite: {
+            build: { outDir: mainOutDir, emptyOutDir: true, minify: false },
+            plugins: [createTransformStatusPlugin('main-transform')],
+          },
+        },
+        {
+          name: 'preload',
+          entry: path.resolve(__dirname, 'fixtures/electron-transform.ts'),
+          vite: {
+            build: { outDir: preloadOutDir, emptyOutDir: true, minify: false },
+            plugins: [createTransformStatusPlugin('preload-transform')],
+          },
+        },
+      ]),
+      logLevel: 'silent',
+    })
+    await viteBuilder.buildApp()
+
+    const mainOutput = fs.readFileSync(path.join(mainOutDir, 'electron-transform.js'), 'utf-8')
+    const preloadOutput = fs.readFileSync(
+      path.join(preloadOutDir, 'electron-transform.js'),
+      'utf-8',
+    )
+
+    expect(mainOutput).toContain('"main-transform"')
+    expect(mainOutput).not.toContain('"preload-transform"')
+    expect(mainOutput).not.toContain('__TEST_TRANSFORM_STATUS__')
+    expect(preloadOutput).toContain('"preload-transform"')
+    expect(preloadOutput).not.toContain('"main-transform"')
+    expect(preloadOutput).not.toContain('__TEST_TRANSFORM_STATUS__')
+  })
+
+  it('isolates nested closeBundle hooks per electron environment', async () => {
+    const root = path.join(__dirname, 'fixtures/mock-html')
+    const mainOutDir = path.join(__dirname, 'dist-electron-env-close-main')
+    const preloadOutDir = path.join(__dirname, 'dist-electron-env-close-preload')
+    const closeBundleCalls: string[] = []
+
+    const createCloseBundlePlugin = (status: string): Plugin => ({
+      name: `test:close-bundle-${status}`,
+      closeBundle() {
+        closeBundleCalls.push(`${status}:${this.environment.name}`)
+      },
+    })
+
+    const viteBuilder = await createBuilder({
+      configFile: false,
+      root,
+      build: {
+        outDir: path.join(__dirname, 'dist-renderer-env'),
+        emptyOutDir: true,
+        minify: false,
+      },
+      plugins: electron([
+        {
+          name: 'main',
+          entry: path.resolve(__dirname, 'fixtures/electron-main.ts'),
+          vite: {
+            build: { outDir: mainOutDir, emptyOutDir: true, minify: false },
+            plugins: [createCloseBundlePlugin('main')],
+          },
+        },
+        {
+          name: 'preload',
+          entry: path.resolve(__dirname, 'fixtures/electron-main.ts'),
+          vite: {
+            build: { outDir: preloadOutDir, emptyOutDir: true, minify: false },
+            plugins: [createCloseBundlePlugin('preload')],
+          },
+        },
+      ]),
+      logLevel: 'silent',
+    })
+    await viteBuilder.buildApp()
+
+    expect([...closeBundleCalls].sort()).toEqual(['main:electron_main', 'preload:electron_preload'])
   })
 })
 
@@ -234,5 +383,48 @@ describe('src/index > electron() plugin (dev mode / createBuilder)', () => {
 
     const output = fs.readFileSync(path.join(outDir, 'electron-main.js'), 'utf-8')
     expect(output.replace(normalizingNewLineRE, '\n')).toMatchSnapshot()
+  })
+})
+
+describe('playground/flat build outputs', () => {
+  it('includes transform and closeBundle hook results in build artifacts', async () => {
+    const playgroundRoot = path.resolve(__dirname, '../playground/flat')
+    const distDir = path.join(playgroundRoot, 'dist')
+    const distElectronDir = path.join(playgroundRoot, 'dist-electron')
+
+    const builder = await createBuilder({
+      configFile: path.join(playgroundRoot, 'vite.config.ts'),
+      root: playgroundRoot,
+      logLevel: 'silent',
+    })
+    await builder.buildApp()
+
+    const rendererBundleName = fs
+      .readdirSync(path.join(distDir, 'assets'))
+      .find((filename) => filename.endsWith('.js'))
+    expect(rendererBundleName).toBeTruthy()
+
+    const rendererOutput = fs.readFileSync(
+      path.join(distDir, 'assets', rendererBundleName!),
+      'utf-8',
+    )
+    const mainOutput = fs.readFileSync(path.join(distElectronDir, 'main.js'), 'utf-8')
+    const rendererCloseBundleOutput = fs.readFileSync(
+      path.join(distDir, 'renderer-close-bundle.txt'),
+      'utf-8',
+    )
+    const mainCloseBundleOutput = fs.readFileSync(
+      path.join(distElectronDir, 'main-close-bundle.txt'),
+      'utf-8',
+    )
+
+    expect(rendererOutput).toContain('"renderer-override-transform"')
+    expect(rendererOutput).not.toContain('__FLAT_RENDERER_TRANSFORM_STATUS__')
+    expect(mainOutput).toContain('"main-override-transform"')
+    expect(mainOutput).not.toContain('__FLAT_MAIN_TRANSFORM_STATUS__')
+    expect(rendererCloseBundleOutput).toBe('override:client')
+    expect(mainCloseBundleOutput).toBe('override:electron_0')
+    expect(fs.existsSync(path.join(distDir, 'main-close-bundle.txt'))).toBe(false)
+    expect(fs.existsSync(path.join(distElectronDir, 'renderer-close-bundle.txt'))).toBe(false)
   })
 })

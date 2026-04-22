@@ -1,6 +1,6 @@
 import { loadPackageJSON } from 'local-pkg'
 import { mergeConfig } from 'vite'
-import type { Plugin, UserConfig } from 'vite'
+import type { UserConfig } from 'vite'
 
 import type { RolldownOptions } from './utils'
 
@@ -26,7 +26,9 @@ export interface ElectronSimpleOptions {
 
 // The simple API just like v0.9.x
 // Vite v3.x support async plugin.
-export default async function electronSimple(options: ElectronSimpleOptions): Promise<Plugin[]> {
+export default async function electronSimple(
+  options: ElectronSimpleOptions,
+): Promise<UserConfig['plugins']> {
   const flatApiOptions = [
     mergeConfig<ElectronOptions, ElectronOptions>(
       {
