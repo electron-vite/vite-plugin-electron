@@ -3,11 +3,13 @@ import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain } from 'electron'
 
 const currentDir = __dirname
+declare const __FLAT_MAIN_STATUS__: string
 
 ipcMain.handle('playground:main-state', () => ({
   mode: 'flat' as const,
   pid: process.pid,
   startedAt: new Date().toISOString(),
+  status: __FLAT_MAIN_STATUS__,
 }))
 
 const createWindow = () => {

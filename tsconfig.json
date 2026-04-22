@@ -1,4 +1,5 @@
 {
   "extends": "@subf/config/tsconfig-lib",
+  "include": ["src", "test", "electron-env.d.ts"],
   "exclude": ["**/fixtures"]
 }
