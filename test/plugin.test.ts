@@ -20,6 +20,7 @@ const generatedDirs = [
   'dist-mock-html',
   'dist-electron-simple',
   'dist-electron-env',
+  'dist-electron-env-define',
   'dist-electron-dev',
 ]
 const generatedFiles = [path.join(__dirname, 'fixtures/mock-html/index.html')]
@@ -146,6 +147,47 @@ describe('src/index > electron() plugin (build mode)', () => {
 
     const output = fs.readFileSync(path.join(electronOutDir, 'electron-main.js'), 'utf-8')
     expect(output.replace(normalizingNewLineRE, '\n')).toMatchSnapshot()
+  })
+
+  it('applies nested electron vite plugins to the target environment config', async () => {
+    const root = path.join(__dirname, 'fixtures/mock-html')
+    const electronOutDir = path.join(__dirname, 'dist-electron-env-define')
+
+    const createMainStatusPlugin = (status: string) => ({
+      name: `test:main-status-${status}`,
+      config() {
+        return {
+          define: {
+            __TEST_MAIN_STATUS__: JSON.stringify(status),
+          },
+        }
+      },
+    })
+
+    const viteBuilder = await createBuilder({
+      configFile: false,
+      root,
+      build: {
+        outDir: path.join(__dirname, 'dist-renderer-env'),
+        emptyOutDir: true,
+        minify: false,
+      },
+      plugins: electron([
+        {
+          entry: path.resolve(__dirname, 'fixtures/electron-define.ts'),
+          vite: {
+            build: { outDir: electronOutDir, emptyOutDir: true, minify: false },
+            plugins: [createMainStatusPlugin('base'), createMainStatusPlugin('override')],
+          },
+        },
+      ]),
+      logLevel: 'silent',
+    })
+    await viteBuilder.buildApp()
+
+    const output = fs.readFileSync(path.join(electronOutDir, 'electron-define.js'), 'utf-8')
+    expect(output).toContain('"override"')
+    expect(output).not.toContain('__TEST_MAIN_STATUS__')
   })
 })
 

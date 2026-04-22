@@ -208,14 +208,110 @@ function collectElectronEnvironmentEntries(
   })
 }
 
-function createPerEnvironmentPlugins(entries: readonly ElectronEnvironmentEntry[]): Plugin[] {
-  return entries.flatMap(({ name, config }) =>
-    (config.plugins ?? []).map((plugin, pluginIndex) =>
-      perEnvironmentPlugin(`${name}:${pluginIndex}`, (environment) =>
-        environment.name === name ? plugin : false,
-      ),
-    ),
-  )
+async function createPerEnvironmentPlugins(entries: ElectronEnvironmentEntry[]): Promise<Plugin[]> {
+  const plugins: Plugin[] = []
+
+  for (const { name, config } of entries) {
+    let pluginIndex = 0
+    const pluginStack = [...(config.plugins ?? [])].reverse()
+
+    while (pluginStack.length > 0) {
+      const pluginOption = pluginStack.pop()
+      if (!pluginOption) {
+        continue
+      }
+
+      if (Array.isArray(pluginOption)) {
+        for (let index = pluginOption.length - 1; index >= 0; index -= 1) {
+          pluginStack.push(pluginOption[index])
+        }
+        continue
+      }
+
+      const plugin = (await pluginOption) as Plugin
+
+      if (plugin.config) {
+        const configHook = plugin.config
+        const configHandler = typeof configHook === 'object' ? configHook.handler : configHook
+
+        plugins.push({
+          name: `${name}:${pluginIndex}:config`,
+          apply: plugin.apply,
+          config:
+            typeof configHook === 'object'
+              ? {
+                  order: configHook.order,
+                  async handler(config, env) {
+                    const environmentConfig = (config.environments?.[name] ?? {}) as UserConfig
+                    const result = await configHandler.call(this, environmentConfig, env)
+
+                    if (!result) {
+                      return undefined
+                    }
+                    return { environments: { [name]: result } }
+                  },
+                }
+              : async function (config, env) {
+                  const result = await configHandler.call(
+                    this,
+                    config.environments?.[name] ?? {},
+                    env,
+                  )
+
+                  return result ? { environments: { [name]: result } } : undefined
+                },
+        })
+      }
+
+      if (plugin.configEnvironment) {
+        const configEnvironmentHook = plugin.configEnvironment
+        const configEnvironmentHandler =
+          typeof configEnvironmentHook === 'object'
+            ? configEnvironmentHook.handler
+            : configEnvironmentHook
+
+        plugins.push({
+          name: `${name}:${pluginIndex}:config-environment`,
+          apply: plugin.apply,
+          configEnvironment:
+            typeof configEnvironmentHook === 'object'
+              ? {
+                  order: configEnvironmentHook.order,
+                  async handler(environmentName, config, env) {
+                    if (environmentName !== name) {
+                      return
+                    }
+
+                    return await configEnvironmentHandler.call(this, environmentName, config, env)
+                  },
+                }
+              : async function (environmentName, config, env) {
+                  if (environmentName !== name) {
+                    return
+                  }
+
+                  return await configEnvironmentHandler.call(this, environmentName, config, env)
+                },
+        })
+      }
+
+      const {
+        config: _config,
+        configEnvironment: _configEnvironment,
+        ...environmentPlugin
+      } = plugin
+
+      plugins.push(
+        perEnvironmentPlugin(`${name}:${pluginIndex}`, (environment) =>
+          environment.name === name ? environmentPlugin : false,
+        ),
+      )
+
+      pluginIndex += 1
+    }
+  }
+
+  return plugins
 }
 
 interface ElectronConfigSetup {
@@ -252,11 +348,11 @@ function createElectronConfigSetup(
   }
 }
 
-function createDevConfig(
+async function createDevConfig(
   optionsArray: ElectronOptions[],
   defaults: BuildDefaults,
   startupPlugin?: Plugin,
-): InlineConfig {
+): Promise<InlineConfig> {
   const { entries, sharedConfig } = createElectronConfigSetup(optionsArray, defaults)
 
   for (const entry of entries) {
@@ -267,7 +363,7 @@ function createDevConfig(
     }
   }
 
-  const plugins = createPerEnvironmentPlugins(entries)
+  const plugins = await createPerEnvironmentPlugins(entries)
   if (startupPlugin) {
     plugins.push(startupPlugin)
   }
@@ -431,7 +527,9 @@ export function build(options: ElectronOptions): ReturnType<typeof viteBuild> {
   return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
 }
 
-export default function electron(options: ElectronOptions | ElectronOptions[]): Plugin[] {
+export default function electron(
+  options: ElectronOptions | ElectronOptions[],
+): UserConfig['plugins'] {
   const optionsArray = Array.isArray(options) ? options : [options]
   let cleanupMock: (() => Promise<void>) | undefined
 
@@ -452,15 +550,6 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
       `[vite-plugin-electron] Vite v${version} does not support \`rolldownOptions\`, please install \`vite@>=8\` or use an earlier version of \`vite-plugin-electron\`.`,
     )
   }
-
-  const perEnvPlugins = optionsArray.flatMap((opt, idx) =>
-    (opt.vite?.plugins || []).map((plugin, pluginIndex) => {
-      const name = resolveEnvironmentName(idx)
-      return perEnvironmentPlugin(`${name}:${pluginIndex}`, (environment) =>
-        environment.name === name ? plugin : false,
-      )
-    }),
-  )
 
   return [
     {
@@ -487,18 +576,17 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
 
           const startupHook = createStartupHook(server, optionsArray)
 
-          void createBuilder(
-            createDevConfig(
-              optionsArray,
-              {
-                mode: server.config.mode,
-                root: server.config.root,
-                envDir: server.config.envDir,
-                envPrefix: server.config.envPrefix,
-              },
-              startupHook,
-            ),
+          createDevConfig(
+            optionsArray,
+            {
+              mode: server.config.mode,
+              root: server.config.root,
+              envDir: server.config.envDir,
+              envPrefix: server.config.envPrefix,
+            },
+            startupHook,
           )
+            .then((config) => createBuilder(config))
             .then((builder) => builder.buildApp())
             .catch((error) => {
               server.config.logger.error(
@@ -509,7 +597,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         })
       },
     },
-    ...perEnvPlugins,
+    createPerEnvironmentPlugins(collectElectronEnvironmentEntries(optionsArray)),
     {
       name: 'vite-plugin-electron:prod',
       apply: 'build',
