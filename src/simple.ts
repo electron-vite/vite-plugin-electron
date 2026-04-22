@@ -94,7 +94,7 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
                 //  - require(✘): ReferenceError: require is not defined in ES module scope, you can use import instead
 
                 // Note, however, that `preload.ts` should not be split. 🚧
-                inlineDynamicImports: true,
+                codeSplitting: false,
                 // When Rollup builds code in `cjs` format, it will automatically split the code into multiple chunks, and use `require()` to load them,
                 // and use `require()` to load other modules when `nodeIntegration: false` in the Main process Errors will occur.
                 // So we need to configure Rollup not to split the code when building to ensure that it works correctly with `nodeIntegration: false`.
