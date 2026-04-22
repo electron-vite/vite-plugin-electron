@@ -165,7 +165,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   let configEnv: ConfigEnv
   let cleanupMock: (() => Promise<void>) | undefined
 
-  if (!version.startsWith('8.')) {
+  if (Number.parseInt(version) < 8) {
     throw new Error(
       `[vite-plugin-electron] Vite v${version} does not support \`rolldownOptions\`, please install \`vite@>=8\` or use an earlier version of \`vite-plugin-electron\`.`,
     )
