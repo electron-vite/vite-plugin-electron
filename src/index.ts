@@ -320,7 +320,11 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
       }),
     )
 
-    await builder.buildApp()
+    // Build only the Electron environments; the renderer app has already been
+    // built by the outer Vite command.
+    for (const [name] of envEntries) {
+      await builder.build(builder.environments[name]!)
+    }
   }
 
   return [
