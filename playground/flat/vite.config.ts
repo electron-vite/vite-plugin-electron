@@ -129,6 +129,7 @@ function createMainStatusPlugin(status: string): Plugin {
     config() {
       return {
         define: {
+          // fixme)) not working
           __FLAT_MAIN_STATUS__: JSON.stringify(status),
         },
       }
@@ -136,6 +137,7 @@ function createMainStatusPlugin(status: string): Plugin {
     configEnvironment() {
       return {
         define: {
+          // fixme)) not working
           __FLAT_MAIN_ENV_STATUS__: JSON.stringify(status),
         },
       }
