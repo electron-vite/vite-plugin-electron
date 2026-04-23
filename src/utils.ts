@@ -85,19 +85,20 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
 }
 
 /** Resolve the default Vite `EnvironmentOptions` for a named Electron build environment. */
-export function resolveViteEnvironmentConfig(options: {
-  entry?: import('vite').LibraryOptions['entry']
-  options?: EnvironmentOptions
-}): EnvironmentOptions {
-  const packageJson = loadPackageJSONSync() ?? {}
-  const esmodule = packageJson.type === 'module'
+export function resolveViteEnvironmentConfig(
+  isESM: boolean,
+  options: {
+    entry?: import('vite').LibraryOptions['entry']
+    options?: EnvironmentOptions
+  },
+): EnvironmentOptions {
   const defaultConfig: EnvironmentOptions = {
     consumer: 'server',
     build: {
       lib: options.entry
         ? {
             entry: options.entry,
-            formats: esmodule ? ['es'] : ['cjs'],
+            formats: isESM ? ['es'] : ['cjs'],
             fileName: () => '[name].js',
           }
         : undefined,

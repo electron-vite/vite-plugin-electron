@@ -1,6 +1,7 @@
 import type { StdioOptions, SpawnOptions } from 'node:child_process'
 import path from 'node:path'
 
+import { loadPackageJSONSync } from 'local-pkg'
 import { build as viteBuild, createBuilder, perEnvironmentPlugin, version } from 'vite'
 import type {
   ConfigEnv,
@@ -10,6 +11,7 @@ import type {
   PluginOption,
   UserConfig,
   ViteDevServer,
+  LibraryOptions,
 } from 'vite'
 
 import {
@@ -25,25 +27,6 @@ import {
 // public utils
 export { resolveViteConfig, withExternalBuiltins }
 export { loadPackageJSON, loadPackageJSONSync } from 'local-pkg'
-
-export interface ElectronOnstartArgs {
-  /**
-   * Electron App startup function.
-   * It will mount the Electron App child-process to `process.electronApp`.
-   * @param argv default value `['.', '--no-sandbox']`
-   * @param options options for `child_process.spawn`
-   * @param customElectronPkg custom electron package name (default: 'electron')
-   */
-  startup: (
-    argv?: string[],
-    options?: import('node:child_process').SpawnOptions,
-    customElectronPkg?: string,
-  ) => Promise<void>
-  /** Reload Electron-Renderer */
-  reload: () => void
-}
-
-export type ElectronOnstart = (args: ElectronOnstartArgs) => void | Promise<void>
 
 interface StartupFn {
   (argv?: string[], options?: SpawnOptions, customElectronPkg?: string): Promise<void>
@@ -173,14 +156,29 @@ export interface ElectronOptions {
    * If this `onstart` is passed, Electron App will not start automatically.
    * However, you can start Electroo App via `startup` function.
    */
-  onstart?: ElectronOnstart
+  onstart?: (args: {
+    /**
+     * Electron App startup function.
+     * It will mount the Electron App child-process to `process.electronApp`.
+     * @param argv default value `['.', '--no-sandbox']`
+     * @param options options for `child_process.spawn`, with default cwd of the Vite project root
+     * @param customElectronPkg custom electron package name (default: 'electron')
+     */
+    startup: (
+      argv?: string[],
+      options?: import('node:child_process').SpawnOptions,
+      customElectronPkg?: string,
+    ) => Promise<void>
+    /** Reload Electron-Renderer */
+    reload: () => void
+  }) => void | Promise<void>
 }
 
 type ElectronFlatEnvironmentConfig = {
   /**
    * Shortcut of `options.build.lib.entry`
    */
-  entry?: import('vite').LibraryOptions['entry']
+  entry?: LibraryOptions['entry']
   /**
    * Vite environment options for this Electron build target.
    */
@@ -192,163 +190,16 @@ type ElectronFlatEnvironmentConfig = {
   /**
    * Triggered when this environment finishes building in `vite serve`.
    */
-  onstart?: ElectronOnstart
+  onstart?: ElectronOptions['onstart']
 }
 
 type ElectronFlatSharedConfig = Pick<InlineConfig, 'envDir' | 'envPrefix' | 'mode' | 'root'>
 
-type ElectronFlatNormalizedOptions = {
-  vite?: ElectronFlatSharedConfig
-  environments: Record<string, ElectronFlatEnvironmentConfig>
-}
+const PLUGIN_PREFIX = 'vite-plugin-electron'
 
-type ElectronFlatEnvironmentContext = {
-  entries: Array<[string, ElectronFlatEnvironmentConfig]>
-  names: string[]
-}
-
-function resolveElectronEnvironmentBuildConfig(
-  environment: ElectronFlatEnvironmentConfig,
-  command: 'serve' | 'build',
-): EnvironmentOptions {
-  const config = resolveViteEnvironmentConfig(environment)
-
-  if (command === 'serve') {
-    config.build ??= {}
-    if (!Object.keys(config.build).includes('watch')) {
-      config.build.watch = {}
-    }
-    config.build.minify ??= false
-  }
-
-  return config
-}
-
-function createElectronEnvironmentScopedPlugins(
-  environmentContext: ElectronFlatEnvironmentContext,
-  pluginPrefix: string,
-): PluginOption[] {
-  return environmentContext.entries.map(([environmentName, environment]) => {
-    if (!environment.plugins) {
-      return undefined
-    }
-
-    return perEnvironmentPlugin(
-      `${pluginPrefix}:plugins:${environmentName}`,
-      (currentEnvironment) => {
-        if (currentEnvironment.name !== environmentName) {
-          return false
-        }
-
-        return environment.plugins
-      },
-    )
-  })
-}
-
-function createElectronEnvironmentStartupPlugins(
-  environmentContext: ElectronFlatEnvironmentContext,
-  server: ViteDevServer,
-  pluginPrefix: string,
-): Plugin[] {
-  const entryCount = environmentContext.names.length
-  let closeBundleCount = 0
-  const startupWithRoot = () => startup(['.', '--no-sandbox'], { cwd: server.config.root })
-
-  return environmentContext.entries.map(([environmentName, environment]) => {
-    return perEnvironmentPlugin(
-      `${pluginPrefix}:startup:${environmentName}`,
-      (currentEnvironment) => {
-        if (currentEnvironment.name !== environmentName) {
-          return false
-        }
-
-        return {
-          name: `${pluginPrefix}:startup-hook:${environmentName}`,
-          closeBundle() {
-            if (++closeBundleCount < entryCount) {
-              return
-            }
-
-            if (environment.onstart) {
-              environment.onstart.call(this, {
-                startup: startupWithRoot,
-                reload() {
-                  if (process.electronApp) {
-                    ;(server.hot || server.ws).send({ type: 'full-reload' })
-                    startup.send('electron-vite&type=hot-reload')
-                  } else {
-                    startupWithRoot()
-                  }
-                },
-              })
-            } else {
-              startupWithRoot()
-            }
-          },
-        }
-      },
-    )
-  })
-}
-
-async function buildElectronWithEnvironmentApi(
-  normalizedOptions: ElectronFlatNormalizedOptions,
-  environmentContext: ElectronFlatEnvironmentContext,
-  command: 'serve' | 'build',
-  inheritedConfig: Pick<InlineConfig, 'envDir' | 'envPrefix' | 'mode' | 'root'>,
-  pluginPrefix: string,
-  startupPlugins: Plugin[] = [],
-): Promise<void> {
-  if (environmentContext.names.length === 0) {
-    return
-  }
-
-  const builder = await createBuilder(
-    withExternalBuiltins({
-      configFile: false,
-      publicDir: false,
-      ...normalizedOptions.vite,
-      ...inheritedConfig,
-      builder: {
-        async buildApp(builder) {
-          for (const environmentName of environmentContext.names) {
-            const environment = builder.environments[environmentName]
-            if (!environment) {
-              throw new Error(
-                `[vite-plugin-electron] Unable to resolve build environment "${environmentName}".`,
-              )
-            }
-
-            if (environment.isBuilt) {
-              continue
-            }
-
-            await builder.build(environment)
-          }
-        },
-      },
-      environments: Object.fromEntries(
-        environmentContext.entries.map(([environmentName, environment]) => [
-          environmentName,
-          resolveElectronEnvironmentBuildConfig(environment, command),
-        ]),
-      ),
-      plugins: [
-        ...createElectronEnvironmentScopedPlugins(environmentContext, pluginPrefix),
-        ...startupPlugins,
-      ],
-    }),
-  )
-
-  await builder.buildApp()
-}
-
-export function build(options: ElectronOptions): ReturnType<typeof viteBuild> {
+export function build(options: ElectronOptions) {
   return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
 }
-
-const pluginPrefix = 'vite-plugin-electron'
 
 export default function electron(options: ElectronOptions | ElectronOptions[]): Plugin[] {
   const optionsArray = Array.isArray(options) ? options : [options]
@@ -356,123 +207,125 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
   let configEnv: ConfigEnv
   let cleanupMock: (() => Promise<void>) | undefined
 
-  if (Number.parseInt(version) < 8) {
+  if (Number.parseInt(version, 10) < 5) {
     throw new Error(
-      `[vite-plugin-electron] Vite v${version} does not support \`rolldownOptions\`, please install \`vite@>=8\` or use an earlier version of \`vite-plugin-electron\`.`,
+      `[${PLUGIN_PREFIX}] Vite v${version} does not support Environment API. Please use vite@>=5.`,
     )
   }
 
-  const areEnvPrefixesEqual = (
-    left: ElectronFlatSharedConfig['envPrefix'],
-    right: ElectronFlatSharedConfig['envPrefix'],
-  ): boolean => {
-    if (Array.isArray(left) || Array.isArray(right)) {
-      return (
-        Array.isArray(left) &&
-        Array.isArray(right) &&
-        left.length === right.length &&
-        left.every((value, index) => value === right[index])
-      )
-    }
-
-    return left === right
-  }
-
-  const resolveSharedFlatValue = <K extends keyof ElectronFlatSharedConfig>(
-    key: K,
-    isEqual: (
-      left: Exclude<ElectronFlatSharedConfig[K], undefined>,
-      right: Exclude<ElectronFlatSharedConfig[K], undefined>,
-    ) => boolean = (left, right) => left === right,
-  ): ElectronFlatSharedConfig[K] | undefined => {
-    const values = optionsArray
-      .map((entry) => entry.vite?.[key])
-      .filter(
-        (value): value is Exclude<ElectronFlatSharedConfig[K], undefined> => value !== undefined,
-      )
-
-    if (values.length === 0) {
-      return undefined
-    }
-
-    const firstValue = values[0]!
-    const restValues = values.slice(1)
-    const hasConflict = restValues.some((value) => !isEqual(firstValue, value))
-
-    if (hasConflict) {
-      throw new Error(
-        `[vite-plugin-electron] electron() requires all \`${key}\` values to match when building multiple Electron entries with Vite environments.`,
-      )
-    }
-
-    return firstValue
-  }
-
   const sharedConfig: ElectronFlatSharedConfig = {}
-
-  const root = resolveSharedFlatValue('root')
-  if (root !== undefined) {
-    sharedConfig.root = root
+  for (const key of ['root', 'mode', 'envDir', 'envPrefix'] as const) {
+    for (const opt of optionsArray) {
+      if (opt.vite?.[key] !== undefined) {
+        sharedConfig[key] = opt.vite[key] as any
+      }
+    }
   }
 
-  const mode = resolveSharedFlatValue('mode')
-  if (mode !== undefined) {
-    sharedConfig.mode = mode
-  }
-
-  const envDir = resolveSharedFlatValue('envDir')
-  if (envDir !== undefined) {
-    sharedConfig.envDir = envDir
-  }
-
-  const envPrefix = resolveSharedFlatValue('envPrefix', areEnvPrefixesEqual)
-  if (envPrefix !== undefined) {
-    sharedConfig.envPrefix = envPrefix
-  }
-
-  const environments = new Map<string, ElectronFlatEnvironmentConfig>()
-
-  for (const [index, optionsEntry] of optionsArray.entries()) {
-    const environmentName = `electron_${optionsEntry.name ?? index}`
-    if (environments.has(environmentName)) {
-      throw new Error(
-        `[vite-plugin-electron] Duplicate Electron environment name "${environmentName}".`,
-      )
+  const environments: Record<string, ElectronFlatEnvironmentConfig> = {}
+  for (const [i, opt] of optionsArray.entries()) {
+    const name = `electron_${opt.name ?? i}`
+    if (environments[name]) {
+      throw new Error(`[${PLUGIN_PREFIX}] Duplicate environment: "${name}"`)
     }
 
-    const { plugins, define, resolve, optimizeDeps, build } = optionsEntry.vite ?? {}
-    const environmentOptions: EnvironmentOptions = {
-      define,
-      resolve,
-      optimizeDeps,
-      build,
-    }
-    const hasOptions = Object.values(environmentOptions).some((value) => value !== undefined)
+    const { plugins, define, resolve, optimizeDeps, build } = opt.vite ?? {}
+    const envOpts: EnvironmentOptions = { define, resolve, optimizeDeps, build }
+    const hasOpts = Object.values(envOpts).some((v) => v !== undefined)
 
-    environments.set(environmentName, {
-      entry: optionsEntry.entry,
-      options: hasOptions ? environmentOptions : undefined,
+    environments[name] = {
+      entry: opt.entry,
+      options: hasOpts ? envOpts : undefined,
       plugins,
-      onstart: optionsEntry.onstart,
-    })
+      onstart: opt.onstart,
+    }
   }
 
-  const normalizedOptions: ElectronFlatNormalizedOptions = {
-    vite: Object.keys(sharedConfig).length > 0 ? sharedConfig : undefined,
-    environments: Object.fromEntries(environments),
-  }
+  const envEntries = Object.entries(environments)
+  const isESM = loadPackageJSONSync()?.type === 'module'
 
-  const environmentEntries = Object.entries(normalizedOptions.environments) as Array<
-    [string, ElectronFlatEnvironmentConfig]
-  >
-  const environmentContext: ElectronFlatEnvironmentContext = {
-    entries: environmentEntries,
-    names: environmentEntries.map(([environmentName]) => environmentName),
+  const createElectronBuilder = async (
+    inheritedConfig: ElectronFlatSharedConfig,
+    server?: ViteDevServer,
+  ) => {
+    if (optionsArray.length === 0) {
+      return
+    }
+
+    let builtCount = 0
+    const builder = await createBuilder(
+      withExternalBuiltins({
+        configFile: false,
+        publicDir: false,
+        ...sharedConfig,
+        ...inheritedConfig,
+        environments: Object.fromEntries(
+          envEntries.map(([name, cfg]) => {
+            const envCfg = resolveViteEnvironmentConfig(isESM, cfg)
+            if (server) {
+              envCfg.build ??= {}
+              envCfg.build.watch ??= {}
+              envCfg.build.minify ??= false
+            }
+            return [name, envCfg]
+          }),
+        ),
+        plugins: envEntries.flatMap(([name, cfg]) => {
+          const plugins: Plugin[] = []
+
+          if (cfg.plugins) {
+            plugins.push(
+              perEnvironmentPlugin(`${PLUGIN_PREFIX}:plugins:${name}`, (ctx) =>
+                ctx.name === name ? cfg.plugins : false,
+              ),
+            )
+          }
+
+          if (server) {
+            plugins.push(
+              perEnvironmentPlugin(`${PLUGIN_PREFIX}:startup:${name}`, (ctx) =>
+                ctx.name === name
+                  ? {
+                      name: `${PLUGIN_PREFIX}:startup-hook:${name}`,
+                      closeBundle() {
+                        if (++builtCount < optionsArray.length) {
+                          return
+                        }
+
+                        if (cfg.onstart) {
+                          cfg.onstart({
+                            startup: (options, env, pkg) =>
+                              startup(options, { cwd: inheritedConfig.root, ...env }, pkg),
+                            reload() {
+                              if (process.electronApp) {
+                                ;(server!.hot || server!.ws).send({ type: 'full-reload' })
+                                startup.send('electron-vite&type=hot-reload')
+                              } else {
+                                startup(undefined, { cwd: inheritedConfig.root })
+                              }
+                            },
+                          })
+                        } else {
+                          startup(undefined, { cwd: inheritedConfig.root })
+                        }
+                      },
+                    }
+                  : false,
+              ),
+            )
+          }
+
+          return plugins
+        }),
+      }),
+    )
+
+    await builder.buildApp()
   }
 
   return [
     {
-      name: `${pluginPrefix}:dev`,
+      name: `${PLUGIN_PREFIX}:dev`,
       apply: 'serve',
       configResolved(config) {
         // When there is no entry (no index.html and no configured input), write a
@@ -490,28 +343,22 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         })
 
         server.httpServer?.once('listening', async () => {
-          Object.assign(process.env, {
-            VITE_DEV_SERVER_URL: resolveServerUrl(server),
-          })
-
-          await buildElectronWithEnvironmentApi(
-            normalizedOptions,
-            environmentContext,
-            'serve',
+          Object.assign(process.env, { VITE_DEV_SERVER_URL: resolveServerUrl(server) })
+          await createElectronBuilder(
+            // reassign is required here
             {
               mode: server.config.mode,
               root: server.config.root,
               envDir: server.config.envDir,
               envPrefix: server.config.envPrefix,
             },
-            pluginPrefix,
-            createElectronEnvironmentStartupPlugins(environmentContext, server, pluginPrefix),
+            server,
           )
         })
       },
     },
     {
-      name: `${pluginPrefix}:prod`,
+      name: `${PLUGIN_PREFIX}:prod`,
       apply: 'build',
       config(config, env) {
         userConfig = config
@@ -528,24 +375,20 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         }
       },
       async closeBundle() {
-        // Remove mock files created in configResolved before building Electron.
-        if (cleanupMock) {
-          await cleanupMock()
-          cleanupMock = undefined
-        }
-
-        await buildElectronWithEnvironmentApi(
-          normalizedOptions,
-          environmentContext,
-          'build',
-          {
+        try {
+          await createElectronBuilder({
             mode: configEnv.mode,
             root: userConfig.root,
             envDir: userConfig.envDir,
             envPrefix: userConfig.envPrefix,
-          },
-          pluginPrefix,
-        )
+          })
+        } finally {
+          // Remove mock files only after the Electron build has finished using them.
+          if (cleanupMock) {
+            await cleanupMock()
+            cleanupMock = undefined
+          }
+        }
       },
     },
   ]

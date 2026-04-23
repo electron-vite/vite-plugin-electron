@@ -57,7 +57,7 @@ describe('src/config', () => {
   })
 
   it('resolveViteEnvironmentConfig', async () => {
-    const config = resolveViteEnvironmentConfig({
+    const config = resolveViteEnvironmentConfig(true, {
       entry: 'electron/main.ts',
       options: {
         define: {
