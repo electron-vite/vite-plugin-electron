@@ -2,7 +2,7 @@ import type { StdioOptions, SpawnOptions } from 'node:child_process'
 import path from 'node:path'
 
 import { loadPackageJSONSync } from 'local-pkg'
-import { build as viteBuild, createBuilder, perEnvironmentPlugin, version } from 'vite'
+import { build as viteBuild, createBuilder, mergeConfig, perEnvironmentPlugin, version } from 'vite'
 import type {
   ConfigEnv,
   EnvironmentOptions,
@@ -195,9 +195,39 @@ type ElectronFlatEnvironmentConfig = {
 
 type ElectronFlatSharedConfig = Pick<InlineConfig, 'envDir' | 'envPrefix' | 'mode' | 'root'>
 
+async function resolvePluginOptions(pluginOption: PluginOption): Promise<Plugin[]> {
+  const resolvedOption = await pluginOption
+
+  if (!resolvedOption) {
+    return []
+  }
+
+  if (Array.isArray(resolvedOption)) {
+    const plugins: Plugin[] = []
+
+    for (const option of resolvedOption) {
+      plugins.push(...(await resolvePluginOptions(option)))
+    }
+
+    return plugins
+  }
+
+  return [resolvedOption]
+}
+
+function getHookHandler<T extends (...args: any[]) => any>(
+  hook: T | { handler: T } | undefined,
+): T | undefined {
+  if (!hook) {
+    return undefined
+  }
+
+  return typeof hook === 'function' ? hook : hook.handler
+}
+
 const PLUGIN_PREFIX = 'vite-plugin-electron'
 
-export function build(options: ElectronOptions) {
+export function build(options: ElectronOptions): ReturnType<typeof viteBuild> {
   return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
 }
 
@@ -274,11 +304,57 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           const plugins: Plugin[] = []
 
           if (cfg.plugins) {
-            plugins.push(
-              perEnvironmentPlugin(`${PLUGIN_PREFIX}:plugins:${name}`, (ctx) =>
-                ctx.name === name ? cfg.plugins : false,
+            const pluginOptions = cfg.plugins
+
+            plugins.push({
+              ...perEnvironmentPlugin(`${PLUGIN_PREFIX}:plugins:${name}`, (ctx) =>
+                ctx.name === name ? pluginOptions : false,
               ),
-            )
+              async configEnvironment(environmentName, environmentConfig, env) {
+                if (environmentName !== name) {
+                  return
+                }
+
+                const resolvedPlugins = await resolvePluginOptions(pluginOptions)
+                let mergedConfig = environmentConfig
+
+                // Proxy config hooks before Vite resolves per-environment plugins.
+                for (const plugin of resolvedPlugins) {
+                  const configHook = getHookHandler(plugin.config)
+
+                  if (!configHook) {
+                    continue
+                  }
+
+                  const configResult = await configHook.call(this, mergedConfig as any, env)
+                  if (configResult) {
+                    mergedConfig = mergeConfig(mergedConfig, configResult as any)
+                  }
+                }
+
+                for (const plugin of resolvedPlugins) {
+                  const configEnvironmentHook = getHookHandler(plugin.configEnvironment)
+
+                  if (!configEnvironmentHook) {
+                    continue
+                  }
+
+                  const configEnvironmentResult = await configEnvironmentHook.call(
+                    this,
+                    environmentName,
+                    mergedConfig,
+                    env,
+                  )
+
+                  if (configEnvironmentResult) {
+                    mergedConfig = mergeConfig(mergedConfig, configEnvironmentResult)
+                  }
+                }
+
+                // Mutate in place so Vite does not deep-merge array fields like build.lib.formats again.
+                Object.assign(environmentConfig, mergedConfig)
+              },
+            })
           }
 
           if (server) {

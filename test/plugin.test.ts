@@ -67,6 +67,7 @@ describe('src/index', () => {
     const root = path.join(__dirname, 'fixtures/flat-build')
     const appOutDir = path.join(__dirname, 'dist-flat-build-app')
     const electronOutDir = path.join(__dirname, 'dist-flat-build-electron')
+    const buildLogPath = path.join(electronOutDir, 'build-log.txt')
 
     const rendererVirtualPlugin: Plugin = {
       name: 'flat-build-renderer-virtual',
@@ -93,6 +94,9 @@ describe('src/index', () => {
         if (id === '\0virtual:flat-build/main-status') {
           return 'export const mainLoadedStatus = "main-loaded"'
         }
+      },
+      closeBundle() {
+        fs.appendFileSync(buildLogPath, `${this.environment.name}\n`, 'utf-8')
       },
     }
 
@@ -132,8 +136,77 @@ describe('src/index', () => {
       const mainCode = fs
         .readFileSync(path.join(electronOutDir, 'main.js'), 'utf-8')
         .replace(normalizingNewLineRE, '\n')
+      const buildLog = fs.readFileSync(buildLogPath, 'utf-8').trim().split(/\r?\n/)
 
       expect(mainCode).toContain('main-loaded')
+      expect(buildLog).toEqual(['electron_0'])
+    } finally {
+      await fs.promises.rm(appOutDir, { recursive: true, force: true })
+      await fs.promises.rm(electronOutDir, { recursive: true, force: true })
+    }
+  })
+
+  it('proxies config hooks for env-scoped plugins before Electron builds', async () => {
+    const root = path.join(__dirname, 'fixtures')
+    const appOutDir = path.join(__dirname, 'dist-env-hooks-app')
+    const electronOutDir = path.join(__dirname, 'dist-env-hooks-electron')
+
+    const statusPlugin: Plugin = {
+      name: 'flat-build-status-plugin',
+      config() {
+        return {
+          define: {
+            __ENV_CONFIG_STATUS__: JSON.stringify('config-main'),
+          },
+        }
+      },
+      configEnvironment(environmentName) {
+        if (environmentName !== 'electron_main') {
+          return
+        }
+
+        return {
+          define: {
+            __ENV_ENV_STATUS__: JSON.stringify('env-main'),
+          },
+        }
+      },
+    }
+
+    await fs.promises.rm(appOutDir, { recursive: true, force: true })
+    await fs.promises.rm(electronOutDir, { recursive: true, force: true })
+
+    try {
+      await build({
+        configFile: false,
+        root,
+        build: {
+          outDir: appOutDir,
+          emptyOutDir: true,
+          minify: false,
+        },
+        plugins: electron([
+          {
+            name: 'main',
+            entry: 'env-status.ts',
+            vite: {
+              build: {
+                minify: false,
+                outDir: electronOutDir,
+              },
+              plugins: [statusPlugin],
+            },
+          },
+        ]),
+        logLevel: 'silent',
+      })
+
+      const mainCode = fs
+        .readFileSync(path.join(electronOutDir, 'env-status.js'), 'utf-8')
+        .replace(normalizingNewLineRE, '\n')
+
+      expect(mainCode).toContain('"config-main"')
+      expect(mainCode).toContain('"env-main"')
     } finally {
       await fs.promises.rm(appOutDir, { recursive: true, force: true })
       await fs.promises.rm(electronOutDir, { recursive: true, force: true })
