@@ -114,19 +114,21 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         }
       },
       async closeBundle() {
-        for (const options of optionsArray) {
-          options.vite ??= {}
-          options.vite.mode ??= configEnv.mode
-          options.vite.root ??= userConfig.root
-          options.vite.envDir ??= userConfig.envDir
-          options.vite.envPrefix ??= userConfig.envPrefix
-          await build(options)
-        }
-
-        // Remove mock files created in configResolved before building Electron.
-        if (cleanupMock) {
-          await cleanupMock()
-          cleanupMock = undefined
+        try {
+          for (const options of optionsArray) {
+            options.vite ??= {}
+            options.vite.mode ??= configEnv.mode
+            options.vite.root ??= userConfig.root
+            options.vite.envDir ??= userConfig.envDir
+            options.vite.envPrefix ??= userConfig.envPrefix
+            await build(options)
+          }
+        } finally {
+          // Remove mock files created in configResolved before building Electron.
+          if (cleanupMock) {
+            await cleanupMock()
+            cleanupMock = undefined
+          }
         }
       },
     },
