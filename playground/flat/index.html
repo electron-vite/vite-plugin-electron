@@ -23,14 +23,46 @@
           <strong id="started-at">Loading...</strong>
         </div>
         <div class="row">
+          <span class="label">Renderer override</span>
+          <strong id="renderer-status">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Renderer define</span>
+          <strong id="renderer-define-status">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Renderer loaded</span>
+          <strong id="renderer-loaded-status">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Renderer transform</span>
+          <strong id="renderer-transform-status">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Main override</span>
+          <strong id="main-status">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Main environment override</span>
+          <strong id="main-environment-status">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Main loaded</span>
+          <strong id="main-loaded-status">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Main transform</span>
+          <strong id="main-transform-status">Loading...</strong>
+        </div>
+        <div class="row">
           <span class="label">Mode</span>
           <strong>flat</strong>
         </div>
         <button id="refresh" type="button">Refresh state</button>
       </section>
       <p class="note">
-        This demo uses <code>src/index.ts</code> with <code>onstart</code> and restarts Electron on
-        rebuild.
+        This demo uses <code>src/index.ts</code> with <code>onstart</code>, plus renderer and main
+        override plugins to verify config merging on rebuild.
       </p>
     </main>
     <script type="module" src="/src/main.ts"></script>

@@ -171,7 +171,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
 
   if (Number.parseInt(version) < 8) {
     throw new Error(
-      `[vite-plugin-electron] Vite v${version} does not support \`rolldownOptions\`, please install \`vite@>=8\` or use an earlier version of \`vite-plugin-electron\`.`,
+      `[vite-plugin-electron] Vite v${version} does not support \`rolldownOptions\`, please install \`vite@>=8\` or use \`vite-plugin-electron@0.29.1\`.`,
     )
   }
 
