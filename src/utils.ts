@@ -8,7 +8,6 @@ import { loadPackageJSONSync } from 'local-pkg'
 import { mergeConfig } from 'vite'
 import type {
   BuildEnvironmentOptions,
-  EnvironmentOptions,
   InlineConfig,
   Logger,
   ResolvedConfig,
@@ -82,39 +81,6 @@ export function resolveViteConfig(options: MultiEnvElectronOptions): InlineConfi
   }
 
   return mergeConfig(defaultConfig, options?.vite || {})
-}
-
-/** Resolve the default Vite `EnvironmentOptions` for a named Electron build environment. */
-export function resolveViteEnvironmentConfig(
-  isESM: boolean,
-  options: {
-    entry?: import('vite').LibraryOptions['entry']
-    options?: EnvironmentOptions
-  },
-): EnvironmentOptions {
-  const defaultConfig: EnvironmentOptions = {
-    consumer: 'server',
-    build: {
-      lib: options.entry
-        ? {
-            entry: options.entry,
-            formats: isESM ? ['es'] : ['cjs'],
-            fileName: () => '[name].js',
-          }
-        : undefined,
-      outDir: 'dist-electron',
-      emptyOutDir: false,
-    },
-    resolve: {
-      conditions: ['node'],
-      mainFields: ['module', 'jsnext:main', 'jsnext'],
-    },
-    define: {
-      'process.env': 'process.env',
-    },
-  }
-
-  return mergeConfig(defaultConfig, options.options || {})
 }
 
 export function withExternalBuiltins(config: InlineConfig): InlineConfig {

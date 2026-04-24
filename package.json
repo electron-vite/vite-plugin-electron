@@ -18,7 +18,8 @@
     "dist",
     "electron-env.d.ts",
     "plugin.d.ts",
-    "simple.d.ts"
+    "simple.d.ts",
+    "multi-env.d.ts"
   ],
   "type": "module",
   "main": "./dist/index.cjs",
@@ -28,6 +29,10 @@
     ".": {
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./multi-env": {
+      "import": "./dist/multi-env.mjs",
+      "require": "./dist/multi-env.cjs"
     },
     "./plugin": {
       "import": "./dist/plugin.mjs",

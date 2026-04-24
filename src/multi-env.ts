@@ -1,24 +1,17 @@
 import { loadPackageJSONSync } from 'local-pkg'
-import { build as viteBuild, createBuilder, mergeConfig, perEnvironmentPlugin, version } from 'vite'
+import { build as viteBuild, createBuilder, mergeConfig, perEnvironmentPlugin } from 'vite'
 import type {
-  ConfigEnv,
   EnvironmentOptions,
   InlineConfig,
   Plugin,
   PluginOption,
-  UserConfig,
   ViteDevServer,
+  MinimalPluginContextWithoutEnvironment,
 } from 'vite'
 
+import { createElectronPlugin } from './base'
 import { triggerStartup } from './startup'
-import {
-  resolveServerUrl,
-  resolveViteConfig,
-  resolveViteEnvironmentConfig,
-  resolveInput,
-  setupMockHtml,
-  withExternalBuiltins,
-} from './utils'
+import { resolveViteConfig, withExternalBuiltins } from './utils'
 
 import type { ElectronOptions } from '.'
 
@@ -64,7 +57,7 @@ function getHookHandler<T extends (...args: any[]) => any>(
   return typeof hook === 'function' ? hook : hook.handler
 }
 
-const PLUGIN_PREFIX = 'vite-plugin-electron'
+const PLUGIN_PREFIX = 'vite-plugin-electron-multi-env'
 
 export function build(options: MultiEnvElectronOptions): ReturnType<typeof viteBuild> {
   return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
@@ -74,16 +67,6 @@ export default function electron(
   options: MultiEnvElectronOptions | MultiEnvElectronOptions[],
 ): Plugin[] {
   const optionsArray = Array.isArray(options) ? options : [options]
-  let userConfig: UserConfig
-  let configEnv: ConfigEnv
-  let cleanupMock: (() => Promise<void>) | undefined
-
-  if (Number.parseInt(version) < 8) {
-    throw new Error(
-      `[vite-plugin-electron] Vite v${version} does not support \`rolldownOptions\`, please install \`vite@>=8\` or use \`vite-plugin-electron@0.29.1\`.`,
-    )
-  }
-
   const environmentOptions = optionsArray.map((opt, i) => {
     const name = `electron_${opt.name ?? i}`
     const { plugins, define, resolve, optimizeDeps, build } = opt.vite ?? {}
@@ -107,6 +90,7 @@ export default function electron(
   const createElectronBuilder = async (
     inheritedConfig: ElectronFlatSharedConfig,
     server?: ViteDevServer,
+    context?: MinimalPluginContextWithoutEnvironment,
   ) => {
     if (optionsArray.length === 0) {
       return
@@ -120,7 +104,31 @@ export default function electron(
         ...inheritedConfig,
         environments: Object.fromEntries(
           environmentOptions.map(([name, cfg]) => {
-            const envCfg = resolveViteEnvironmentConfig(isESM, cfg)
+            const envCfg: EnvironmentOptions = mergeConfig<EnvironmentOptions, EnvironmentOptions>(
+              {
+                consumer: 'server',
+                build: {
+                  lib: cfg.entry
+                    ? {
+                        entry: cfg.entry,
+                        formats: isESM ? ['es'] : ['cjs'],
+                        fileName: () => '[name].js',
+                      }
+                    : undefined,
+                  outDir: 'dist-electron',
+                  emptyOutDir: false,
+                },
+                resolve: {
+                  conditions: ['node'],
+                  mainFields: ['module', 'jsnext:main', 'jsnext'],
+                },
+                define: {
+                  'process.env': 'process.env',
+                },
+              },
+              cfg.options || {},
+            )
+
             if (server) {
               envCfg.build ??= {}
               envCfg.build.watch ??= {}
@@ -197,7 +205,7 @@ export default function electron(
                         if (++builtCount < optionsArray.length) {
                           return
                         }
-                        triggerStartup(this, server, cfg)
+                        triggerStartup(context!, server, cfg)
                       },
                     }
                   : false,
@@ -217,73 +225,28 @@ export default function electron(
     }
   }
 
-  return [
-    {
-      name: `${PLUGIN_PREFIX}:dev`,
-      apply: 'serve',
-      configResolved(config) {
-        // When there is no entry (no index.html and no configured input), write a
-        // temporary mock so that Vite's dev server starts without errors.
-        if (!resolveInput(config)) {
-          cleanupMock = setupMockHtml(config, false, config.logger)
-        }
-      },
-      configureServer(server) {
-        server.httpServer?.once('close', async () => {
-          if (cleanupMock) {
-            await cleanupMock()
-            cleanupMock = undefined
-          }
-        })
-
-        server.httpServer?.once('listening', async () => {
-          Object.assign(process.env, { VITE_DEV_SERVER_URL: resolveServerUrl(server) })
-          await createElectronBuilder(
-            // reassign is required here
-            {
-              mode: server.config.mode,
-              root: server.config.root,
-              envDir: server.config.envDir,
-              envPrefix: server.config.envPrefix,
-            },
-            server,
-          )
-        })
-      },
+  return createElectronPlugin({
+    prefix: PLUGIN_PREFIX,
+    async dev(pluginContext, server) {
+      await createElectronBuilder(
+        // reassign is required here
+        {
+          mode: server.config.mode,
+          root: server.config.root,
+          envDir: server.config.envDir,
+          envPrefix: server.config.envPrefix,
+        },
+        server,
+        pluginContext,
+      )
     },
-    {
-      name: `${PLUGIN_PREFIX}:prod`,
-      apply: 'build',
-      config(config, env) {
-        userConfig = config
-        configEnv = env
-
-        // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
-        config.base ??= './'
-      },
-      configResolved(config) {
-        // When there is no entry (no index.html and no configured input), write a
-        // temporary mock so that Vite's build has a valid entry point.
-        if (!resolveInput(config)) {
-          cleanupMock = setupMockHtml(config, true, config.logger)
-        }
-      },
-      async closeBundle() {
-        try {
-          await createElectronBuilder({
-            mode: configEnv.mode,
-            root: userConfig.root,
-            envDir: userConfig.envDir,
-            envPrefix: userConfig.envPrefix,
-          })
-        } finally {
-          // Remove mock files only after the Electron build has finished using them.
-          if (cleanupMock) {
-            await cleanupMock()
-            cleanupMock = undefined
-          }
-        }
-      },
+    async build(userConfig, configEnv) {
+      await createElectronBuilder({
+        mode: configEnv.mode,
+        root: userConfig.root,
+        envDir: userConfig.envDir,
+        envPrefix: userConfig.envPrefix,
+      })
     },
-  ]
+  })
 }

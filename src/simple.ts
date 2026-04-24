@@ -2,9 +2,9 @@ import { loadPackageJSON } from 'local-pkg'
 import { mergeConfig } from 'vite'
 import type { Plugin, UserConfig } from 'vite'
 
-import electron from './multi-env'
 import type { RolldownOptions } from './utils'
 
+import electron from './index'
 import type { ElectronOptions } from './index'
 
 export interface ElectronSimpleOptions {

@@ -3,8 +3,7 @@ import { builtinModules } from 'node:module'
 import type { InlineConfig } from 'vite'
 import { describe, expect, it } from 'vitest'
 
-import { withExternalBuiltins } from '../src/multi-env'
-import { resolveViteEnvironmentConfig } from '../src/utils'
+import { withExternalBuiltins } from '../src/utils'
 import type { RolldownOptions } from '../src/utils'
 
 type ExternalOption = RolldownOptions['external']
@@ -54,25 +53,5 @@ describe('src/config', () => {
 
     expect(mainEnvironment).toBeTruthy()
     expect(mainEnvironment?.build?.rolldownOptions?.external).toEqual(builtins.concat(['foo']))
-  })
-
-  it('resolveViteEnvironmentConfig', async () => {
-    const config = resolveViteEnvironmentConfig(true, {
-      entry: 'electron/main.ts',
-      options: {
-        define: {
-          __TEST_ENV__: JSON.stringify('main'),
-        },
-      },
-    })
-
-    expect(config.consumer).toBe('server')
-    expect(config.build?.lib).toBeTruthy()
-    expect(config.define).toEqual(
-      expect.objectContaining({
-        'process.env': 'process.env',
-        __TEST_ENV__: JSON.stringify('main'),
-      }),
-    )
   })
 })
