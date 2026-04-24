@@ -1,10 +1,10 @@
 import { build as viteBuild } from 'vite'
-import type { Plugin } from 'vite'
+import type { Plugin, LibraryOptions, InlineConfig } from 'vite'
 
 import { createElectronPlugin } from './base'
 import { triggerStartup } from './startup'
 import type { OnStartOptions } from './startup'
-import { resolveViteConfig, withExternalBuiltins } from './utils'
+import { checkESModule, resolveViteConfigBase, withExternalBuiltins } from './utils'
 
 // public utils
 export { startup } from './startup'
@@ -15,19 +15,24 @@ export interface ElectronOptions extends OnStartOptions {
   /**
    * Shortcut of `build.lib.entry`
    */
-  entry?: import('vite').LibraryOptions['entry']
-  vite?: import('vite').InlineConfig
+  entry?: LibraryOptions['entry']
+  vite?: InlineConfig
 }
 
 export function build(options: ElectronOptions): ReturnType<typeof viteBuild> {
-  return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
+  return buildBase(checkESModule(), options)
+}
+
+function buildBase(isESM: boolean, options: ElectronOptions): ReturnType<typeof viteBuild> {
+  return viteBuild(withExternalBuiltins(resolveViteConfigBase(isESM, options)))
 }
 
 export default function electron(options: ElectronOptions | ElectronOptions[]): Plugin[] {
   const optionsArray = Array.isArray(options) ? options : [options]
+
   return createElectronPlugin({
     prefix: 'vite-plugin-electron',
-    dev(pluginContext, server) {
+    dev(pluginContext, server, isESM) {
       const entryCount = optionsArray.length
       let closeBundleCount = 0
 
@@ -55,17 +60,17 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             triggerStartup(pluginContext, server, options)
           },
         })
-        build(options)
+        buildBase(isESM, options)
       }
     },
-    async build(userConfig, configEnv) {
+    async build(userConfig, configEnv, isESM) {
       for (const options of optionsArray) {
         options.vite ??= {}
         options.vite.mode ??= configEnv.mode
         options.vite.root ??= userConfig.root
         options.vite.envDir ??= userConfig.envDir
         options.vite.envPrefix ??= userConfig.envPrefix
-        await build(options)
+        await buildBase(isESM, options)
       }
     },
   })

@@ -1,4 +1,3 @@
-import { loadPackageJSONSync } from 'local-pkg'
 import { build as viteBuild, createBuilder, mergeConfig, perEnvironmentPlugin } from 'vite'
 import type {
   EnvironmentOptions,
@@ -11,7 +10,7 @@ import type {
 
 import { createElectronPlugin } from './base'
 import { triggerStartup } from './startup'
-import { resolveViteConfig, withExternalBuiltins } from './utils'
+import { resolveViteConfig, resolveViteConfigBase, withExternalBuiltins } from './utils'
 
 import type { ElectronOptions } from '.'
 
@@ -85,9 +84,8 @@ export default function electron(
     ] as const
   })
 
-  const isESM = loadPackageJSONSync()?.type === 'module'
-
   const createElectronBuilder = async (
+    isESM: boolean,
     inheritedConfig: ElectronFlatSharedConfig,
     server?: ViteDevServer,
     context?: MinimalPluginContextWithoutEnvironment,
@@ -104,31 +102,11 @@ export default function electron(
         ...inheritedConfig,
         environments: Object.fromEntries(
           environmentOptions.map(([name, cfg]) => {
-            const envCfg: EnvironmentOptions = mergeConfig<EnvironmentOptions, EnvironmentOptions>(
-              {
-                consumer: 'server',
-                build: {
-                  lib: cfg.entry
-                    ? {
-                        entry: cfg.entry,
-                        formats: isESM ? ['es'] : ['cjs'],
-                        fileName: () => '[name].js',
-                      }
-                    : undefined,
-                  outDir: 'dist-electron',
-                  emptyOutDir: false,
-                },
-                resolve: {
-                  conditions: ['node'],
-                  mainFields: ['module', 'jsnext:main', 'jsnext'],
-                },
-                define: {
-                  'process.env': 'process.env',
-                },
-              },
-              cfg.options || {},
-            )
-
+            const envCfg: EnvironmentOptions = resolveViteConfigBase(isESM, {
+              entry: cfg.entry,
+              vite: cfg.options,
+            })
+            envCfg.consumer = 'server'
             if (server) {
               envCfg.build ??= {}
               envCfg.build.watch ??= {}
@@ -164,9 +142,9 @@ export default function electron(
                     continue
                   }
 
-                  const configResult = await configHook.call(this, mergedConfig as any, env)
+                  const configResult = await configHook.call(this, mergedConfig, env)
                   if (configResult) {
-                    mergedConfig = mergeConfig(mergedConfig, configResult as any)
+                    mergedConfig = mergeConfig(mergedConfig, configResult)
                   }
                 }
 
@@ -227,8 +205,9 @@ export default function electron(
 
   return createElectronPlugin({
     prefix: PLUGIN_PREFIX,
-    async dev(pluginContext, server) {
+    async dev(pluginContext, server, isESM) {
       await createElectronBuilder(
+        isESM,
         // reassign is required here
         {
           mode: server.config.mode,
@@ -240,8 +219,8 @@ export default function electron(
         pluginContext,
       )
     },
-    async build(userConfig, configEnv) {
-      await createElectronBuilder({
+    async build(userConfig, configEnv, isESM) {
+      await createElectronBuilder(isESM, {
         mode: configEnv.mode,
         root: userConfig.root,
         envDir: userConfig.envDir,

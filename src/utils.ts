@@ -45,10 +45,20 @@ function resolveBuiltinExternals(
   return builtins
 }
 
+export function checkESModule(): boolean {
+  return loadPackageJSONSync()?.type === 'module'
+}
+
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
 export function resolveViteConfig(options: MultiEnvElectronOptions): InlineConfig {
-  const packageJson = loadPackageJSONSync() ?? {}
-  const esmodule = packageJson.type === 'module'
+  return resolveViteConfigBase(checkESModule(), options)
+}
+
+/** Resolve the default Vite's `InlineConfig` for build Electron-Main */
+export function resolveViteConfigBase(
+  esmodule: boolean,
+  options: MultiEnvElectronOptions,
+): InlineConfig {
   const defaultConfig: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
     configFile: false,

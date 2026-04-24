@@ -7,15 +7,16 @@ import type {
   MinimalPluginContextWithoutEnvironment,
 } from 'vite'
 
-import { resolveServerUrl, resolveInput, setupMockHtml } from './utils'
+import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule } from './utils'
 
 interface FactoryOptions {
   prefix: string
   dev: (
     pluginContext: MinimalPluginContextWithoutEnvironment,
     server: ViteDevServer,
+    isESM: boolean,
   ) => Promise<void> | void
-  build: (userConfig: UserConfig, configEnv: ConfigEnv) => Promise<void> | void
+  build: (userConfig: UserConfig, configEnv: ConfigEnv, isESM: boolean) => Promise<void> | void
 }
 
 export function createElectronPlugin({ prefix, dev, build }: FactoryOptions): Plugin[] {
@@ -28,6 +29,8 @@ export function createElectronPlugin({ prefix, dev, build }: FactoryOptions): Pl
       `[vite-plugin-electron] Vite v${version} does not support \`rolldownOptions\`, please install \`vite@>=8\` or use \`vite-plugin-electron@0.29.1\`.`,
     )
   }
+
+  const isESM = checkESModule()
 
   return [
     {
@@ -53,7 +56,7 @@ export function createElectronPlugin({ prefix, dev, build }: FactoryOptions): Pl
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
 
-          dev(this, server)
+          dev(this, server, isESM)
         })
       },
     },
@@ -76,7 +79,7 @@ export function createElectronPlugin({ prefix, dev, build }: FactoryOptions): Pl
       },
       async closeBundle() {
         try {
-          await build(userConfig, configEnv)
+          await build(userConfig, configEnv, isESM)
         } finally {
           // Remove mock files created in configResolved before building Electron.
           if (cleanupMock) {
