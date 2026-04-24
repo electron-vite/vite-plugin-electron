@@ -5,7 +5,7 @@ import { build } from 'vite'
 import type { Plugin } from 'vite'
 import { describe, expect, it } from 'vitest'
 
-import electron from '../src/index'
+import electron from '../src/multi-env'
 import { notBundle } from '../src/plugin'
 
 const pluginNotBundle = notBundle()

@@ -15,7 +15,7 @@ import type {
   ViteDevServer,
 } from 'vite'
 
-import type { ElectronOptions } from './index'
+import type { MultiEnvElectronOptions } from './multi-env'
 
 export interface PidTree {
   pid: number
@@ -47,7 +47,7 @@ function resolveBuiltinExternals(
 }
 
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
-export function resolveViteConfig(options: ElectronOptions): InlineConfig {
+export function resolveViteConfig(options: MultiEnvElectronOptions): InlineConfig {
   const packageJson = loadPackageJSONSync() ?? {}
   const esmodule = packageJson.type === 'module'
   const defaultConfig: InlineConfig = {

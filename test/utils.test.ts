@@ -3,7 +3,7 @@ import { builtinModules } from 'node:module'
 import type { InlineConfig } from 'vite'
 import { describe, expect, it } from 'vitest'
 
-import { withExternalBuiltins } from '../src/index'
+import { withExternalBuiltins } from '../src/multi-env'
 import { resolveViteEnvironmentConfig } from '../src/utils'
 import type { RolldownOptions } from '../src/utils'
 
