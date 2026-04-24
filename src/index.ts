@@ -17,7 +17,11 @@ import {
 export { resolveViteConfig, withExternalBuiltins }
 export { loadPackageJSON, loadPackageJSONSync } from 'local-pkg'
 interface StartupFn {
-  (): Promise<void>
+  (
+    argv?: string[],
+    options?: import('node:child_process').SpawnOptions,
+    customElectronPkg?: string,
+  ): Promise<void>
   send: (message: string) => void
   hookedProcessExit: boolean
   exit: () => Promise<void>
@@ -220,9 +224,20 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                   return
                 }
 
+                const startupWithRoot = (
+                  argv?: string[],
+                  spawnOptions?: import('node:child_process').SpawnOptions,
+                  customElectronPkg?: string,
+                ) => {
+                  return startup(
+                    argv,
+                    { cwd: server.config.root, ...spawnOptions },
+                    customElectronPkg,
+                  )
+                }
                 if (options.onstart) {
                   options.onstart.call(this, {
-                    startup,
+                    startup: startupWithRoot,
                     // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
                     // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
                     // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
@@ -233,12 +248,12 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
                         // For Electron apps that don't need to use the renderer process.
                         startup.send('electron-vite&type=hot-reload')
                       } else {
-                        startup()
+                        startupWithRoot()
                       }
                     },
                   })
                 } else {
-                  startup()
+                  startupWithRoot()
                 }
               },
             })
