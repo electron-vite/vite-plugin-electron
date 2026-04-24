@@ -280,12 +280,6 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
         }
       },
       async closeBundle() {
-        // Remove mock files created in configResolved before building Electron.
-        if (cleanupMock) {
-          await cleanupMock()
-          cleanupMock = undefined
-        }
-
         for (const options of optionsArray) {
           options.vite ??= {}
           options.vite.mode ??= configEnv.mode
@@ -293,6 +287,12 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           options.vite.envDir ??= userConfig.envDir
           options.vite.envPrefix ??= userConfig.envPrefix
           await build(options)
+        }
+
+        // Remove mock files created in configResolved before building Electron.
+        if (cleanupMock) {
+          await cleanupMock()
+          cleanupMock = undefined
         }
       },
     },
