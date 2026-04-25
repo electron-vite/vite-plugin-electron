@@ -14,7 +14,7 @@ import type {
   ViteDevServer,
 } from 'vite'
 
-import type { ElectronOptions } from '.'
+import type { MultiEnvElectronOptions } from './multi-env'
 
 export interface PidTree {
   pid: number
@@ -22,10 +22,47 @@ export interface PidTree {
   children?: PidTree[]
 }
 
+function resolveBuiltinExternals(
+  external: RolldownOptions['external'],
+): RolldownOptions['external'] {
+  const builtins: (string | RegExp)[] = builtinModules.filter((e) => !e.startsWith('_'))
+  builtins.push('electron', ...builtins.map((m) => `node:${m}`))
+
+  if (Array.isArray(external)) {
+    return builtins.concat(external)
+  }
+
+  if (typeof external === 'string' || external instanceof RegExp) {
+    return builtins.concat([external])
+  }
+
+  if (typeof external === 'function') {
+    const original = external
+    return function (source, importer, isResolved) {
+      if (builtins.includes(source)) {
+        return true
+      }
+      return original(source, importer, isResolved)
+    }
+  }
+
+  return builtins
+}
+
+export function checkESModule(): boolean {
+  return loadPackageJSONSync()?.type === 'module'
+}
+
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
-export function resolveViteConfig(options: ElectronOptions): InlineConfig {
-  const packageJson = loadPackageJSONSync() ?? {}
-  const esmodule = packageJson.type === 'module'
+export function resolveViteConfig(options: MultiEnvElectronOptions): InlineConfig {
+  return resolveViteConfigBase(checkESModule(), options)
+}
+
+/** Resolve the default Vite's `InlineConfig` for build Electron-Main */
+export function resolveViteConfigBase(
+  esmodule: boolean,
+  options: MultiEnvElectronOptions,
+): InlineConfig {
   const defaultConfig: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
     configFile: false,
@@ -61,27 +98,21 @@ export function resolveViteConfig(options: ElectronOptions): InlineConfig {
 }
 
 export function withExternalBuiltins(config: InlineConfig): InlineConfig {
-  const builtins = builtinModules.filter((e) => !e.startsWith('_'))
-  builtins.push('electron', ...builtins.map((m) => `node:${m}`))
-
   config.build ??= {}
   config.build.rolldownOptions ??= {}
+  config.build.rolldownOptions.external = resolveBuiltinExternals(
+    config.build.rolldownOptions.external,
+  )
 
-  let external = config.build.rolldownOptions.external
-  if (Array.isArray(external) || typeof external === 'string' || external instanceof RegExp) {
-    external = builtins.concat(external as string[])
-  } else if (typeof external === 'function') {
-    const original = external
-    external = function (source, importer, isResolved) {
-      if (builtins.includes(source)) {
-        return true
-      }
-      return original(source, importer, isResolved)
+  if (config.environments) {
+    for (const environment of Object.values(config.environments)) {
+      environment.build ??= {}
+      environment.build.rolldownOptions ??= {}
+      environment.build.rolldownOptions.external = resolveBuiltinExternals(
+        environment.build.rolldownOptions.external,
+      )
     }
-  } else {
-    external = builtins
   }
-  config.build.rolldownOptions.external = external
 
   return config
 }

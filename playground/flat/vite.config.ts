@@ -4,7 +4,7 @@ import path from 'node:path'
 import { defineConfig } from 'vite'
 import type { Plugin } from 'vite'
 
-import electron from '../../src/index'
+import electron from '../../src/multi-env'
 
 const RENDERER_STATUS_VIRTUAL_ID = 'virtual:playground-flat/renderer-status'
 const RESOLVED_RENDERER_STATUS_VIRTUAL_ID = `\0${RENDERER_STATUS_VIRTUAL_ID}`

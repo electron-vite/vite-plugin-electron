@@ -4,8 +4,8 @@ import type { Plugin, UserConfig } from 'vite'
 
 import type { RolldownOptions } from './utils'
 
-import electron from '.'
-import type { ElectronOptions } from '.'
+import electron from './index'
+import type { ElectronOptions } from './index'
 
 export interface ElectronSimpleOptions {
   main: ElectronOptions
