@@ -25,11 +25,15 @@ export interface PidTree {
 function resolveBuiltinExternals(
   external: RolldownOptions['external'],
 ): RolldownOptions['external'] {
-  const builtins = builtinModules.filter((e) => !e.startsWith('_'))
+  const builtins: (string | RegExp)[] = builtinModules.filter((e) => !e.startsWith('_'))
   builtins.push('electron', ...builtins.map((m) => `node:${m}`))
 
-  if (Array.isArray(external) || typeof external === 'string' || external instanceof RegExp) {
-    return builtins.concat(external as string[])
+  if (Array.isArray(external)) {
+    return builtins.concat(external)
+  }
+
+  if (typeof external === 'string' || external instanceof RegExp) {
+    return builtins.concat([external])
   }
 
   if (typeof external === 'function') {

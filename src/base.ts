@@ -56,7 +56,7 @@ export function createElectronPlugin({ prefix, dev, build }: FactoryOptions): Pl
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
 
-          dev(this, server, isESM)
+          await dev(this, server, isESM)
         })
       },
     },

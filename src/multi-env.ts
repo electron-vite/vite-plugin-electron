@@ -66,8 +66,15 @@ export default function electron(
   options: MultiEnvElectronOptions | MultiEnvElectronOptions[],
 ): Plugin[] {
   const optionsArray = Array.isArray(options) ? options : [options]
+  const envNames = new Set<string>()
   const environmentOptions = optionsArray.map((opt, i) => {
-    const name = `electron_${opt.name ?? i}`
+    const name = `electron_${opt.name || i}`
+    if (envNames.has(name)) {
+      throw new Error(
+        `[vite-plugin-electron] Duplicate environment name "${name}". Please provide unique "name" properties for each environment in the options array.`,
+      )
+    }
+    envNames.add(name)
     const { plugins, define, resolve, optimizeDeps, build } = opt.vite ?? {}
     const envOpts: EnvironmentOptions = { define, resolve, optimizeDeps, build }
     const hasOpts = Object.values(envOpts).some((v) => v !== undefined)
@@ -198,7 +205,7 @@ export default function electron(
 
     // Build only the Electron environments; the renderer app has already been
     // built by the outer Vite command.
-    for (const [name] of environmentOptions) {
+    for (const name of envNames) {
       await builder.build(builder.environments[name]!)
     }
   }
