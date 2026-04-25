@@ -133,6 +133,8 @@ describe('src/multi-env', () => {
 
     await resetDirs(appOutDir, electronOutDir)
 
+    // The .foo import only works if config() merges assetsInclude early enough
+    // for Vite's asset pipeline to see it.
     await build({
       configFile: false,
       root,
@@ -230,6 +232,57 @@ describe('src/multi-env', () => {
 
     expect(mainCode).toContain('"config-main"')
     expect(mainCode).toContain('"env-main"')
+  })
+
+  it('merges config hook results beyond EnvironmentOptions fields', async () => {
+    const root = path.join(__dirname, 'fixtures')
+    const appOutDir = path.join(__dirname, 'dist-env-hook-merge-app')
+    const electronOutDir = path.join(__dirname, 'dist-env-hook-merge-electron')
+
+    const mergePlugin: Plugin = {
+      name: 'merge-config-plugin',
+      config() {
+        return {
+          define: {
+            __ENV_NAME__: JSON.stringify('config-merged'),
+          },
+          assetsInclude: ['**/*.foo'],
+        }
+      },
+    }
+
+    await resetDirs(appOutDir, electronOutDir)
+
+    await build({
+      configFile: false,
+      root,
+      build: {
+        outDir: appOutDir,
+        emptyOutDir: true,
+        minify: false,
+      },
+      plugins: electron([
+        {
+          name: 'main',
+          entry: 'env-config-merge.ts',
+          vite: {
+            build: {
+              assetsInlineLimit: 0,
+              minify: false,
+              outDir: electronOutDir,
+            },
+            plugins: [mergePlugin],
+          },
+        },
+      ]),
+      logLevel: 'silent',
+    })
+
+    const mainCode = fs
+      .readFileSync(path.join(electronOutDir, 'env-config-merge.js'), 'utf-8')
+      .replace(normalizingNewLineRE, '\n')
+
+    expect(mainCode).toContain('"config-merged"')
   })
 
   it('isolates per-option config overrides in the option array', async () => {

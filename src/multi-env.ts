@@ -133,15 +133,12 @@ export default function electron(
               applyToEnvironment(environment) {
                 return environment.name === name ? pluginOptions : false
               },
-              async configEnvironment(environmentName, environmentConfig, env) {
-                if (environmentName !== name) {
-                  return
-                }
-
+              async config(config, env) {
                 const resolvedPlugins = await resolvePluginOptions(pluginOptions)
-                let mergedConfig = environmentConfig
+                let mergedConfig = {}
+                let environmentMergedConfig = {}
+                let configInput = mergeConfig({}, config)
 
-                // Proxy config hooks before Vite resolves per-environment plugins.
                 for (const plugin of resolvedPlugins) {
                   const configHook = getHookHandler(plugin.config)
 
@@ -149,11 +146,64 @@ export default function electron(
                     continue
                   }
 
-                  const configResult = await configHook.call(this, mergedConfig, env)
+                  const configResult = await configHook.call(this, configInput, env)
                   if (configResult) {
-                    mergedConfig = mergeConfig(mergedConfig, configResult)
+                    // Keep root-level fields on the top-level config so Vite sees them
+                    // before the asset pipeline resolves, but scope Electron-specific
+                    // fields to the generated environment.
+                    const { define, resolve, optimizeDeps, build, ...rootConfigResult } =
+                      configResult
+
+                    if (Object.keys(rootConfigResult).length > 0) {
+                      mergedConfig = mergeConfig(mergedConfig, rootConfigResult)
+                    }
+
+                    const environmentConfigResult = {
+                      ...(define !== undefined ? { define } : {}),
+                      ...(resolve !== undefined ? { resolve } : {}),
+                      ...(optimizeDeps !== undefined ? { optimizeDeps } : {}),
+                      ...(build !== undefined ? { build } : {}),
+                    }
+
+                    if (Object.keys(environmentConfigResult).length > 0) {
+                      environmentMergedConfig = mergeConfig(
+                        environmentMergedConfig,
+                        environmentConfigResult,
+                      )
+                    }
+
+                    configInput = mergeConfig(configInput, configResult)
                   }
                 }
+
+                if (
+                  Object.keys(mergedConfig).length === 0 &&
+                  Object.keys(environmentMergedConfig).length === 0
+                ) {
+                  return
+                }
+
+                const configResult: Record<string, unknown> = {
+                  ...mergedConfig,
+                }
+
+                if (Object.keys(environmentMergedConfig).length > 0) {
+                  configResult.environments = {
+                    [name]: environmentMergedConfig,
+                  }
+                }
+
+                return configResult
+              },
+              // configEnvironment runs after applyToEnvironment selects the target
+              // environment, so it only needs to proxy the environment-specific hook.
+              async configEnvironment(environmentName, environmentConfig, env) {
+                if (environmentName !== name) {
+                  return
+                }
+
+                const resolvedPlugins = await resolvePluginOptions(pluginOptions)
+                let mergedConfig = environmentConfig
 
                 for (const plugin of resolvedPlugins) {
                   const configEnvironmentHook = getHookHandler(plugin.configEnvironment)

@@ -1,3 +1,4 @@
 {
-  "extends": "@subf/config/tsconfig-lib"
+  "extends": "@subf/config/tsconfig-lib",
+  "exclude": ["**/fixtures", "**/playground"]
 }
