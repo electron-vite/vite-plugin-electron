@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multi-env playground</title>
+  </head>
+  <body>
+    <main class="shell">
+      <p class="eyebrow">vite-plugin-electron /multi-env</p>
+      <h1>Named Vite environments for main and preload.</h1>
+      <section class="card">
+        <div class="row">
+          <span class="label">Main PID</span>
+          <strong id="main-pid">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Main started</span>
+          <strong id="main-started-at">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Main label</span>
+          <strong id="main-status">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Main environment</span>
+          <strong id="main-environment">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Preload PID</span>
+          <strong id="preload-pid">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Preload loaded</span>
+          <strong id="preload-loaded-at">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Preload label</span>
+          <strong id="preload-status">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Preload environment</span>
+          <strong id="preload-environment">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Electron version</span>
+          <strong id="electron-version">Loading...</strong>
+        </div>
+        <div class="row">
+          <span class="label">Ping</span>
+          <strong id="ping">Waiting...</strong>
+        </div>
+        <button id="refresh" type="button">Refresh state</button>
+      </section>
+      <p class="note">
+        This demo imports <code>src/multi-env.ts</code>. That subpath only exists in
+        <code>vite-plugin-electron@&gt;=1.0.0</code>.
+      </p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

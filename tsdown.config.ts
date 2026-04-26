@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
     plugin: 'src/plugin.ts',
     simple: 'src/simple.ts',
+    'multi-env': 'src/multi-env.ts',
   },
   outputOptions: {
     exports: 'named',

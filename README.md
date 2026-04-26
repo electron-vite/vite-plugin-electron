@@ -165,6 +165,81 @@ export interface ElectronOptions {
 }
 ```
 
+## `/multi-env`
+
+> [!important]
+> `vite-plugin-electron/multi-env` is only available in `vite-plugin-electron@>=1.0.0`.
+> It does not exist in `0.x` releases.
+
+Use `/multi-env` when you want each Electron target to map to an explicit Vite environment. It uses Vite's Environment API to build Electron targets, and it is the future-facing way to handle multi-target builds.
+
+```js
+import electron, { simpleOptions } from 'vite-plugin-electron/multi-env'
+
+export default {
+  plugins: [
+    electron(
+      simpleOptions({
+        main: {
+          input: 'electron/main.ts',
+          options: {
+            define: {
+              __ELECTRON_TARGET__: JSON.stringify('main'),
+            },
+          },
+        },
+        preload: {
+          input: 'electron/preload.ts',
+          onstart({ reload }) {
+            reload()
+          },
+          options: {
+            define: {
+              __ELECTRON_TARGET__: JSON.stringify('preload'),
+            },
+            build: {
+              rolldownOptions: {
+                output: {
+                  format: 'cjs',
+                  codeSplitting: false,
+                },
+              },
+            },
+          },
+        },
+      }),
+    ),
+  ],
+}
+```
+
+`simpleOptions()` can turn a keyed object into the array that `electron()` expects. The `main` and `preload` keys also reuse the same default presets as the `simple` API, so you can organize config by key without losing the convenience presets.
+
+```ts
+export interface MultiEnvElectronOptions {
+  /**
+   * Optional name for the Electron environment `electron_${name}`.
+   *
+   * By default, the plugin will generate environment names like `electron_0`,
+   * `electron_1`, etc. based on the order of the options provided.
+   */
+  name?: string
+  /**
+   * Shortcut of `options.build.rolldownOptions.input`
+   */
+  input?: import('vite').BuildEnvironmentOptions['rolldownOptions']['input']
+  /**
+   * Shortcut of `options.build.rolldownOptions.plugins`
+   */
+  plugins?: import('vite').BuildEnvironmentOptions['rolldownOptions']['plugins']
+  /**
+   * Per-environment Vite options.
+   */
+  options?: import('vite').EnvironmentOptions
+  onstart?: ElectronOptions['onstart']
+}
+```
+
 ## Recommend Structure
 
 Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-vanilla-ts) created based on `create vite` as an example
@@ -218,7 +293,7 @@ There are many cases here 👉 [electron-vite-samples](https://github.com/caoxie
 
 ## Playground
 
-The local demo suite lives in [playground/](playground/README.md) and includes separate flat and simple modes that import the plugin source directly from this repo.
+The local demo suite lives in [playground/](playground/README.md) and includes flat, simple, and multi-env modes that import the plugin source directly from this repo.
 
 ## JavaScript API
 
