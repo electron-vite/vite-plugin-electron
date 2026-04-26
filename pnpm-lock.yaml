@@ -58,6 +58,12 @@ importers:
         specifier: 'catalog:'
         version: 40.9.1
 
+  playground/multi-env:
+    devDependencies:
+      electron:
+        specifier: 'catalog:'
+        version: 40.9.1
+
   playground/simple:
     devDependencies:
       electron:
