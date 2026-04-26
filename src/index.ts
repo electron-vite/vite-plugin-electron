@@ -32,7 +32,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
 
   return createElectronPlugin({
     prefix: 'vite-plugin-electron',
-    dev(pluginContext, server, isESM) {
+    async dev(pluginContext, server, isESM) {
       const entryCount = optionsArray.length
       let closeBundleCount = 0
 
@@ -60,7 +60,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             triggerStartup(pluginContext, server, options)
           },
         })
-        buildBase(isESM, options)
+        await buildBase(isESM, options)
       }
     },
     async build(userConfig, configEnv, isESM) {

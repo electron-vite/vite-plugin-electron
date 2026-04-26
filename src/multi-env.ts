@@ -69,9 +69,11 @@ export function simpleOptions(options: MultiEnvElectronOptionsRecord): MultiEnvE
       case 'preload':
         return Object.assign(rest, {
           name,
-          onstart(args: Parameters<NonNullable<MultiEnvElectronOptions['onstart']>>[0]) {
-            args.reload()
-          },
+          onstart:
+            rest.onstart ||
+            ((args: Parameters<NonNullable<MultiEnvElectronOptions['onstart']>>[0]) => {
+              args.reload()
+            }),
           options: mergeConfig<EnvironmentOptions, EnvironmentOptions>(
             {
               build: {
