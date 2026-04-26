@@ -51,13 +51,7 @@ export default function electron(
     }
     envNames.add(name)
 
-    return [
-      name,
-      {
-        name,
-        ...opt,
-      },
-    ] as const
+    return { ...opt, name } as const
   })
 
   const createElectronBuilder = async (
@@ -77,7 +71,7 @@ export default function electron(
         publicDir: false,
         ...inheritedConfig,
         environments: Object.fromEntries(
-          environmentOptions.map(([name, opt]) => {
+          environmentOptions.map((opt) => {
             const envCfg = mergeConfig<EnvironmentOptions, EnvironmentOptions>(
               {
                 consumer: 'server',
@@ -112,10 +106,11 @@ export default function electron(
               envCfg.build.watch ??= {}
               envCfg.build.minify ??= false
             }
-            return [name, envCfg]
+            return [opt.name, envCfg]
           }),
         ),
-        plugins: environmentOptions.flatMap(([name, cfg]) => {
+        plugins: environmentOptions.flatMap((opt) => {
+          const name = opt.name
           return server
             ? perEnvironmentPlugin(`${PLUGIN_PREFIX}:startup:${name}`, (ctx) => {
                 if (ctx.name !== name) {
@@ -127,7 +122,7 @@ export default function electron(
                     if (++builtCount < optionsArray.length) {
                       return
                     }
-                    triggerStartup(context!, server, cfg)
+                    triggerStartup(context!, server, opt)
                   },
                 }
               })
