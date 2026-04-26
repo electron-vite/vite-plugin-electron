@@ -53,18 +53,83 @@ export function checkESModule(): boolean {
   return loadPackageJSONSync()?.type === 'module'
 }
 
-/** Resolve the default Vite's `InlineConfig` for build Electron-Main */
-export function resolveViteConfig(options: ElectronOptions): InlineConfig {
-  return resolveViteConfigBase(checkESModule(), options)
+export const defaultMainSimpleConfig: InlineConfig = {
+  build: {
+    rolldownOptions: {
+      platform: 'node',
+    },
+  },
 }
 
-/** Resolve the default Vite's `InlineConfig` for build Electron-Main */
-export function resolveViteConfigBase(esmodule: boolean, options: ElectronOptions): InlineConfig {
-  const defaultConfig: InlineConfig = {
-    // 🚧 Avoid recursive build caused by load config file
-    configFile: false,
-    publicDir: false,
+export function createDefaultPreloadConfig(
+  esmodule: boolean,
+  input: RolldownOptions['input'],
+): InlineConfig {
+  const fileExt = esmodule ? 'mjs' : 'js'
 
+  return {
+    build: {
+      rolldownOptions: {
+        // `rolldownOptions.input` has higher priority than `build.lib`.
+        // @see - https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L482
+        input,
+        platform: 'node',
+        output: {
+          // In most cases, use `cjs` format
+          format: 'cjs',
+          // `require()` can usable matrix
+          //  @see - https://github.com/electron/electron/blob/v30.0.0-nightly.20240104/docs/tutorial/esm.md#preload-scripts
+          //  ┏———————————————————————————————————┳——————————┳———————————┓
+          //  │ webPreferences: { }               │  import  │  require  │
+          //  ┠———————————————————————————————————╂——————————╂———————————┨
+          //  │ nodeIntegration: false(undefined) │    ✘     │     ✔     │
+          //  ┠———————————————————————————————————╂——————————╂———————————┨
+          //  │ nodeIntegration: true             │    ✔     │     ✔     │
+          //  ┠———————————————————————————————————╂——————————╂———————————┨
+          //  │ sandbox: true(undefined)          │    ✘     │     ✔     │
+          //  ┠———————————————————————————————————╂——————————╂———————————┨
+          //  │ sandbox: false                    │    ✔     │     ✘     │
+          //  ┠———————————————————————————————————╂——————————╂———————————┨
+          //  │ nodeIntegration: false            │    ✘     │     ✔     │
+          //  │ sandbox: true                     │          │           │
+          //  ┠———————————————————————————————————╂——————————╂———————————┨
+          //  │ nodeIntegration: false            │    ✔     │     ✘     │
+          //  │ sandbox: false                    │          │           │
+          //  ┠———————————————————————————————————╂——————————╂———————————┨
+          //  │ nodeIntegration: true             │    ✘     │     ✔     │
+          //  │ sandbox: true                     │          │           │
+          //  ┠———————————————————————————————————╂——————————╂———————————┨
+          //  │ nodeIntegration: true             │    ✔     │     ✔     │
+          //  │ sandbox: false                    │          │           │
+          //  ┗———————————————————————————————————┸——————————┸———————————┛
+          //  - import(✘): SyntaxError: Cannot use import statement outside a module
+          //  - require(✘): ReferenceError: require is not defined in ES module scope, you can use import instead
+          // Note, however, that `preload.ts` should not be split. 🚧
+          codeSplitting: false,
+          // When Rollup builds code in `cjs` format, it will automatically split the code into multiple chunks, and use `require()` to load them,
+          // and use `require()` to load other modules when `nodeIntegration: false` in the Main process Errors will occur.
+          // So we need to configure Rollup not to split the code when building to ensure that it works correctly with `nodeIntegration: false`.
+          // @see - https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L608
+          entryFileNames: `[name].${fileExt}`,
+          chunkFileNames: `[name].${fileExt}`,
+          assetFileNames: '[name].[ext]',
+        },
+      },
+    },
+  }
+}
+
+interface ElectronViteDefaultsOptions {
+  entry?: ElectronOptions['entry']
+  input?: RolldownOptions['input']
+  plugins?: RolldownOptions['plugins']
+}
+
+export function createElectronViteDefaults(
+  esmodule = false,
+  options: ElectronViteDefaultsOptions = {},
+): InlineConfig {
+  return {
     build: {
       lib: options.entry
         ? {
@@ -77,6 +142,16 @@ export function resolveViteConfigBase(esmodule: boolean, options: ElectronOption
       outDir: 'dist-electron',
       // Avoid multiple entries affecting each other
       emptyOutDir: false,
+      rolldownOptions: {
+        platform: 'node',
+        ...(options.input !== undefined
+          ? {
+              input: options.input,
+              output: { format: esmodule ? 'es' : 'cjs' },
+            }
+          : {}),
+        ...(options.plugins !== undefined ? { plugins: options.plugins } : {}),
+      },
     },
     resolve: {
       conditions: ['node'],
@@ -90,6 +165,19 @@ export function resolveViteConfigBase(esmodule: boolean, options: ElectronOption
       'process.env': 'process.env',
     },
   }
+}
+
+/** Resolve the default Vite's `InlineConfig` for build Electron-Main */
+export function resolveViteConfig(options: ElectronOptions): InlineConfig {
+  return resolveViteConfigBase(checkESModule(), options)
+}
+
+/** Resolve the default Vite's `InlineConfig` for build Electron-Main */
+export function resolveViteConfigBase(esmodule: boolean, options: ElectronOptions): InlineConfig {
+  const defaultConfig = createElectronViteDefaults(esmodule, { entry: options.entry })
+  // 🚧 Avoid recursive build caused by load config file
+  defaultConfig.configFile = false
+  defaultConfig.publicDir = false
 
   return mergeConfig(defaultConfig, options?.vite || {})
 }

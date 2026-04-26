@@ -8,9 +8,15 @@ import type {
 } from 'vite'
 
 import { createElectronPlugin } from './base'
-import { triggerStartup } from './startup'
+import { defaultPreloadOnstart, triggerStartup } from './startup'
 import type { OnStartOptions } from './startup'
-import { checkESModule, withExternalBuiltins } from './utils'
+import {
+  checkESModule,
+  createDefaultPreloadConfig,
+  createElectronViteDefaults,
+  defaultMainSimpleConfig,
+  withExternalBuiltins,
+} from './utils'
 import type { RolldownOptions } from './utils'
 
 export type MultiEnvElectronOptionName = 'main' | 'preload' | (string & {})
@@ -46,22 +52,13 @@ export type MultiEnvElectronOptionsRecord = Record<
  * Helper function to create simple API for {@link electron} like `vite-plugin-electron/simple`.
  */
 export function simpleOptions(options: MultiEnvElectronOptionsRecord): MultiEnvElectronOptions[] {
-  const esmodule = checkESModule()
-  const fileExt = esmodule ? 'mjs' : 'js'
-  // todo)) extract common options from `src/simple.ts` instead of creating manually
   return Object.entries(options).map(([name, { options, ...rest }]) => {
     switch (name) {
       case 'main':
         return Object.assign(rest, {
           name,
           options: mergeConfig<EnvironmentOptions, EnvironmentOptions>(
-            {
-              build: {
-                rolldownOptions: {
-                  platform: 'node',
-                },
-              },
-            },
+            defaultMainSimpleConfig,
             options ?? {},
           ),
         })
@@ -69,26 +66,9 @@ export function simpleOptions(options: MultiEnvElectronOptionsRecord): MultiEnvE
       case 'preload':
         return Object.assign(rest, {
           name,
-          onstart:
-            rest.onstart ||
-            ((args: Parameters<NonNullable<MultiEnvElectronOptions['onstart']>>[0]) => {
-              args.reload()
-            }),
+          onstart: rest.onstart || defaultPreloadOnstart,
           options: mergeConfig<EnvironmentOptions, EnvironmentOptions>(
-            {
-              build: {
-                rolldownOptions: {
-                  platform: 'node',
-                  output: {
-                    format: 'cjs',
-                    codeSplitting: false,
-                    entryFileNames: `[name].${fileExt}`,
-                    chunkFileNames: `[name].${fileExt}`,
-                    assetFileNames: '[name].[ext]',
-                  },
-                },
-              },
-            },
+            createDefaultPreloadConfig(checkESModule(), rest.input),
             options ?? {},
           ),
         })
@@ -139,41 +119,22 @@ export default function electron(
         ...inheritedConfig,
         environments: Object.fromEntries(
           environmentOptions.map((opt) => {
+            const defaultConfig = createElectronViteDefaults(isESM, {
+              input: opt.input,
+              plugins: opt.plugins,
+            })
+
             const envCfg = mergeConfig<EnvironmentOptions, EnvironmentOptions>(
-              {
-                consumer: 'server',
-                // todo)) extract common options from `src/index.ts` instead of creating manually
-                build: {
-                  outDir: 'dist-electron',
-                  emptyOutDir: false,
-                  rolldownOptions: {
-                    input: opt.input,
-                    plugins: opt.plugins,
-                    platform: 'node',
-                    output: {
-                      format: isESM ? 'es' : 'cjs',
-                    },
-                  },
-                },
-                resolve: {
-                  conditions: ['node'],
-                  // #98
-                  // Since we're building for electron (which uses Node.js), we don't want to use the "browser" field in the packages.
-                  // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.
-                  mainFields: ['module', 'jsnext:main', 'jsnext'],
-                },
-                define: {
-                  // @see - https://github.com/vitejs/vite/blob/v5.0.11/packages/vite/src/node/plugins/define.ts#L20
-                  'process.env': 'process.env',
-                },
-              },
+              { consumer: 'server', ...defaultConfig },
               opt.options ?? {},
             )
+
             if (server) {
               envCfg.build ??= {}
               envCfg.build.watch ??= {}
               envCfg.build.minify ??= false
             }
+
             return [opt.name, envCfg]
           }),
         ),

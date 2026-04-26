@@ -182,3 +182,9 @@ export function triggerStartup(
     startupWithRoot()
   }
 }
+
+export const defaultPreloadOnstart: OnStartOptions['onstart'] = async (args) => {
+  // Notify the Renderer-Process to reload the page when the Preload-Scripts build is complete,
+  // instead of restarting the entire Electron App.
+  args.reload()
+}
