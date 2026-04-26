@@ -23,6 +23,56 @@
           ],
         },
       },
+
+      ## `/multi-env`
+
+      > [!important]
+      > `vite-plugin-electron/multi-env` 仅存在于 `vite-plugin-electron@>=1.0.0`。
+      > `0.x` 版本没有这个入口。
+
+      当你想把每个 Electron 构建目标映射成独立的 Vite environment 时，使用 `/multi-env` 会更直接。它适合按 environment 拆分 `main`、`preload`，并为每个目标单独配置 `define`、`rolldownOptions` 和 `onstart`。
+
+      ```js
+      import electron from 'vite-plugin-electron/multi-env'
+
+      export default {
+        plugins: [
+          electron([
+            {
+              name: 'main',
+              input: 'electron/main.ts',
+              options: {
+                define: {
+                  __ELECTRON_TARGET__: JSON.stringify('main'),
+                },
+              },
+            },
+            {
+              name: 'preload',
+              input: 'electron/preload.ts',
+              onstart({ reload }) {
+                reload()
+              },
+              options: {
+                define: {
+                  __ELECTRON_TARGET__: JSON.stringify('preload'),
+                },
+                build: {
+                  rolldownOptions: {
+                    output: {
+                      format: 'cjs',
+                      codeSplitting: false,
+                    },
+                  },
+                },
+              },
+            },
+          ]),
+        ],
+      }
+      ```
+
+      `name: 'main'` 会生成稳定的 environment 名 `electron_main`。`plugins` 对应的是 `options.build.rolldownOptions.plugins`，而 `options` 则用于补充每个 environment 自己的 Vite 配置。
     },
   }),
   ```

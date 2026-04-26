@@ -30,7 +30,7 @@ export interface MultiEnvElectronOptions extends OnStartOptions {
    */
   plugins?: RolldownOptions['plugins']
   /**
-   * Environment options to configure Vite differently for each Electron environment.
+   * Per-environment Vite options.
    */
   options?: EnvironmentOptions
 }
