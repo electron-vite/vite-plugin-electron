@@ -48,7 +48,7 @@ export type MultiEnvElectronOptionsRecord = Record<
 export function simpleOptions(options: MultiEnvElectronOptionsRecord): MultiEnvElectronOptions[] {
   const esmodule = checkESModule()
   const fileExt = esmodule ? 'mjs' : 'js'
-  // todo)) extract common options from `electronSimple` instead of creating manually
+  // todo)) extract common options from `src/simple.ts` instead of creating manually
   return Object.entries(options).map(([name, { options, ...rest }]) => {
     switch (name) {
       case 'main':
@@ -140,6 +140,7 @@ export default function electron(
             const envCfg = mergeConfig<EnvironmentOptions, EnvironmentOptions>(
               {
                 consumer: 'server',
+                // todo)) extract common options from `src/index.ts` instead of creating manually
                 build: {
                   outDir: 'dist-electron',
                   emptyOutDir: false,
