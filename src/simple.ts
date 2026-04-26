@@ -1,7 +1,7 @@
-import { loadPackageJSON } from 'local-pkg'
 import { mergeConfig } from 'vite'
 import type { Plugin, UserConfig } from 'vite'
 
+import { checkESModule } from './utils'
 import type { RolldownOptions } from './utils'
 
 import electron from './index'
@@ -41,8 +41,7 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
       options.main,
     ),
   ]
-  const packageJson = (await loadPackageJSON()) ?? {}
-  const esmodule = packageJson.type === 'module'
+  const esmodule = checkESModule()
   if (options.preload) {
     const { input, vite: viteConfig = {}, ...preloadOptions } = options.preload
     const preload: ElectronOptions = {

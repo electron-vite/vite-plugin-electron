@@ -1,4 +1,5 @@
 {
   "extends": "@subf/config/tsconfig-lib",
-  "exclude": ["**/fixtures", "**/playground"]
+  "include": ["src", "*.d.ts", "tsdown.config.ts"],
+  "exclude": ["**/fixtures"]
 }

@@ -14,7 +14,7 @@ import type {
   ViteDevServer,
 } from 'vite'
 
-import type { MultiEnvElectronOptions } from './multi-env'
+import type { ElectronOptions } from '.'
 
 export interface PidTree {
   pid: number
@@ -54,15 +54,12 @@ export function checkESModule(): boolean {
 }
 
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
-export function resolveViteConfig(options: MultiEnvElectronOptions): InlineConfig {
+export function resolveViteConfig(options: ElectronOptions): InlineConfig {
   return resolveViteConfigBase(checkESModule(), options)
 }
 
 /** Resolve the default Vite's `InlineConfig` for build Electron-Main */
-export function resolveViteConfigBase(
-  esmodule: boolean,
-  options: MultiEnvElectronOptions,
-): InlineConfig {
+export function resolveViteConfigBase(esmodule: boolean, options: ElectronOptions): InlineConfig {
   const defaultConfig: InlineConfig = {
     // 🚧 Avoid recursive build caused by load config file
     configFile: false,
