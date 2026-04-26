@@ -133,8 +133,6 @@ describe('src/multi-env', () => {
 
     await resetDirs(appOutDir, electronOutDir)
 
-    // The .foo import only works if config() merges assetsInclude early enough
-    // for Vite's asset pipeline to see it.
     await build({
       configFile: false,
       root,
@@ -147,13 +145,13 @@ describe('src/multi-env', () => {
         rendererVirtualPlugin,
         electron([
           {
-            entry: 'electron/main.ts',
-            vite: {
+            input: 'electron/main.ts',
+            plugins: [mainVirtualPlugin],
+            options: {
               build: {
                 outDir: electronOutDir,
                 minify: false,
               },
-              plugins: [mainVirtualPlugin],
             },
           },
         ]),
@@ -173,32 +171,10 @@ describe('src/multi-env', () => {
     expect(buildLog).toEqual(['electron_0'])
   })
 
-  it('proxies config hooks for env-scoped plugins before Electron builds', async () => {
+  it('merges per-environment define options before Electron builds', async () => {
     const root = path.join(__dirname, 'fixtures')
     const appOutDir = path.join(__dirname, 'dist-env-hooks-app')
     const electronOutDir = path.join(__dirname, 'dist-env-hooks-electron')
-
-    const statusPlugin: Plugin = {
-      name: 'flat-build-status-plugin',
-      config() {
-        return {
-          define: {
-            __ENV_CONFIG_STATUS__: JSON.stringify('config-main'),
-          },
-        }
-      },
-      configEnvironment(environmentName) {
-        if (environmentName !== 'electron_main') {
-          return
-        }
-
-        return {
-          define: {
-            __ENV_ENV_STATUS__: JSON.stringify('env-main'),
-          },
-        }
-      },
-    }
 
     await resetDirs(appOutDir, electronOutDir)
 
@@ -213,13 +189,16 @@ describe('src/multi-env', () => {
       plugins: electron([
         {
           name: 'main',
-          entry: 'env-status.ts',
-          vite: {
+          input: 'env-status.ts',
+          options: {
+            define: {
+              __ENV_CONFIG_STATUS__: JSON.stringify('config-main'),
+              __ENV_ENV_STATUS__: JSON.stringify('env-main'),
+            },
             build: {
               minify: false,
               outDir: electronOutDir,
             },
-            plugins: [statusPlugin],
           },
         },
       ]),
@@ -234,22 +213,10 @@ describe('src/multi-env', () => {
     expect(mainCode).toContain('"env-main"')
   })
 
-  it('merges config hook results beyond EnvironmentOptions fields', async () => {
+  it('merges per-environment build options beyond shortcut fields', async () => {
     const root = path.join(__dirname, 'fixtures')
     const appOutDir = path.join(__dirname, 'dist-env-hook-merge-app')
     const electronOutDir = path.join(__dirname, 'dist-env-hook-merge-electron')
-
-    const mergePlugin: Plugin = {
-      name: 'merge-config-plugin',
-      config() {
-        return {
-          define: {
-            __ENV_NAME__: JSON.stringify('config-merged'),
-          },
-          assetsInclude: ['**/*.foo'],
-        }
-      },
-    }
 
     await resetDirs(appOutDir, electronOutDir)
 
@@ -264,14 +231,20 @@ describe('src/multi-env', () => {
       plugins: electron([
         {
           name: 'main',
-          entry: 'env-config-merge.ts',
-          vite: {
+          input: 'env-main.ts',
+          options: {
+            define: {
+              __ENV_NAME__: JSON.stringify('config-merged'),
+            },
             build: {
-              assetsInlineLimit: 0,
               minify: false,
               outDir: electronOutDir,
+              rolldownOptions: {
+                output: {
+                  banner: '/* config-merged-banner */',
+                },
+              },
             },
-            plugins: [mergePlugin],
           },
         },
       ]),
@@ -279,10 +252,11 @@ describe('src/multi-env', () => {
     })
 
     const mainCode = fs
-      .readFileSync(path.join(electronOutDir, 'env-config-merge.js'), 'utf-8')
+      .readFileSync(path.join(electronOutDir, 'env-main.js'), 'utf-8')
       .replace(normalizingNewLineRE, '\n')
 
     expect(mainCode).toContain('"config-merged"')
+    expect(mainCode).toContain('config-merged-banner')
   })
 
   it('isolates per-option config overrides in the option array', async () => {
@@ -307,8 +281,8 @@ describe('src/multi-env', () => {
       plugins: electron([
         {
           name: 'main',
-          entry: 'env-main.ts',
-          vite: {
+          input: 'env-main.ts',
+          options: {
             define: {
               __ENV_NAME__: JSON.stringify('main-override'),
             },
@@ -320,8 +294,8 @@ describe('src/multi-env', () => {
         },
         {
           name: 'preload',
-          entry: 'env-preload.ts',
-          vite: {
+          input: 'env-preload.ts',
+          options: {
             define: {
               __ENV_NAME__: JSON.stringify('preload-override'),
             },
@@ -384,24 +358,24 @@ describe('src/multi-env', () => {
       plugins: electron([
         {
           name: 'main',
-          entry: 'env-main.ts',
-          vite: {
+          input: 'env-main.ts',
+          plugins: [mainPlugin],
+          options: {
             build: {
               minify: false,
               outDir: mainOutDir,
             },
-            plugins: [mainPlugin],
           },
         },
         {
           name: 'preload',
-          entry: 'env-preload.ts',
-          vite: {
+          input: 'env-preload.ts',
+          plugins: [preloadPlugin],
+          options: {
             build: {
               minify: false,
               outDir: preloadOutDir,
             },
-            plugins: [preloadPlugin],
           },
         },
       ]),
@@ -444,24 +418,24 @@ describe('src/multi-env', () => {
       plugins: electron([
         {
           name: 'main',
-          entry: 'env-main.ts',
-          vite: {
+          input: 'env-main.ts',
+          plugins: [createLifecyclePlugin('main', mainLogPath)],
+          options: {
             build: {
               minify: false,
               outDir: mainOutDir,
             },
-            plugins: [createLifecyclePlugin('main', mainLogPath)],
           },
         },
         {
           name: 'preload',
-          entry: 'env-preload.ts',
-          vite: {
+          input: 'env-preload.ts',
+          plugins: [createLifecyclePlugin('preload', preloadLogPath)],
+          options: {
             build: {
               minify: false,
               outDir: preloadOutDir,
             },
-            plugins: [createLifecyclePlugin('preload', preloadLogPath)],
           },
         },
       ]),
@@ -523,8 +497,16 @@ describe('src/multi-env', () => {
       plugins: electron([
         {
           name: 'main',
-          entry: 'env-main.ts',
-          vite: {
+          input: 'env-main.ts',
+          plugins: [
+            {
+              name: 'flat-main-plugin',
+              renderChunk(code) {
+                return `/* ${this.environment.name}:flat-main */\n${code}`
+              },
+            },
+          ],
+          options: {
             define: {
               __ENV_NAME__: JSON.stringify('flat-main'),
             },
@@ -532,20 +514,20 @@ describe('src/multi-env', () => {
               minify: false,
               outDir: electronOutDir,
             },
-            plugins: [
-              {
-                name: 'flat-main-plugin',
-                renderChunk(code) {
-                  return `/* ${this.environment.name}:flat-main */\n${code}`
-                },
-              },
-            ],
           },
         },
         {
           name: 'preload',
-          entry: 'env-preload.ts',
-          vite: {
+          input: 'env-preload.ts',
+          plugins: [
+            {
+              name: 'flat-preload-plugin',
+              renderChunk(code) {
+                return `/* ${this.environment.name}:flat-preload */\n${code}`
+              },
+            },
+          ],
+          options: {
             define: {
               __ENV_NAME__: JSON.stringify('flat-preload'),
             },
@@ -553,14 +535,6 @@ describe('src/multi-env', () => {
               minify: false,
               outDir: electronOutDir,
             },
-            plugins: [
-              {
-                name: 'flat-preload-plugin',
-                renderChunk(code) {
-                  return `/* ${this.environment.name}:flat-preload */\n${code}`
-                },
-              },
-            ],
           },
         },
       ]),

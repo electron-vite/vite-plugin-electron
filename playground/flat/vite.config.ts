@@ -167,10 +167,8 @@ export default defineConfig({
     createRendererStatusPlugin('override'),
     electron([
       {
-        entry: 'electron/main.ts',
-        vite: {
-          plugins: [createMainStatusPlugin('base'), createMainStatusPlugin('override')],
-        },
+        input: 'electron/main.ts',
+        plugins: [createMainStatusPlugin('base'), createMainStatusPlugin('override')],
       },
     ]),
   ],

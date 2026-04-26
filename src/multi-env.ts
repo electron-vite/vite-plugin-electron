@@ -1,20 +1,19 @@
-import { build as viteBuild, createBuilder, mergeConfig, perEnvironmentPlugin } from 'vite'
+import { createBuilder, mergeConfig, perEnvironmentPlugin } from 'vite'
 import type {
   EnvironmentOptions,
-  InlineConfig,
   Plugin,
-  PluginOption,
   ViteDevServer,
+  InlineConfig,
   MinimalPluginContextWithoutEnvironment,
 } from 'vite'
 
 import { createElectronPlugin } from './base'
 import { triggerStartup } from './startup'
-import { resolveViteConfig, resolveViteConfigBase, withExternalBuiltins } from './utils'
+import type { OnStartOptions } from './startup'
+import { withExternalBuiltins } from './utils'
+import type { RolldownOptions } from './utils'
 
-import type { ElectronOptions } from '.'
-
-export interface MultiEnvElectronOptions extends ElectronOptions {
+export interface MultiEnvElectronOptions extends OnStartOptions {
   /**
    * Optional name for the Electron environment.
    *
@@ -22,45 +21,21 @@ export interface MultiEnvElectronOptions extends ElectronOptions {
    * `electron_1`, etc. based on the order of the options provided.
    */
   name?: string
-}
-
-type ElectronFlatSharedConfig = Pick<InlineConfig, 'envDir' | 'envPrefix' | 'mode' | 'root'>
-
-async function resolvePluginOptions(pluginOption: PluginOption): Promise<Plugin[]> {
-  const resolvedOption = await pluginOption
-
-  if (!resolvedOption) {
-    return []
-  }
-
-  if (Array.isArray(resolvedOption)) {
-    const plugins: Plugin[] = []
-
-    for (const option of resolvedOption) {
-      plugins.push(...(await resolvePluginOptions(option)))
-    }
-
-    return plugins
-  }
-
-  return [resolvedOption]
-}
-
-function getHookHandler<T extends (...args: any[]) => any>(
-  hook: T | { handler: T } | undefined,
-): T | undefined {
-  if (!hook) {
-    return undefined
-  }
-
-  return typeof hook === 'function' ? hook : hook.handler
+  /**
+   * Shortcut of `options.build.rolldownOptions.input`
+   */
+  input?: RolldownOptions['input']
+  /**
+   * Shortcut of `options.build.rolldownOptions.plugins`
+   */
+  plugins?: RolldownOptions['plugins']
+  /**
+   * Environment options to configure Vite differently for each Electron environment.
+   */
+  options?: EnvironmentOptions
 }
 
 const PLUGIN_PREFIX = 'vite-plugin-electron-multi-env'
-
-export function build(options: MultiEnvElectronOptions): ReturnType<typeof viteBuild> {
-  return viteBuild(withExternalBuiltins(resolveViteConfig(options)))
-}
 
 export default function electron(
   options: MultiEnvElectronOptions | MultiEnvElectronOptions[],
@@ -75,25 +50,19 @@ export default function electron(
       )
     }
     envNames.add(name)
-    const { plugins, define, resolve, optimizeDeps, build } = opt.vite ?? {}
-    const envOpts: EnvironmentOptions = { define, resolve, optimizeDeps, build }
-    const hasOpts = Object.values(envOpts).some((v) => v !== undefined)
 
     return [
       name,
       {
         name,
-        entry: opt.entry,
-        options: hasOpts ? envOpts : undefined,
-        plugins,
-        onstart: opt.onstart,
+        ...opt,
       },
     ] as const
   })
 
   const createElectronBuilder = async (
     isESM: boolean,
-    inheritedConfig: ElectronFlatSharedConfig,
+    inheritedConfig: InlineConfig,
     server?: ViteDevServer,
     context?: MinimalPluginContextWithoutEnvironment,
   ) => {
@@ -108,12 +77,36 @@ export default function electron(
         publicDir: false,
         ...inheritedConfig,
         environments: Object.fromEntries(
-          environmentOptions.map(([name, cfg]) => {
-            const envCfg: EnvironmentOptions = resolveViteConfigBase(isESM, {
-              entry: cfg.entry,
-              vite: cfg.options,
-            })
-            envCfg.consumer = 'server'
+          environmentOptions.map(([name, opt]) => {
+            const envCfg = mergeConfig<EnvironmentOptions, EnvironmentOptions>(
+              {
+                consumer: 'server',
+                build: {
+                  outDir: 'dist-electron',
+                  emptyOutDir: false,
+                  rolldownOptions: {
+                    input: opt.input,
+                    plugins: opt.plugins,
+                    platform: 'node',
+                    output: {
+                      format: isESM ? 'es' : 'cjs',
+                    },
+                  },
+                },
+                resolve: {
+                  conditions: ['node'],
+                  // #98
+                  // Since we're building for electron (which uses Node.js), we don't want to use the "browser" field in the packages.
+                  // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.
+                  mainFields: ['module', 'jsnext:main', 'jsnext'],
+                },
+                define: {
+                  // @see - https://github.com/vitejs/vite/blob/v5.0.11/packages/vite/src/node/plugins/define.ts#L20
+                  'process.env': 'process.env',
+                },
+              },
+              opt.options ?? {},
+            )
             if (server) {
               envCfg.build ??= {}
               envCfg.build.watch ??= {}
@@ -123,132 +116,22 @@ export default function electron(
           }),
         ),
         plugins: environmentOptions.flatMap(([name, cfg]) => {
-          const plugins: Plugin[] = []
-
-          if (cfg.plugins) {
-            const pluginOptions = cfg.plugins
-
-            plugins.push({
-              name: `${PLUGIN_PREFIX}:plugins:${name}`,
-              applyToEnvironment(environment) {
-                return environment.name === name ? pluginOptions : false
-              },
-              async config(config, env) {
-                const resolvedPlugins = await resolvePluginOptions(pluginOptions)
-                let mergedConfig = {}
-                let environmentMergedConfig = {}
-                let configInput = mergeConfig({}, config)
-
-                for (const plugin of resolvedPlugins) {
-                  const configHook = getHookHandler(plugin.config)
-
-                  if (!configHook) {
-                    continue
-                  }
-
-                  const configResult = await configHook.call(this, configInput, env)
-                  if (configResult) {
-                    // Keep root-level fields on the top-level config so Vite sees them
-                    // before the asset pipeline resolves, but scope Electron-specific
-                    // fields to the generated environment.
-                    const { define, resolve, optimizeDeps, build, ...rootConfigResult } =
-                      configResult
-
-                    if (Object.keys(rootConfigResult).length > 0) {
-                      mergedConfig = mergeConfig(mergedConfig, rootConfigResult)
+          return server
+            ? perEnvironmentPlugin(`${PLUGIN_PREFIX}:startup:${name}`, (ctx) => {
+                if (ctx.name !== name) {
+                  return false
+                }
+                return {
+                  name: `${PLUGIN_PREFIX}:startup-hook:${name}`,
+                  closeBundle() {
+                    if (++builtCount < optionsArray.length) {
+                      return
                     }
-
-                    const environmentConfigResult = {
-                      ...(define !== undefined ? { define } : {}),
-                      ...(resolve !== undefined ? { resolve } : {}),
-                      ...(optimizeDeps !== undefined ? { optimizeDeps } : {}),
-                      ...(build !== undefined ? { build } : {}),
-                    }
-
-                    if (Object.keys(environmentConfigResult).length > 0) {
-                      environmentMergedConfig = mergeConfig(
-                        environmentMergedConfig,
-                        environmentConfigResult,
-                      )
-                    }
-
-                    configInput = mergeConfig(configInput, configResult)
-                  }
+                    triggerStartup(context!, server, cfg)
+                  },
                 }
-
-                if (
-                  Object.keys(mergedConfig).length === 0 &&
-                  Object.keys(environmentMergedConfig).length === 0
-                ) {
-                  return
-                }
-
-                const configResult: Record<string, unknown> = {
-                  ...mergedConfig,
-                }
-
-                if (Object.keys(environmentMergedConfig).length > 0) {
-                  configResult.environments = {
-                    [name]: environmentMergedConfig,
-                  }
-                }
-
-                return configResult
-              },
-              // configEnvironment runs after applyToEnvironment selects the target
-              // environment, so it only needs to proxy the environment-specific hook.
-              async configEnvironment(environmentName, environmentConfig, env) {
-                if (environmentName !== name) {
-                  return
-                }
-
-                const resolvedPlugins = await resolvePluginOptions(pluginOptions)
-                let mergedConfig = environmentConfig
-
-                for (const plugin of resolvedPlugins) {
-                  const configEnvironmentHook = getHookHandler(plugin.configEnvironment)
-
-                  if (!configEnvironmentHook) {
-                    continue
-                  }
-
-                  const configEnvironmentResult = await configEnvironmentHook.call(
-                    this,
-                    environmentName,
-                    mergedConfig,
-                    env,
-                  )
-
-                  if (configEnvironmentResult) {
-                    mergedConfig = mergeConfig(mergedConfig, configEnvironmentResult)
-                  }
-                }
-
-                // Mutate in place so Vite does not deep-merge array fields like build.lib.formats again.
-                Object.assign(environmentConfig, mergedConfig)
-              },
-            })
-          }
-
-          if (server) {
-            plugins.push(
-              perEnvironmentPlugin(`${PLUGIN_PREFIX}:startup:${name}`, (ctx) =>
-                ctx.name === name
-                  ? {
-                      name: `${PLUGIN_PREFIX}:startup-hook:${name}`,
-                      closeBundle() {
-                        if (++builtCount < optionsArray.length) {
-                          return
-                        }
-                        triggerStartup(context!, server, cfg)
-                      },
-                    }
-                  : false,
-              ),
-            )
-          }
-
-          return plugins
+              })
+            : null
         }),
       }),
     )
