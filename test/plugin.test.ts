@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { build } from 'vite'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import electron from '../src'
 import { notBundle } from '../src/plugin'
@@ -10,6 +10,25 @@ import { notBundle } from '../src/plugin'
 const pluginNotBundle = notBundle()
 pluginNotBundle.apply = undefined
 const normalizingNewLineRE = /[\r\n]+/g
+const mockHtmlRoot = path.join(__dirname, 'fixtures/mock-html')
+const mockHtmlPath = path.join(mockHtmlRoot, 'index.html')
+const mockHtmlOutDir = path.join(__dirname, 'dist-mock-html')
+const mockHtmlDistPath = path.join(mockHtmlOutDir, 'index.html')
+
+async function cleanupMockHtml() {
+  await Promise.all([
+    fs.promises.rm(mockHtmlPath, { force: true }),
+    fs.promises.rm(mockHtmlOutDir, { recursive: true, force: true }),
+  ])
+}
+
+beforeEach(async () => {
+  await cleanupMockHtml()
+})
+
+afterEach(async () => {
+  await cleanupMockHtml()
+})
 
 describe('src/plugin', () => {
   it('notBundle', async () => {
@@ -34,20 +53,15 @@ describe('src/plugin', () => {
   })
   describe('src/index', () => {
     it('mockHtml', async () => {
-      const root = path.join(__dirname, 'fixtures/mock-html')
-      const outDir = path.join(__dirname, 'dist-mock-html')
-      const htmlPath = path.join(root, 'index.html')
-      const distHtmlPath = path.join(outDir, 'index.html')
-
       // Ensure no index.html exists before the test
-      expect(fs.existsSync(htmlPath)).toBe(false)
+      expect(fs.existsSync(mockHtmlPath)).toBe(false)
 
       // Pass empty array to test mock HTML lifecycle without triggering Electron builds.
       await build({
         configFile: false,
-        root,
+        root: mockHtmlRoot,
         build: {
-          outDir,
+          outDir: mockHtmlOutDir,
           emptyOutDir: true,
           minify: false,
         },
@@ -56,8 +70,8 @@ describe('src/plugin', () => {
       })
 
       // Both the source mock and its built copy must be cleaned up
-      expect(fs.existsSync(htmlPath)).toBe(false)
-      expect(fs.existsSync(distHtmlPath)).toBe(false)
+      expect(fs.existsSync(mockHtmlPath)).toBe(false)
+      expect(fs.existsSync(mockHtmlDistPath)).toBe(false)
     })
   })
 })
