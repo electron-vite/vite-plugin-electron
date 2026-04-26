@@ -10,9 +10,9 @@ import { notBundle } from '../src/plugin'
 const pluginNotBundle = notBundle()
 pluginNotBundle.apply = undefined
 const normalizingNewLineRE = /[\r\n]+/g
-const mockHtmlRoot = path.join(__dirname, 'fixtures/mock-html')
+const mockHtmlRoot = path.join(__dirname, 'fixtures/mock-html-plugin')
 const mockHtmlPath = path.join(mockHtmlRoot, 'index.html')
-const mockHtmlOutDir = path.join(__dirname, 'dist-mock-html')
+const mockHtmlOutDir = path.join(__dirname, 'dist-mock-html-plugin')
 const mockHtmlDistPath = path.join(mockHtmlOutDir, 'index.html')
 
 async function cleanupMockHtml() {
@@ -24,6 +24,7 @@ async function cleanupMockHtml() {
 
 beforeEach(async () => {
   await cleanupMockHtml()
+  fs.mkdirSync(mockHtmlRoot, { recursive: true })
 })
 
 afterEach(async () => {

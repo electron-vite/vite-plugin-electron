@@ -174,49 +174,54 @@ export interface ElectronOptions {
 Use `/multi-env` when you want each Electron target to map to an explicit Vite environment. It uses Vite's Environment API to build Electron targets, and it is the future-facing way to handle multi-target builds.
 
 ```js
-import electron from 'vite-plugin-electron/multi-env'
+import electron, { simpleOptions } from 'vite-plugin-electron/multi-env'
 
 export default {
   plugins: [
-    electron([
-      {
-        name: 'main',
-        input: 'electron/main.ts',
-        options: {
-          define: {
-            __ELECTRON_TARGET__: JSON.stringify('main'),
+    electron(
+      simpleOptions({
+        main: {
+          input: 'electron/main.ts',
+          options: {
+            define: {
+              __ELECTRON_TARGET__: JSON.stringify('main'),
+            },
           },
         },
-      },
-      {
-        name: 'preload',
-        input: 'electron/preload.ts',
-        onstart({ reload }) {
-          reload()
-        },
-        options: {
-          define: {
-            __ELECTRON_TARGET__: JSON.stringify('preload'),
+        preload: {
+          input: 'electron/preload.ts',
+          onstart({ reload }) {
+            reload()
           },
-          build: {
-            rolldownOptions: {
-              output: {
-                format: 'cjs',
-                codeSplitting: false,
+          options: {
+            define: {
+              __ELECTRON_TARGET__: JSON.stringify('preload'),
+            },
+            build: {
+              rolldownOptions: {
+                output: {
+                  format: 'cjs',
+                  codeSplitting: false,
+                },
               },
             },
           },
         },
-      },
-    ]),
+      }),
+    ),
   ],
 }
 ```
 
+`simpleOptions()` can turn a keyed object into the array that `electron()` expects. The `main` and `preload` keys also reuse the same default presets as the `simple` API, so you can organize config by key without losing the convenience presets.
+
 ```ts
 export interface MultiEnvElectronOptions {
   /**
-   * Generates a stable Vite environment name like `electron_main`.
+   * Optional name for the Electron environment `electron_${name}`.
+   *
+   * By default, the plugin will generate environment names like `electron_0`,
+   * `electron_1`, etc. based on the order of the options provided.
    */
   name?: string
   /**

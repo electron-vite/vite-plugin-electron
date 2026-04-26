@@ -10,12 +10,14 @@ import type {
 import { createElectronPlugin } from './base'
 import { triggerStartup } from './startup'
 import type { OnStartOptions } from './startup'
-import { withExternalBuiltins } from './utils'
+import { checkESModule, withExternalBuiltins } from './utils'
 import type { RolldownOptions } from './utils'
+
+export type MultiEnvElectronOptionName = 'main' | 'preload' | (string & {})
 
 export interface MultiEnvElectronOptions extends OnStartOptions {
   /**
-   * Optional name for the Electron environment.
+   * Optional name for the Electron environment `electron_${name}`.
    *
    * By default, the plugin will generate environment names like `electron_0`,
    * `electron_1`, etc. based on the order of the options provided.
@@ -33,6 +35,69 @@ export interface MultiEnvElectronOptions extends OnStartOptions {
    * Per-environment Vite options.
    */
   options?: EnvironmentOptions
+}
+
+export type MultiEnvElectronOptionsRecord = Record<
+  MultiEnvElectronOptionName,
+  Omit<MultiEnvElectronOptions, 'name'>
+>
+
+/**
+ * Helper function to create simple API for {@link electron} like `vite-plugin-electron/simple`.
+ */
+export function simpleOptions(options: MultiEnvElectronOptionsRecord): MultiEnvElectronOptions[] {
+  const esmodule = checkESModule()
+  const fileExt = esmodule ? 'mjs' : 'js'
+  // todo)) extract common options from `electronSimple` instead of creating manually
+  return Object.entries(options).map(([name, { options, ...rest }]) => {
+    switch (name) {
+      case 'main':
+        return Object.assign(rest, {
+          name,
+          options: mergeConfig<EnvironmentOptions, EnvironmentOptions>(
+            {
+              build: {
+                rolldownOptions: {
+                  platform: 'node',
+                },
+              },
+            },
+            options ?? {},
+          ),
+        })
+
+      case 'preload':
+        return Object.assign(rest, {
+          name,
+          onstart(args: Parameters<NonNullable<MultiEnvElectronOptions['onstart']>>[0]) {
+            args.reload()
+          },
+          options: mergeConfig<EnvironmentOptions, EnvironmentOptions>(
+            {
+              build: {
+                rolldownOptions: {
+                  platform: 'node',
+                  output: {
+                    format: 'cjs',
+                    codeSplitting: false,
+                    entryFileNames: `[name].${fileExt}`,
+                    chunkFileNames: `[name].${fileExt}`,
+                    assetFileNames: '[name].[ext]',
+                  },
+                },
+              },
+            },
+            options ?? {},
+          ),
+        })
+
+      default:
+        return Object.assign(rest, {
+          name,
+          options,
+        })
+    }
+  })
 }
 
 const PLUGIN_PREFIX = 'vite-plugin-electron-multi-env'

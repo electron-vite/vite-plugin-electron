@@ -3,15 +3,32 @@ import path from 'node:path'
 
 import { build } from 'vite'
 import type { Plugin } from 'vite'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import electron from '../src/multi-env'
+import electron, { simpleOptions } from '../src/multi-env'
 
 const normalizingNewLineRE = /[\r\n]+/g
+const mockHtmlRoot = path.join(__dirname, 'fixtures/mock-html-multi-env')
+const mockHtmlPath = path.join(mockHtmlRoot, 'index.html')
+const mockHtmlOutDir = path.join(__dirname, 'dist-mock-html-multi-env')
+const mockHtmlDistPath = path.join(mockHtmlOutDir, 'index.html')
 
 const cleanupDirs = new Set<string>()
 
+async function cleanupMockHtml() {
+  await Promise.all([
+    fs.promises.rm(mockHtmlPath, { force: true }),
+    fs.promises.rm(mockHtmlOutDir, { recursive: true, force: true }),
+  ])
+}
+
+beforeEach(async () => {
+  await cleanupMockHtml()
+  fs.mkdirSync(mockHtmlRoot, { recursive: true })
+})
+
 afterEach(async () => {
+  await cleanupMockHtml()
   await Promise.all(
     [...cleanupDirs].map((dir) => fs.promises.rm(dir, { recursive: true, force: true })),
   )
@@ -68,21 +85,73 @@ function createLifecyclePlugin(label: string, logPath: string): Plugin {
 }
 
 describe('src/multi-env', () => {
+  it('simpleOptions composes a keyed object', () => {
+    const composed = simpleOptions({
+      main: {
+        input: 'electron/main.ts',
+      },
+      preload: {
+        input: 'electron/preload.ts',
+        options: {
+          build: {
+            minify: false,
+          },
+        },
+      },
+    })
+
+    expect(composed[0]).toMatchObject({
+      name: 'main',
+      input: 'electron/main.ts',
+      options: {
+        build: {
+          rolldownOptions: {
+            platform: 'node',
+          },
+        },
+      },
+    })
+
+    expect(composed[1]).toMatchObject({
+      name: 'preload',
+      input: 'electron/preload.ts',
+      options: {
+        build: {
+          minify: false,
+          rolldownOptions: {
+            platform: 'node',
+            output: {
+              format: 'cjs',
+              codeSplitting: false,
+              entryFileNames: '[name].mjs',
+              chunkFileNames: '[name].mjs',
+              assetFileNames: '[name].[ext]',
+            },
+          },
+        },
+      },
+    })
+
+    expect(composed[0].onstart).toBeUndefined()
+
+    const reload = vi.fn()
+    composed[1].onstart?.({
+      reload,
+      startup: async () => {},
+    } as never)
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
   it('mockHtml', async () => {
-    const root = path.join(__dirname, 'fixtures/mock-html')
-    const outDir = path.join(__dirname, 'dist-mock-html')
-    const htmlPath = path.join(root, 'index.html')
-    const distHtmlPath = path.join(outDir, 'index.html')
+    trackDirs(mockHtmlOutDir)
 
-    trackDirs(outDir)
-
-    expect(fs.existsSync(htmlPath)).toBe(false)
+    expect(fs.existsSync(mockHtmlPath)).toBe(false)
 
     await build({
       configFile: false,
-      root,
+      root: mockHtmlRoot,
       build: {
-        outDir,
+        outDir: mockHtmlOutDir,
         emptyOutDir: true,
         minify: false,
       },
@@ -90,8 +159,8 @@ describe('src/multi-env', () => {
       logLevel: 'silent',
     })
 
-    expect(fs.existsSync(htmlPath)).toBe(false)
-    expect(fs.existsSync(distHtmlPath)).toBe(false)
+    expect(fs.existsSync(mockHtmlPath)).toBe(false)
+    expect(fs.existsSync(mockHtmlDistPath)).toBe(false)
   })
 
   it('builds electron flat environments without rebuilding the renderer app', async () => {

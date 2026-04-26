@@ -150,49 +150,54 @@ export interface ElectronOptions {
 当你希望每个 Electron 构建目标都映射到一个明确的 Vite environment 时，使用 `/multi-env` 会更直接。它使用 Vite 的 Environment API 来构建 Electron 目标，是更面向未来的多目标构建方式。
 
 ```js
-import electron from 'vite-plugin-electron/multi-env'
+import electron, { simpleOptions } from 'vite-plugin-electron/multi-env'
 
 export default {
   plugins: [
-    electron([
-      {
-        name: 'main',
-        input: 'electron/main.ts',
-        options: {
-          define: {
-            __ELECTRON_TARGET__: JSON.stringify('main'),
+    electron(
+      simpleOptions({
+        main: {
+          input: 'electron/main.ts',
+          options: {
+            define: {
+              __ELECTRON_TARGET__: JSON.stringify('main'),
+            },
           },
         },
-      },
-      {
-        name: 'preload',
-        input: 'electron/preload.ts',
-        onstart({ reload }) {
-          reload()
-        },
-        options: {
-          define: {
-            __ELECTRON_TARGET__: JSON.stringify('preload'),
+        preload: {
+          input: 'electron/preload.ts',
+          onstart({ reload }) {
+            reload()
           },
-          build: {
-            rolldownOptions: {
-              output: {
-                format: 'cjs',
-                codeSplitting: false,
+          options: {
+            define: {
+              __ELECTRON_TARGET__: JSON.stringify('preload'),
+            },
+            build: {
+              rolldownOptions: {
+                output: {
+                  format: 'cjs',
+                  codeSplitting: false,
+                },
               },
             },
           },
         },
-      },
-    ]),
+      }),
+    ),
   ],
 }
 ```
 
+`simpleOptions()` 可以把一个按环境名分组的对象转换成 `electron()` 需要的数组。`main` 和 `preload` 这两个 key 还会复用 `simple` API 的默认预设，这样你既能按 key 组织配置，又不会失去这些便利配置。
+
 ```ts
 export interface MultiEnvElectronOptions {
   /**
-   * Generates a stable Vite environment name like `electron_main`.
+   * Optional name for the Electron environment.
+   *
+   * By default, the plugin will generate environment names like `electron_0`,
+   * `electron_1`, etc. based on the order of the options provided.
    */
   name?: string
   /**
@@ -210,8 +215,6 @@ export interface MultiEnvElectronOptions {
   onstart?: ElectronOptions['onstart']
 }
 ```
-
-`name: 'main'` 会生成一个稳定的 Vite environment 名，比如 `electron_main`。`plugins` 对应的是 `options.build.rolldownOptions.plugins`，而 `options` 则用于补充每个 environment 自己的 Vite 配置。
 
 ## 推荐目录结构
 
