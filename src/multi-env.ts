@@ -153,7 +153,7 @@ export default function electron(
             // the existing handler, then append the electron builds. The user's
             // handler is responsible for every environment it registered; we only
             // add the electron environments that we injected.
-            await prevBuildApp(builder)
+            await prevBuildApp.call(builder, builder)
           } else {
             for (const [name, env] of Object.entries(builder.environments)) {
               if (!envNames.has(name)) {

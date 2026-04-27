@@ -633,4 +633,68 @@ describe('src/multi-env', () => {
     expect(preloadCode).toContain('"flat-preload"')
     expect(preloadCode).not.toContain('electron_main:flat-main')
   })
+
+  it('respects user-defined buildApp and still builds electron environments', async () => {
+    const root = path.join(__dirname, 'fixtures')
+    const appOutDir = path.join(__dirname, 'dist-user-buildapp-app')
+    const electronOutDir = path.join(__dirname, 'dist-user-buildapp-electron')
+
+    await resetDirs(appOutDir, electronOutDir)
+
+    // Track which environments the user's buildApp was invoked for, and
+    // whether `this` was the ViteBuilder (has an `environments` property).
+    const userBuiltEnvs: string[] = []
+    let userBuildAppThis: unknown
+
+    const builder = await createBuilder({
+      configFile: false,
+      root,
+      build: {
+        outDir: appOutDir,
+        emptyOutDir: true,
+        minify: false,
+      },
+      builder: {
+        buildApp: async function (b) {
+          // Capture `this` to verify it is forwarded correctly via .call().
+          userBuildAppThis = this
+          for (const [name, env] of Object.entries(b.environments)) {
+            userBuiltEnvs.push(name)
+            await b.build(env)
+          }
+        },
+      },
+      plugins: electron([
+        {
+          name: 'main',
+          input: 'env-main.ts',
+          options: {
+            define: {
+              __ENV_NAME__: JSON.stringify('user-buildapp-main'),
+            },
+            build: {
+              minify: false,
+              outDir: electronOutDir,
+            },
+          },
+        },
+      ]),
+      logLevel: 'silent',
+    })
+    await builder.buildApp()
+
+    // The user's buildApp should have been called.
+    expect(userBuiltEnvs.length).toBeGreaterThan(0)
+
+    // `this` should be the ViteBuilder instance (has an `environments` map).
+    expect(userBuildAppThis).toBeDefined()
+    expect(typeof (userBuildAppThis as { environments?: unknown }).environments).toBe('object')
+
+    // The electron environment should have been built regardless of whether
+    // the user's buildApp included it.
+    const mainCode = fs
+      .readFileSync(path.join(electronOutDir, 'env-main.js'), 'utf-8')
+      .replace(normalizingNewLineRE, '\n')
+    expect(mainCode).toContain('"user-buildapp-main"')
+  })
 })
