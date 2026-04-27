@@ -70,7 +70,7 @@ export const defaultMainSimpleConfig: InlineConfig = {
 
 export function createDefaultPreloadConfig(
   esmodule: boolean,
-  input: RolldownOptions['input'],
+  input?: RolldownOptions['input'],
 ): InlineConfig {
   const fileExt = esmodule ? 'mjs' : 'js'
 

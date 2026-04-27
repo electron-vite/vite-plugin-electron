@@ -62,7 +62,7 @@ export function simpleOptions(options: MultiEnvElectronOptionsRecord): MultiEnvE
           name,
           onstart: rest.onstart || defaultPreloadOnstart,
           options: mergeConfig<EnvironmentOptions, EnvironmentOptions>(
-            createDefaultPreloadConfig(checkESModule(), rest.input),
+            createDefaultPreloadConfig(checkESModule()),
             options ?? {},
           ),
         })
@@ -74,6 +74,10 @@ export function simpleOptions(options: MultiEnvElectronOptionsRecord): MultiEnvE
         })
     }
   })
+}
+
+export function electronSimple(options: MultiEnvElectronOptionsRecord): Plugin[] {
+  return electron(simpleOptions(options))
 }
 
 const PLUGIN_PREFIX = 'vite-plugin-electron-multi-env'

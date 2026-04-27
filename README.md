@@ -171,49 +171,61 @@ export interface ElectronOptions {
 > `vite-plugin-electron/multi-env` is only available in `vite-plugin-electron@>=1.0.0`.
 > It does not exist in `0.x` releases.
 
-Use `/multi-env` when you want each Electron target to map to an explicit Vite environment. It uses Vite's Environment API to build Electron targets, and it is the future-facing way to handle multi-target builds.
+Using Vite's Environment API to build Electron targets instead of manually calling `build()` . It is the future-facing way to handle multi-target builds, and the configuration is more concise and easier to maintain: use `rolldownOption.input` to specify the entry and overidable environment config for each target.
+
+Flat API:
 
 ```js
-import electron, { simpleOptions } from 'vite-plugin-electron/multi-env'
+import electron from 'vite-plugin-electron/multi-env'
 
 export default {
   plugins: [
-    electron(
-      simpleOptions({
-        main: {
-          input: 'electron/main.ts',
-          options: {
-            define: {
-              __ELECTRON_TARGET__: JSON.stringify('main'),
-            },
+    electron({
+      input: 'electron/main.ts',
+    }),
+  ],
+}
+```
+
+Simple API:
+
+```js
+import { electronSimple } from 'vite-plugin-electron/multi-env'
+
+export default {
+  plugins: [
+    electronSimple({
+      main: {
+        input: 'electron/main.ts',
+        options: {
+          define: {
+            __ELECTRON_TARGET__: JSON.stringify('main'),
           },
         },
-        preload: {
-          input: 'electron/preload.ts',
-          onstart({ reload }) {
-            reload()
-          },
-          options: {
-            define: {
-              __ELECTRON_TARGET__: JSON.stringify('preload'),
-            },
-            build: {
-              rolldownOptions: {
-                output: {
-                  format: 'cjs',
-                  codeSplitting: false,
-                },
-              },
-            },
+      },
+      preload: {
+        input: 'electron/preload.ts',
+        options: {
+          define: {
+            __ELECTRON_TARGET__: JSON.stringify('preload'),
           },
         },
       }),
+      // You can also add custom targets, and they will be built in the same way as the main process, but with different environment variables.
+      custom: {
+        input: 'electron/custom.ts',
+        options: {
+          define: {
+            __ELECTRON_TARGET__: JSON.stringify('custom'),
+          },
+        },
+      },
     ),
   ],
 }
 ```
 
-`simpleOptions()` can turn a keyed object into the array that `electron()` expects. The `main` and `preload` keys also reuse the same default presets as the `simple` API, so you can organize config by key without losing the convenience presets.
+### Configuration
 
 ```ts
 export interface MultiEnvElectronOptions {
