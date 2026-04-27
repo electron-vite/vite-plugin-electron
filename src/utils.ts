@@ -25,8 +25,15 @@ export interface PidTree {
 function resolveBuiltinExternals(
   external: RolldownOptions['external'],
 ): RolldownOptions['external'] {
-  const builtins: (string | RegExp)[] = builtinModules.filter((e) => !e.startsWith('_'))
-  builtins.push('electron', ...builtins.map((m) => `node:${m}`))
+  const builtins: (string | RegExp)[] = [
+    'electron',
+    'electron/main',
+    'electron/renderer',
+    'electron/common',
+    'electron/utility',
+    ...builtinModules,
+    /^node:/,
+  ]
 
   if (Array.isArray(external)) {
     return builtins.concat(external)
