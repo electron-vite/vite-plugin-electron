@@ -17,9 +17,15 @@ interface FactoryOptions {
     isESM: boolean,
   ) => Promise<void> | void
   build: (userConfig: UserConfig, configEnv: ConfigEnv, isESM: boolean) => Promise<void> | void
+  buildConfig?: (config: UserConfig, env: ConfigEnv) => UserConfig | undefined
 }
 
-export function createElectronPlugin({ prefix, dev, build }: FactoryOptions): Plugin[] {
+export function createElectronPlugin({
+  prefix,
+  buildConfig,
+  dev,
+  build,
+}: FactoryOptions): Plugin[] {
   let userConfig: UserConfig
   let configEnv: ConfigEnv
   let cleanupMock: (() => Promise<void>) | undefined
@@ -67,8 +73,11 @@ export function createElectronPlugin({ prefix, dev, build }: FactoryOptions): Pl
         userConfig = config
         configEnv = env
 
-        // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
-        config.base ??= './'
+        return {
+          // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
+          ...(config.base ? {} : { base: './' }),
+          ...buildConfig?.(config, env),
+        }
       },
       configResolved(config) {
         // When there is no entry (no index.html and no configured input), write a

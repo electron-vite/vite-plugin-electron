@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { build } from 'vite'
+import { createBuilder } from 'vite'
 import type { Plugin } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -147,7 +147,7 @@ describe('src/multi-env', () => {
 
     expect(fs.existsSync(mockHtmlPath)).toBe(false)
 
-    await build({
+    const builder = await createBuilder({
       configFile: false,
       root: mockHtmlRoot,
       build: {
@@ -158,6 +158,7 @@ describe('src/multi-env', () => {
       plugins: electron([]),
       logLevel: 'silent',
     })
+    await builder.buildApp()
 
     expect(fs.existsSync(mockHtmlPath)).toBe(false)
     expect(fs.existsSync(mockHtmlDistPath)).toBe(false)
@@ -202,7 +203,7 @@ describe('src/multi-env', () => {
 
     await resetDirs(appOutDir, electronOutDir)
 
-    await build({
+    const builder = await createBuilder({
       configFile: false,
       root,
       build: {
@@ -227,6 +228,7 @@ describe('src/multi-env', () => {
       ],
       logLevel: 'silent',
     })
+    await builder.buildApp()
 
     expect(fs.existsSync(path.join(appOutDir, 'index.html'))).toBe(true)
     expect(fs.existsSync(path.join(electronOutDir, 'main.js'))).toBe(true)
@@ -247,7 +249,7 @@ describe('src/multi-env', () => {
 
     await resetDirs(appOutDir, electronOutDir)
 
-    await build({
+    const builder = await createBuilder({
       configFile: false,
       root,
       build: {
@@ -273,6 +275,7 @@ describe('src/multi-env', () => {
       ]),
       logLevel: 'silent',
     })
+    await builder.buildApp()
 
     const mainCode = fs
       .readFileSync(path.join(electronOutDir, 'env-status.js'), 'utf-8')
@@ -289,7 +292,7 @@ describe('src/multi-env', () => {
 
     await resetDirs(appOutDir, electronOutDir)
 
-    await build({
+    const builder = await createBuilder({
       configFile: false,
       root,
       build: {
@@ -319,6 +322,7 @@ describe('src/multi-env', () => {
       ]),
       logLevel: 'silent',
     })
+    await builder.buildApp()
 
     const mainCode = fs
       .readFileSync(path.join(electronOutDir, 'env-main.js'), 'utf-8')
@@ -336,7 +340,7 @@ describe('src/multi-env', () => {
 
     await resetDirs(appOutDir, mainOutDir, preloadOutDir)
 
-    await build({
+    const builder = await createBuilder({
       configFile: false,
       root,
       build: {
@@ -377,6 +381,7 @@ describe('src/multi-env', () => {
       ]),
       logLevel: 'silent',
     })
+    await builder.buildApp()
 
     const mainCode = fs
       .readFileSync(path.join(mainOutDir, 'env-main.js'), 'utf-8')
@@ -416,7 +421,7 @@ describe('src/multi-env', () => {
 
     await resetDirs(appOutDir, mainOutDir, preloadOutDir)
 
-    await build({
+    const builder = await createBuilder({
       configFile: false,
       root,
       build: {
@@ -450,6 +455,7 @@ describe('src/multi-env', () => {
       ]),
       logLevel: 'silent',
     })
+    await builder.buildApp()
 
     const mainCode = fs
       .readFileSync(path.join(mainOutDir, 'env-main.js'), 'utf-8')
@@ -476,7 +482,7 @@ describe('src/multi-env', () => {
 
     await resetDirs(appOutDir, mainOutDir, preloadOutDir, logsDir)
 
-    await build({
+    const builder = await createBuilder({
       configFile: false,
       root,
       build: {
@@ -510,6 +516,7 @@ describe('src/multi-env', () => {
       ]),
       logLevel: 'silent',
     })
+    await builder.buildApp()
 
     const mainCode = fs
       .readFileSync(path.join(mainOutDir, 'env-main.js'), 'utf-8')
@@ -555,7 +562,7 @@ describe('src/multi-env', () => {
 
     await resetDirs(appOutDir, electronOutDir)
 
-    await build({
+    const builder = await createBuilder({
       configFile: false,
       root,
       build: {
@@ -609,6 +616,7 @@ describe('src/multi-env', () => {
       ]),
       logLevel: 'silent',
     })
+    await builder.buildApp()
 
     const mainCode = fs
       .readFileSync(path.join(electronOutDir, 'env-main.js'), 'utf-8')
@@ -624,5 +632,61 @@ describe('src/multi-env', () => {
     expect(preloadCode).toContain('electron_preload:flat-preload')
     expect(preloadCode).toContain('"flat-preload"')
     expect(preloadCode).not.toContain('electron_main:flat-main')
+  })
+
+  it('respects user-defined buildApp and still builds electron environments', async () => {
+    const root = path.join(__dirname, 'fixtures')
+    const appOutDir = path.join(__dirname, 'dist-user-buildapp-app')
+    const electronOutDir = path.join(__dirname, 'dist-user-buildapp-electron')
+
+    await resetDirs(appOutDir, electronOutDir)
+
+    // Track which environments the user's buildApp was invoked for
+    const userBuiltEnvs: string[] = []
+
+    const builder = await createBuilder({
+      configFile: false,
+      root,
+      build: {
+        outDir: appOutDir,
+        emptyOutDir: true,
+        minify: false,
+      },
+      builder: {
+        async buildApp(b) {
+          for (const [name, env] of Object.entries(b.environments)) {
+            userBuiltEnvs.push(name)
+            await b.build(env)
+          }
+        },
+      },
+      plugins: electron([
+        {
+          name: 'main',
+          input: 'env-main.ts',
+          options: {
+            define: {
+              __ENV_NAME__: JSON.stringify('user-buildapp-main'),
+            },
+            build: {
+              minify: false,
+              outDir: electronOutDir,
+            },
+          },
+        },
+      ]),
+      logLevel: 'silent',
+    })
+    await builder.buildApp()
+
+    // The user's buildApp should have been called.
+    expect(userBuiltEnvs.length).toBeGreaterThan(0)
+
+    // The electron environment should have been built regardless of whether
+    // the user's buildApp included it.
+    const mainCode = fs
+      .readFileSync(path.join(electronOutDir, 'env-main.js'), 'utf-8')
+      .replace(normalizingNewLineRE, '\n')
+    expect(mainCode).toContain('"user-buildapp-main"')
   })
 })

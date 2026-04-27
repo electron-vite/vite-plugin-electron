@@ -1,11 +1,5 @@
 import { createBuilder, mergeConfig, perEnvironmentPlugin } from 'vite'
-import type {
-  EnvironmentOptions,
-  Plugin,
-  ViteDevServer,
-  InlineConfig,
-  MinimalPluginContextWithoutEnvironment,
-} from 'vite'
+import type { EnvironmentOptions, Plugin, ViteBuilder } from 'vite'
 
 import { createElectronPlugin } from './base'
 import { defaultPreloadOnstart, triggerStartup } from './startup'
@@ -101,94 +95,104 @@ export default function electron(
     return { ...opt, name } as const
   })
 
-  const createElectronBuilder = async (
-    isESM: boolean,
-    inheritedConfig: InlineConfig,
-    server?: ViteDevServer,
-    context?: MinimalPluginContextWithoutEnvironment,
-  ) => {
-    if (optionsArray.length === 0) {
-      return
-    }
+  const isESM = checkESModule()
 
-    let builtCount = 0
-    const builder = await createBuilder(
-      withExternalBuiltins({
-        configFile: false,
-        publicDir: false,
-        ...inheritedConfig,
-        environments: Object.fromEntries(
-          environmentOptions.map((opt) => {
-            const defaultConfig = createElectronViteDefaults(isESM, {
-              input: opt.input,
-              plugins: opt.plugins,
-            })
+  // Shared: create per-environment EnvironmentOptions from the options array.
+  const defaultEnvs = Object.fromEntries(
+    environmentOptions.map((opt) => {
+      const defaultConfig = createElectronViteDefaults(isESM, {
+        input: opt.input,
+        plugins: opt.plugins,
+      })
 
-            const envCfg = mergeConfig<EnvironmentOptions, EnvironmentOptions>(
-              { consumer: 'server', ...defaultConfig },
-              opt.options ?? {},
-            )
-
-            if (server) {
-              envCfg.build ??= {}
-              envCfg.build.watch ??= {}
-              envCfg.build.minify ??= false
-            }
-
-            return [opt.name, envCfg]
-          }),
+      return [
+        opt.name,
+        mergeConfig<EnvironmentOptions, EnvironmentOptions>(
+          { consumer: 'server', ...defaultConfig },
+          opt.options ?? {},
         ),
-        plugins: environmentOptions.flatMap((opt) => {
-          const name = opt.name
-          return server
-            ? perEnvironmentPlugin(`${PLUGIN_PREFIX}:startup:${name}`, (ctx) => {
-                if (ctx.name !== name) {
-                  return false
-                }
-                return {
-                  name: `${PLUGIN_PREFIX}:startup-hook:${name}`,
-                  closeBundle() {
-                    if (++builtCount < optionsArray.length) {
-                      return
-                    }
-                    triggerStartup(context!, server, opt)
-                  },
-                }
-              })
-            : null
-        }),
-      }),
-    )
+      ]
+    }),
+  )
 
-    // Build only the Electron environments; the renderer app has already been
-    // built by the outer Vite command.
-    for (const name of envNames) {
-      await builder.build(builder.environments[name]!)
+  // Build each electron environment from the given builder in declaration order.
+  const buildElectronEnvironments = async (builder: ViteBuilder): Promise<void> => {
+    for (const name of Object.keys(builder.environments)) {
+      const env = builder.environments[name]
+      if (env && !env.isBuilt) {
+        await builder.build(env)
+      }
     }
   }
 
   return createElectronPlugin({
     prefix: PLUGIN_PREFIX,
-    async dev(pluginContext, server, isESM) {
-      await createElectronBuilder(
-        isESM,
-        // reassign is required here
-        {
+    async dev(pluginContext, server) {
+      if (optionsArray.length === 0) {
+        return
+      }
+
+      let builtCount = 0
+
+      // In watch/dev mode, enable watching and disable minification.
+      for (const envCfg of Object.values(defaultEnvs)) {
+        envCfg.build ??= {}
+        envCfg.build.watch ??= {}
+        envCfg.build.minify ??= false
+      }
+
+      const builder = await createBuilder(
+        withExternalBuiltins({
+          configFile: false,
+          publicDir: false,
           mode: server.config.mode,
           root: server.config.root,
           envDir: server.config.envDir,
           envPrefix: server.config.envPrefix,
-        },
-        server,
-        pluginContext,
+          environments: defaultEnvs,
+          plugins: environmentOptions.flatMap((opt) => {
+            const name = opt.name
+            return perEnvironmentPlugin(`${PLUGIN_PREFIX}:startup:${name}`, (ctx) => {
+              if (ctx.name !== name) {
+                return false
+              }
+              return {
+                name: `${PLUGIN_PREFIX}:startup-hook:${name}`,
+                closeBundle() {
+                  if (++builtCount < optionsArray.length) {
+                    return
+                  }
+                  triggerStartup(pluginContext, server, opt)
+                },
+              }
+            })
+          }),
+        }),
       )
+
+      await buildElectronEnvironments(builder)
     },
-    async build(userConfig, configEnv, isESM) {
-      await createElectronBuilder(isESM, {
-        mode: configEnv.mode,
-        root: userConfig.root,
-        envDir: userConfig.envDir,
-        envPrefix: userConfig.envPrefix,
+    // Build is fully handled by the config() hook, so we can leave this empty.
+    async build() {},
+    // Use the config() hook to inject electron environments
+    buildConfig(config) {
+      if (optionsArray.length === 0) {
+        return
+      }
+
+      return withExternalBuiltins({
+        environments: defaultEnvs,
+        builder: {
+          async buildApp(builder) {
+            const prevBuildApp = config.builder?.buildApp
+            if (prevBuildApp) {
+              await prevBuildApp.call(this, builder)
+            }
+
+            // Let the user's buildApp run first so the mock HTML remains available.
+            await buildElectronEnvironments(builder)
+          },
+        },
       })
     },
   })
