@@ -11,13 +11,13 @@ import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule } from './
 
 interface FactoryOptions {
   prefix: string
-  buildConfig?: (config: UserConfig, env: ConfigEnv) => UserConfig
   dev: (
     pluginContext: MinimalPluginContextWithoutEnvironment,
     server: ViteDevServer,
     isESM: boolean,
   ) => Promise<void> | void
   build: (userConfig: UserConfig, configEnv: ConfigEnv, isESM: boolean) => Promise<void> | void
+  buildConfig?: (config: UserConfig, env: ConfigEnv) => UserConfig | undefined
 }
 
 export function createElectronPlugin({
