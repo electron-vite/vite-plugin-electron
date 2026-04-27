@@ -1,6 +1,7 @@
 {
   "name": "electron-playground-multi-env",
   "private": true,
+  "type": "module",
   "main": "./dist-electron/main.js",
   "scripts": {
     "dev": "vite",

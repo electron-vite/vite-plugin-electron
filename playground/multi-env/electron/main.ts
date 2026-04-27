@@ -1,4 +1,5 @@
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { app, BrowserWindow, ipcMain } from 'electron'
 
@@ -24,7 +25,7 @@ ipcMain.handle('playground:multi-env-state', () => ({
   mainStartedAt: startedAt,
   mainStatus: __PLAYGROUND_MULTI_ENV_MAIN_LABEL__,
 }))
-
+const __dirname = dirname(fileURLToPath(import.meta.url))
 const createWindow = () => {
   const window = new BrowserWindow({
     width: 1120,
@@ -32,7 +33,7 @@ const createWindow = () => {
     title: `Multi-env playground - pid ${process.pid}`,
     webPreferences: {
       contextIsolation: true,
-      preload: join(__dirname, 'preload.js'),
+      preload: join(__dirname, 'preload.mjs'),
     },
   })
 
