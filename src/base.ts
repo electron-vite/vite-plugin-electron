@@ -11,10 +11,7 @@ import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule } from './
 
 interface FactoryOptions {
   prefix: string
-  buildConfig?: (
-    config: UserConfig,
-    env: ConfigEnv,
-  ) => Promise<void | UserConfig> | void | UserConfig
+  buildConfig?: (config: UserConfig, env: ConfigEnv) => UserConfig
   dev: (
     pluginContext: MinimalPluginContextWithoutEnvironment,
     server: ViteDevServer,
@@ -72,13 +69,13 @@ export function createElectronPlugin({
     {
       name: `${prefix}:prod`,
       apply: 'build',
-      async config(config, env) {
+      config(config, env) {
         userConfig = config
         configEnv = env
 
         return {
           // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
-          base: config.base ?? './',
+          ...(config.base ? {} : { base: './' }),
           ...buildConfig?.(config, env),
         }
       },
