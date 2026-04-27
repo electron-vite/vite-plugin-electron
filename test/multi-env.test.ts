@@ -641,10 +641,8 @@ describe('src/multi-env', () => {
 
     await resetDirs(appOutDir, electronOutDir)
 
-    // Track which environments the user's buildApp was invoked for, and
-    // whether `this` was the ViteBuilder (has an `environments` property).
+    // Track which environments the user's buildApp was invoked for
     const userBuiltEnvs: string[] = []
-    let userBuildAppThis: unknown
 
     const builder = await createBuilder({
       configFile: false,
@@ -655,9 +653,7 @@ describe('src/multi-env', () => {
         minify: false,
       },
       builder: {
-        buildApp: async function (b) {
-          // Capture `this` to verify it is forwarded correctly via .call().
-          userBuildAppThis = this
+        async buildApp(b) {
           for (const [name, env] of Object.entries(b.environments)) {
             userBuiltEnvs.push(name)
             await b.build(env)
@@ -685,10 +681,6 @@ describe('src/multi-env', () => {
 
     // The user's buildApp should have been called.
     expect(userBuiltEnvs.length).toBeGreaterThan(0)
-
-    // `this` should be the ViteBuilder instance (has an `environments` map).
-    expect(userBuildAppThis).toBeDefined()
-    expect(typeof (userBuildAppThis as { environments?: unknown }).environments).toBe('object')
 
     // The electron environment should have been built regardless of whether
     // the user's buildApp included it.

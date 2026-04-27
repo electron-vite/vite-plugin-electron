@@ -11,6 +11,10 @@ import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule } from './
 
 interface FactoryOptions {
   prefix: string
+  buildConfig?: (
+    config: UserConfig,
+    env: ConfigEnv,
+  ) => Promise<void | UserConfig> | void | UserConfig
   dev: (
     pluginContext: MinimalPluginContextWithoutEnvironment,
     server: ViteDevServer,
@@ -19,7 +23,12 @@ interface FactoryOptions {
   build: (userConfig: UserConfig, configEnv: ConfigEnv, isESM: boolean) => Promise<void> | void
 }
 
-export function createElectronPlugin({ prefix, dev, build }: FactoryOptions): Plugin[] {
+export function createElectronPlugin({
+  prefix,
+  buildConfig,
+  dev,
+  build,
+}: FactoryOptions): Plugin[] {
   let userConfig: UserConfig
   let configEnv: ConfigEnv
   let cleanupMock: (() => Promise<void>) | undefined
@@ -63,12 +72,15 @@ export function createElectronPlugin({ prefix, dev, build }: FactoryOptions): Pl
     {
       name: `${prefix}:prod`,
       apply: 'build',
-      config(config, env) {
+      async config(config, env) {
         userConfig = config
         configEnv = env
 
-        // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
-        config.base ??= './'
+        return {
+          // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
+          base: config.base ?? './',
+          ...buildConfig?.(config, env),
+        }
       },
       configResolved(config) {
         // When there is no entry (no index.html and no configured input), write a
