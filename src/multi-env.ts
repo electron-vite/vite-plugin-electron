@@ -1,5 +1,5 @@
 import { createBuilder, mergeConfig, perEnvironmentPlugin } from 'vite'
-import type { EnvironmentOptions, Plugin } from 'vite'
+import type { EnvironmentOptions, Plugin, ViteBuilder } from 'vite'
 
 import { createElectronPlugin } from './base'
 import { defaultPreloadOnstart, triggerStartup } from './startup'
@@ -121,6 +121,14 @@ export default function electron(
   // them and avoids a double-build.
   let electronBuiltViaApp = false
 
+  // Build each electron environment from the given builder in declaration order.
+  const buildElectronEnvironments = async (builder: ViteBuilder): Promise<void> => {
+    for (const name of envNames) {
+      const env = builder.environments[name]
+      if (env) await builder.build(env)
+    }
+  }
+
   return [
     // Build mode: use the config() hook to inject electron environments and
     // set builder.buildApp so Vite's CLI builds the renderer app first, then
@@ -150,8 +158,10 @@ export default function electron(
           electronBuiltViaApp = true
 
           if (prevBuildApp) {
-            // Delegate renderer (and any other user-defined) builds to the
-            // existing handler, then append the electron builds.
+            // Delegate all builds (renderer + any user-defined environments) to
+            // the existing handler, then append the electron builds. The user's
+            // handler is responsible for every environment it registered; we only
+            // add the electron environments that we injected.
             await prevBuildApp(builder)
           } else {
             for (const [name, env] of Object.entries(builder.environments)) {
@@ -161,9 +171,7 @@ export default function electron(
             }
           }
 
-          for (const name of envNames) {
-            await builder.build(builder.environments[name]!)
-          }
+          await buildElectronEnvironments(builder)
         }
       },
     },
@@ -215,9 +223,7 @@ export default function electron(
           }),
         )
 
-        for (const name of envNames) {
-          await builder.build(builder.environments[name]!)
-        }
+        await buildElectronEnvironments(builder)
       },
       // Fallback for Vite's programmatic build() API, which skips buildApp and
       // only builds the first (client) environment via closeBundle. When the
@@ -238,9 +244,7 @@ export default function electron(
           environments: envsCfg.environments,
         })
 
-        for (const name of envNames) {
-          await builder.build(builder.environments[name]!)
-        }
+        await buildElectronEnvironments(builder)
       },
     }),
   ]
