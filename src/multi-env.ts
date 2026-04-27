@@ -116,11 +116,6 @@ export default function electron(
       }),
     )
 
-  // Set to true when buildApp takes ownership of the electron builds so that
-  // the closeBundle-based fallback (used by the programmatic build() API) skips
-  // them and avoids a double-build.
-  let electronBuiltViaApp = false
-
   // Build each electron environment from the given builder in declaration order.
   const buildElectronEnvironments = async (builder: ViteBuilder): Promise<void> => {
     for (const name of envNames) {
@@ -153,10 +148,6 @@ export default function electron(
         const prevBuildApp = config.builder?.buildApp
         config.builder ??= {}
         config.builder.buildApp = async (builder) => {
-          // Claim ownership of the electron builds up-front so that the
-          // closeBundle-based fallback (below) does not run them a second time.
-          electronBuiltViaApp = true
-
           if (prevBuildApp) {
             // Delegate all builds (renderer + any user-defined environments) to
             // the existing handler, then append the electron builds. The user's
@@ -225,27 +216,8 @@ export default function electron(
 
         await buildElectronEnvironments(builder)
       },
-      // Fallback for Vite's programmatic build() API, which skips buildApp and
-      // only builds the first (client) environment via closeBundle. When the
-      // CLI-driven buildApp path already ran, this is a no-op.
-      async build(userConfig, configEnv) {
-        if (electronBuiltViaApp || optionsArray.length === 0) {
-          return
-        }
-
-        const envsCfg = withExternalBuiltins({ environments: createEnvironments() })
-        const builder = await createBuilder({
-          configFile: false,
-          publicDir: false,
-          mode: configEnv.mode,
-          root: userConfig.root,
-          envDir: userConfig.envDir,
-          envPrefix: userConfig.envPrefix,
-          environments: envsCfg.environments,
-        })
-
-        await buildElectronEnvironments(builder)
-      },
+      // Build is fully handled by the config() hook and builder.buildApp above.
+      async build() {},
     }),
   ]
 }
