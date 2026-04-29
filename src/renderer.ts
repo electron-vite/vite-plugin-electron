@@ -199,7 +199,10 @@ if (typeof document === 'undefined') {
   ]
   for (const key of keys) {
     _ipcRenderer[key] = () => {
-      throw new Error(`ipcRenderer doesn't work in a Web Worker.\nYou can see https://github.com/electron-vite/vite-plugin-electron/issues/69`)
+      throw new Error([
+        "ipcRenderer doesn't work in a Web Worker.",
+        'You can see https://github.com/electron-vite/vite-plugin-electron/issues/69',
+      ].join('\\n'))
     }
   }
 } else {
