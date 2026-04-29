@@ -199,10 +199,7 @@ if (typeof document === 'undefined') {
   ]
   for (const key of keys) {
     _ipcRenderer[key] = () => {
-      throw new Error(
-        "ipcRenderer doesn't work in a Web Worker.\\n" +
-        'You can see https://github.com/electron-vite/vite-plugin-electron/issues/69',
-      )
+      throw new Error(`ipcRenderer doesn't work in a Web Worker.\nYou can see https://github.com/electron-vite/vite-plugin-electron/issues/69`)
     }
   }
 } else {
@@ -469,7 +466,7 @@ function libEsm(options: {
       const rightValue = member === 'default' ? `${target}.default || ${target}` : `${target}.${member}`
       return `${leftValue} = ${rightValue}`
     }),
-    aliases && Object.keys(aliases).length > 0
+    Object.keys(aliases).length > 0
       ? [
           'export {',
           ...Object.entries(aliases).map(([member, alias]) => `  ${alias} as ${member},`),
