@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { build } from 'vite'
+import { build, createBuilder } from 'vite'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import electron from '../src'
@@ -18,6 +18,11 @@ const mockHtmlDistPath = path.join(mockHtmlOutDir, 'index.html')
 const rendererBuildRoot = path.join(__dirname, 'fixtures/renderer-build')
 const rendererBuildOutDir = path.join(__dirname, 'dist-renderer-build')
 const rendererBuildElectronOutDir = path.join(__dirname, 'dist-renderer-electron')
+const rendererResolveBuildRoot = path.join(__dirname, 'fixtures/renderer-resolve-build')
+const rendererResolveBuildOutDir = path.join(__dirname, 'dist-renderer-resolve-build')
+const rendererResolveElectronOutDir = path.join(__dirname, 'dist-renderer-resolve-electron')
+const rendererCacheDir = path.join(__dirname, '..', 'node_modules', '.vite-electron-renderer')
+const localPkgCacheFile = path.join(rendererCacheDir, 'local-pkg.cjs')
 
 async function cleanupMockHtml() {
   await Promise.all([
@@ -30,6 +35,9 @@ async function cleanupRendererBuild() {
   await Promise.all([
     fs.promises.rm(rendererBuildOutDir, { recursive: true, force: true }),
     fs.promises.rm(rendererBuildElectronOutDir, { recursive: true, force: true }),
+    fs.promises.rm(rendererResolveBuildOutDir, { recursive: true, force: true }),
+    fs.promises.rm(rendererResolveElectronOutDir, { recursive: true, force: true }),
+    fs.promises.rm(localPkgCacheFile, { force: true }),
   ])
 }
 
@@ -89,7 +97,7 @@ describe('src/plugin', () => {
 
   describe('src/simple', () => {
     it('builds renderer support with the built-in plugin', async () => {
-      await build({
+      const builder = await createBuilder({
         configFile: false,
         root: rendererBuildRoot,
         build: {
@@ -110,6 +118,7 @@ describe('src/plugin', () => {
         }),
         logLevel: 'silent',
       })
+      await builder.buildApp()
 
       const assetDir = path.join(rendererBuildOutDir, 'assets')
       const bundle = fs
@@ -121,6 +130,43 @@ describe('src/plugin', () => {
       expect(bundle).toContain('requireElectron')
       expect(bundle).toContain('vite-plugin-electron-renderer:builtin:electron')
       expect(fs.existsSync(path.join(rendererBuildElectronOutDir, 'main.js'))).toBe(true)
+    })
+
+    it('prebundles custom esm renderer modules with createBuilder', async () => {
+      const builder = await createBuilder({
+        configFile: false,
+        root: rendererResolveBuildRoot,
+        build: {
+          outDir: rendererResolveBuildOutDir,
+          emptyOutDir: true,
+          minify: false,
+        },
+        plugins: await electronSimple({
+          main: {
+            entry: 'electron/main.ts',
+            vite: {
+              build: {
+                outDir: path.relative(rendererResolveBuildRoot, rendererResolveElectronOutDir),
+              },
+            },
+          },
+          renderer: {
+            resolve: {
+              'local-pkg': {
+                type: 'esm',
+              },
+            },
+          },
+        }),
+        logLevel: 'silent',
+      })
+      await builder.buildApp()
+
+      expect(fs.existsSync(localPkgCacheFile)).toBe(true)
+
+      const bundle = fs.readFileSync(localPkgCacheFile, 'utf-8')
+      expect(bundle).toContain('loadPackageJSONSync')
+      expect(fs.existsSync(path.join(rendererResolveElectronOutDir, 'main.js'))).toBe(true)
     })
   })
 })

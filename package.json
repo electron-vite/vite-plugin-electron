@@ -68,7 +68,6 @@
     "prepublishOnly": "pnpm run build && pnpm run test"
   },
   "dependencies": {
-    "esbuild": "^0.28.0",
     "local-pkg": "^1.1.2"
   },
   "devDependencies": {

@@ -2,9 +2,11 @@ import fs from 'node:fs'
 import { builtinModules, createRequire } from 'node:module'
 import path from 'node:path'
 
-import type { BuildOptions as EsbuildBuildOptions } from 'esbuild'
+import { createBuilder, mergeConfig, normalizePath } from 'vite'
 import type { Plugin, UserConfig } from 'vite'
-import { normalizePath } from 'vite'
+
+import type { RolldownOptions } from './utils'
+import { withExternalBuiltins } from './utils'
 
 const require = createRequire(import.meta.url)
 
@@ -89,13 +91,18 @@ const javascriptKeywords = [
 
 interface RendererModuleBuildHelpers {
   cjs: (module: string) => Promise<string>
-  esm: (module: string, buildOptions?: EsbuildBuildOptions) => Promise<string>
+  esm: (module: string, buildOptions?: RendererModuleBuildOptions) => Promise<string>
 }
 
 interface RendererResolveOptions {
   type: 'cjs' | 'esm'
   build?: (args: RendererModuleBuildHelpers) => Promise<string>
 }
+
+export type RendererModuleBuildOptions = Omit<
+  RolldownOptions,
+  'external' | 'input' | 'output' | 'platform'
+>
 
 export interface RendererOptions {
   /**
@@ -221,19 +228,18 @@ export default function renderer(options: RendererOptions = {}): Plugin {
   let root = normalizePath(process.cwd())
   let cacheDir = path.posix.join(root, CACHE_DIR)
   const activeResolveOptions = new Map<string, RendererResolveOptions>()
+  const moduleContents = new Map<string, Promise<string>>()
 
   return {
     name: RENDERER_PLUGIN_NAME,
     enforce: 'pre',
-    config(config, { command }) {
+    config(config) {
       root = normalizePath(config.root ? path.resolve(config.root) : process.cwd())
       cacheDir = path.posix.join(findNodeModules(root)[0] ?? root, CACHE_DIR)
       activeResolveOptions.clear()
+      moduleContents.clear()
 
       for (const [id, resolveOptions] of Object.entries(options.resolve ?? {})) {
-        if (command === 'build' && resolveOptions.type === 'esm') {
-          continue
-        }
         activeResolveOptions.set(id, resolveOptions)
       }
 
@@ -268,28 +274,44 @@ export default function renderer(options: RendererOptions = {}): Plugin {
         return
       }
 
-      if (resolveOptions.build) {
-        return resolveOptions.build({
-          cjs: async (module) => getCjsInteropSnippet({ importId: module, exportId: module }),
-          esm: (module, buildOptions) =>
-            getPreBundleSnippet({
-              module,
-              outdir: cacheDir,
-              root,
-              buildOptions,
-            }),
+      const cached = moduleContents.get(source)
+      if (cached) {
+        return cached
+      }
+
+      const loaded = (async () => {
+        if (resolveOptions.build) {
+          return resolveOptions.build({
+            cjs: async (module) => getCjsInteropSnippet({ importId: module, exportId: module }),
+            esm: (module, buildOptions) =>
+              getPreBundleSnippet({
+                module,
+                outdir: cacheDir,
+                root,
+                buildOptions,
+              }),
+          })
+        }
+
+        if (resolveOptions.type === 'cjs') {
+          return getCjsInteropSnippet({ importId: source, exportId: source })
+        }
+
+        return getPreBundleSnippet({
+          module: source,
+          outdir: cacheDir,
+          root,
         })
-      }
+      })()
 
-      if (resolveOptions.type === 'cjs') {
-        return getCjsInteropSnippet({ importId: source, exportId: source })
-      }
+      moduleContents.set(source, loaded)
 
-      return getPreBundleSnippet({
-        module: source,
-        outdir: cacheDir,
-        root,
-      })
+      try {
+        return await loaded
+      } catch (error) {
+        moduleContents.delete(source)
+        throw error
+      }
     },
   }
 }
@@ -322,27 +344,86 @@ async function getPreBundleSnippet(options: {
   module: string
   outdir: string
   root: string
-  buildOptions?: EsbuildBuildOptions
+  buildOptions?: RendererModuleBuildOptions
 }): Promise<string> {
-  const { build } = await import('esbuild')
   const outfile = path.posix.join(options.outdir, `${options.module}.cjs`)
   ensureDir(path.dirname(outfile))
-  await build({
-    entryPoints: [options.module],
+  await buildRendererModuleWithRolldown({
+    module: options.module,
     outfile,
-    target: 'node20',
-    format: 'cjs',
-    bundle: true,
-    sourcemap: 'inline',
-    platform: 'node',
-    external: [...builtinSet],
-    ...options.buildOptions,
+    root: options.root,
+    buildOptions: options.buildOptions,
   })
 
   return getCjsInteropSnippet({
     importId: outfile,
     exportId: relativeify(path.posix.relative(options.root, outfile)),
   })
+}
+
+async function buildRendererModuleWithRolldown(options: {
+  module: string
+  outfile: string
+  root: string
+  buildOptions?: RendererModuleBuildOptions
+}): Promise<void> {
+  const virtualEntryId = `${VIRTUAL_ID_PREFIX}entry:${options.module}`
+  const buildConfig = withExternalBuiltins({
+    configFile: false,
+    publicDir: false,
+    logLevel: 'silent',
+    root: options.root,
+    build: {
+      copyPublicDir: false,
+      emptyOutDir: false,
+      minify: false,
+      outDir: path.dirname(options.outfile),
+      sourcemap: 'inline',
+      rolldownOptions: mergeConfig(
+        {
+          input: { entry: virtualEntryId },
+          platform: 'node',
+          output: {
+            entryFileNames: path.basename(options.outfile),
+            format: 'cjs',
+            inlineDynamicImports: true,
+          },
+        } satisfies Pick<RolldownOptions, 'input' | 'output' | 'platform'>,
+        options.buildOptions ?? {},
+      ),
+    },
+    plugins: [
+      {
+        name: `${RENDERER_PLUGIN_NAME}:prebundle-entry`,
+        enforce: 'pre',
+        resolveId(id) {
+          if (id === virtualEntryId) {
+            return id
+          }
+        },
+        load(id) {
+          if (id === virtualEntryId) {
+            const source = JSON.stringify(options.module)
+            return [
+              `import * as moduleExports from ${source}`,
+              `export * from ${source}`,
+              'export default moduleExports.default ?? moduleExports',
+            ].join('\n')
+          }
+        },
+      },
+    ],
+  })
+  const builder = await createBuilder(
+    buildConfig,
+  )
+
+  const environment = builder.environments.client
+  if (!environment) {
+    throw new Error(`[vite-plugin-electron] Unable to create a renderer prebundle environment.`)
+  }
+
+  await builder.build(environment)
 }
 
 function libEsm(options: {

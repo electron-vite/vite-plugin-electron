@@ -11,9 +11,6 @@ importers:
 
   .:
     dependencies:
-      esbuild:
-        specifier: ^0.28.0
-        version: 0.28.0
       local-pkg:
         specifier: ^1.1.2
         version: 1.1.2
@@ -1887,6 +1884,7 @@ snapshots:
       '@esbuild/win32-arm64': 0.28.0
       '@esbuild/win32-ia32': 0.28.0
       '@esbuild/win32-x64': 0.28.0
+    optional: true
 
   estree-walker@3.0.3:
     dependencies:
