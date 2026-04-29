@@ -1,6 +1,7 @@
 import { mergeConfig } from 'vite'
 import type { Plugin } from 'vite'
 
+import type { RendererOptions } from './renderer'
 import { defaultPreloadOnstart } from './startup'
 import { checkESModule, createDefaultPreloadConfig, defaultMainSimpleConfig } from './utils'
 import type { RolldownOptions } from './utils'
@@ -19,10 +20,9 @@ export interface ElectronSimpleOptions {
     input: RolldownOptions['input']
   }
   /**
-   * Support use Node.js API in Electron-Renderer
-   * @see https://github.com/electron-vite/vite-plugin-electron-renderer
+   * Support use Node.js API in Electron-Renderer with the built-in renderer plugin.
    */
-  renderer?: import('vite-plugin-electron-renderer').RendererOptions
+  renderer?: RendererOptions
 }
 
 // The simple API just like v0.9.x
@@ -47,18 +47,8 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
   const plugins = electron(flatApiOptions)
 
   if (options.renderer) {
-    try {
-      const renderer = await import('vite-plugin-electron-renderer')
-      plugins.push(renderer.default(options.renderer))
-    } catch (error: any) {
-      if (error.code === 'ERR_MODULE_NOT_FOUND') {
-        throw new Error(
-          `\`renderer\` option depends on "vite-plugin-electron-renderer". Did you install it? Try \`npm i -D vite-plugin-electron-renderer\`.`,
-        )
-      }
-
-      throw error
-    }
+    const renderer = await import('./renderer')
+    plugins.push(renderer.default(options.renderer))
   }
 
   return plugins

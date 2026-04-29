@@ -28,6 +28,8 @@
 npm i -D vite-plugin-electron
 ```
 
+`renderer` 选项已经内置，不需要再额外安装渲染进程插件依赖。
+
 2. 把 `vite-plugin-electron` 加到 `vite.config.ts` 的 `plugins` 配置里
 
 ```js
@@ -41,10 +43,10 @@ export default {
         entry: 'electron/main.ts',
       },
       preload: {
-        // Shortcut of `build.rollupOptions.input`
+        // Shortcut of `build.rolldownOptions.input`
         input: 'electron/preload.ts',
       },
-      // Optional: Use Node.js API in the Renderer process
+      // Optional: Use the built-in Node.js/Electron renderer support
       renderer: {},
     }),
   ],
@@ -384,8 +386,6 @@ export default {
   ],
 }
 ```
-
-<!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
 
 <!--
 

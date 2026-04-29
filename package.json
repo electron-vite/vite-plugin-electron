@@ -64,6 +64,7 @@
     "prepublishOnly": "pnpm run build && pnpm run test"
   },
   "dependencies": {
+    "esbuild": "^0.28.0",
     "local-pkg": "^1.1.2"
   },
   "devDependencies": {
@@ -75,16 +76,7 @@
     "tsdown": "^0.21.7",
     "typescript": "^5.9.3",
     "vite": "^8.0.8",
-    "vite-plugin-electron-renderer": "^0.14.6",
     "vitest": "^4.1.4"
-  },
-  "peerDependencies": {
-    "vite-plugin-electron-renderer": "*"
-  },
-  "peerDependenciesMeta": {
-    "vite-plugin-electron-renderer": {
-      "optional": true
-    }
   },
   "packageManager": "pnpm@10.26.1"
 }

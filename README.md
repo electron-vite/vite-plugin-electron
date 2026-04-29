@@ -52,6 +52,8 @@ In short, `vite-plugin-electron` makes developing Electron apps as easy as norma
 npm i -D vite-plugin-electron
 ```
 
+The `renderer` option is built in, so no extra renderer plugin dependency is required.
+
 2. Add `vite-plugin-electron` to the `plugins` section of `vite.config.ts`
 
 ```js
@@ -65,10 +67,10 @@ export default {
         entry: 'electron/main.ts',
       },
       preload: {
-        // Shortcut of `build.rollupOptions.input`
+        // Shortcut of `build.rolldownOptions.input`
         input: 'electron/preload.ts',
       },
-      // Optional: Use Node.js API in the Renderer process
+      // Optional: Use the built-in Node.js/Electron renderer support
       renderer: {},
     }),
   ],
@@ -420,8 +422,6 @@ export default {
   ],
 }
 ```
-
-<!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
 
 <!--
 
