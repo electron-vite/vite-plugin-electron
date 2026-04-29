@@ -1,10 +1,9 @@
 import fs from 'node:fs'
 import { builtinModules, createRequire } from 'node:module'
-import os from 'node:os'
 import path from 'node:path'
 
 import type { BuildOptions as EsbuildBuildOptions } from 'esbuild'
-import type { Plugin } from 'vite'
+import type { Plugin, UserConfig } from 'vite'
 import { normalizePath } from 'vite'
 
 const require = createRequire(import.meta.url)
@@ -154,7 +153,7 @@ const electronMainApis = [
   { name: 'View', environments: ['Main'] },
 ] as const
 
-export const electron = `
+export const electron: string = `
 const electron = typeof require !== 'undefined'
   ? (function requireElectron() {
     const avoid_parse_require = require
@@ -295,31 +294,8 @@ export default function renderer(options: RendererOptions = {}): Plugin {
   }
 }
 
-function adaptElectronBuild(config: {
-  base?: string
-  build?: {
-    rolldownOptions?: {
-      output?: { freeze?: boolean } | Array<{ freeze?: boolean }>
-    }
-  }
-}): void {
+function adaptElectronBuild(config: UserConfig): void {
   config.base ??= './'
-  config.build ??= {}
-  config.build.rolldownOptions ??= {}
-  setOutputFreeze(config.build.rolldownOptions)
-}
-
-function setOutputFreeze(rolldownOptions: {
-  output?: { freeze?: boolean } | Array<{ freeze?: boolean }>
-}): void {
-  rolldownOptions.output ??= {}
-  if (Array.isArray(rolldownOptions.output)) {
-    for (const output of rolldownOptions.output) {
-      output.freeze ??= false
-    }
-    return
-  }
-  rolldownOptions.output.freeze ??= false
 }
 
 function excludeOptimizedDeps(

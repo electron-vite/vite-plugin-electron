@@ -119,7 +119,7 @@ describe('src/plugin', () => {
         .join('\n')
 
       expect(bundle).toContain('requireElectron')
-      expect(bundle).toContain(`avoid_parse_require("electron")`)
+      expect(bundle).toContain('vite-plugin-electron-renderer:builtin:electron')
       expect(fs.existsSync(path.join(rendererBuildElectronOutDir, 'main.js'))).toBe(true)
     })
   })

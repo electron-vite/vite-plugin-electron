@@ -38,6 +38,10 @@
       "import": "./dist/plugin.mjs",
       "require": "./dist/plugin.cjs"
     },
+    "./renderer": {
+      "import": "./dist/renderer.mjs",
+      "require": "./dist/renderer.cjs"
+    },
     "./simple": {
       "import": "./dist/simple.mjs",
       "require": "./dist/simple.cjs"
