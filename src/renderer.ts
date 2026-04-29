@@ -15,7 +15,7 @@ const RENDERER_PLUGIN_NAME = 'vite-plugin-electron-renderer'
 const VIRTUAL_ID_PREFIX = '\0vite-plugin-electron-renderer:'
 const BUILTIN_ID_PREFIX = `${VIRTUAL_ID_PREFIX}builtin:`
 const RESOLVE_ID_PREFIX = `${VIRTUAL_ID_PREFIX}resolve:`
-const RENDERER_MODULE_ID_FILTER = /^\0vite-plugin-electron-renderer:(builtin|resolve):/
+const RENDERER_MODULE_ID_FILTER = createIdPrefixFilter(BUILTIN_ID_PREFIX, RESOLVE_ID_PREFIX)
 
 const javascriptKeywords = [
   'break',
@@ -414,7 +414,7 @@ async function getPreBundleSnippet(options: {
 
   return getCjsInteropSnippet({
     importId: outfile,
-    exportId: relativeify(path.posix.relative(options.root, outfile)),
+    exportId: ensureRelativePath(path.posix.relative(options.root, outfile)),
   })
 }
 
@@ -459,21 +459,15 @@ async function buildRendererModuleWithRolldown(options: {
             id: virtualEntryFilter,
           },
           handler(id) {
-            if (id === virtualEntryId) {
-              return id
-            }
-
-            return
+            return id
           },
         },
         load: {
           filter: {
             id: virtualEntryFilter,
           },
-          handler(id) {
-            if (id === virtualEntryId) {
-              return getRendererEntryModuleSnippet(options.module)
-            }
+          handler() {
+            return getRendererEntryModuleSnippet(options.module)
           },
         },
       },
@@ -483,7 +477,9 @@ async function buildRendererModuleWithRolldown(options: {
 
   const environment = builder.environments.client
   if (!environment) {
-    throw new Error(`[vite-plugin-electron] Unable to create a renderer prebundle environment.`)
+    throw new Error(
+      `[vite-plugin-electron] Unable to create a renderer prebundle environment because builder.environments.client is undefined. Please check the Vite renderer build configuration.`,
+    )
   }
 
   await builder.build(environment)
@@ -513,7 +509,7 @@ function findNodeModules(root: string, matches: string[] = []): string[] {
   return parent === normalizedRoot ? matches : findNodeModules(parent, matches)
 }
 
-function relativeify(relativePath: string): string {
+function ensureRelativePath(relativePath: string): string {
   if (relativePath === '') {
     return '.'
   }
@@ -529,6 +525,10 @@ function ensureDir(dirname: string): void {
 
 function createExactIdFilter(id: string): RegExp {
   return new RegExp(`^${escapeRegExp(id)}$`)
+}
+
+function createIdPrefixFilter(...prefixes: string[]): RegExp {
+  return new RegExp(`^(?:${prefixes.map(escapeRegExp).join('|')})`)
 }
 
 function escapeRegExp(value: string): string {

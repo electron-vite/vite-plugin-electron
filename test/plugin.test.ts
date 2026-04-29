@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { build, createBuilder } from 'vite'
+import { build, createBuilder, normalizePath } from 'vite'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import electron from '../src'
@@ -200,7 +200,7 @@ describe('src/plugin', () => {
                       {
                         name: 'renderer-build-callback-transform',
                         transform(code, id) {
-                          if (id.includes('/node_modules/local-pkg/')) {
+                          if (normalizePath(id).includes('/node_modules/local-pkg/')) {
                             transformTriggered = true
                           }
 
