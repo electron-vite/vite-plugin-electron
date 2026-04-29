@@ -90,7 +90,7 @@ const javascriptKeywords = [
 ]
 
 interface RendererModuleBuildHelpers {
-  cjs: (module: string) => Promise<string>
+  cjs: (module: string) => string
   esm: (module: string, buildOptions?: RendererModuleBuildOptions) => Promise<string>
 }
 
@@ -286,7 +286,7 @@ export default function renderer(options: RendererOptions = {}): Plugin {
         const loaded = (async () => {
           if (resolveOptions.build) {
             return resolveOptions.build({
-              cjs: async (module) => getCjsInteropSnippet({ importId: module, exportId: module }),
+              cjs: (module) => getCjsInteropSnippet({ importId: module, exportId: module }),
               esm: (module, buildOptions) =>
                 getPreBundleSnippet({
                   module,
