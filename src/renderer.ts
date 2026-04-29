@@ -246,72 +246,75 @@ export default function renderer(options: RendererOptions = {}): Plugin {
       adaptElectronBuild(config)
       excludeOptimizedDeps(config, activeResolveOptions.keys())
     },
-    resolveId(source) {
-      if (builtinSet.has(source)) {
-        return `${BUILTIN_ID_PREFIX}${source}`
-      }
+    resolveId: {
+      handler(source) {
+        if (builtinSet.has(source)) {
+          return `${BUILTIN_ID_PREFIX}${source}`
+        }
 
-      if (activeResolveOptions.has(source)) {
-        return `${RESOLVE_ID_PREFIX}${source}`
-      }
+        if (activeResolveOptions.has(source)) {
+          return `${RESOLVE_ID_PREFIX}${source}`
+        }
+      },
     },
-    async load(id) {
-      if (id.startsWith(BUILTIN_ID_PREFIX)) {
-        const source = id.slice(BUILTIN_ID_PREFIX.length)
-        return source === 'electron'
-          ? electron
-          : getCjsInteropSnippet({ importId: source, exportId: source })
-      }
+    load: {
+      filter: {
+        id: /^\0vite-plugin-electron-renderer:(builtin|resolve):/,
+      },
+      async handler(id) {
+        if (id.startsWith(BUILTIN_ID_PREFIX)) {
+          const source = id.slice(BUILTIN_ID_PREFIX.length)
+          return source === 'electron'
+            ? electron
+            : getCjsInteropSnippet({ importId: source, exportId: source })
+        }
 
-      if (!id.startsWith(RESOLVE_ID_PREFIX)) {
-        return
-      }
+        const source = id.slice(RESOLVE_ID_PREFIX.length)
+        const resolveOptions = activeResolveOptions.get(source)
 
-      const source = id.slice(RESOLVE_ID_PREFIX.length)
-      const resolveOptions = activeResolveOptions.get(source)
+        if (!resolveOptions) {
+          return
+        }
 
-      if (!resolveOptions) {
-        return
-      }
+        const cached = moduleContents.get(source)
+        if (cached) {
+          return cached
+        }
 
-      const cached = moduleContents.get(source)
-      if (cached) {
-        return cached
-      }
+        const loaded = (async () => {
+          if (resolveOptions.build) {
+            return resolveOptions.build({
+              cjs: async (module) => getCjsInteropSnippet({ importId: module, exportId: module }),
+              esm: (module, buildOptions) =>
+                getPreBundleSnippet({
+                  module,
+                  outdir: cacheDir,
+                  root,
+                  buildOptions,
+                }),
+            })
+          }
 
-      const loaded = (async () => {
-        if (resolveOptions.build) {
-          return resolveOptions.build({
-            cjs: async (module) => getCjsInteropSnippet({ importId: module, exportId: module }),
-            esm: (module, buildOptions) =>
-              getPreBundleSnippet({
-                module,
-                outdir: cacheDir,
-                root,
-                buildOptions,
-              }),
+          if (resolveOptions.type === 'cjs') {
+            return getCjsInteropSnippet({ importId: source, exportId: source })
+          }
+
+          return getPreBundleSnippet({
+            module: source,
+            outdir: cacheDir,
+            root,
           })
+        })()
+
+        moduleContents.set(source, loaded)
+
+        try {
+          return await loaded
+        } catch (error) {
+          moduleContents.delete(source)
+          throw error
         }
-
-        if (resolveOptions.type === 'cjs') {
-          return getCjsInteropSnippet({ importId: source, exportId: source })
-        }
-
-        return getPreBundleSnippet({
-          module: source,
-          outdir: cacheDir,
-          root,
-        })
-      })()
-
-      moduleContents.set(source, loaded)
-
-      try {
-        return await loaded
-      } catch (error) {
-        moduleContents.delete(source)
-        throw error
-      }
+      },
     },
   }
 }
@@ -334,10 +337,36 @@ function excludeOptimizedDeps(
 }
 
 function getCjsInteropSnippet(module: { importId: string; exportId: string }): string {
-  const { exports } = libEsm({
-    exports: Object.getOwnPropertyNames(require(module.importId)),
-  })
-  return `const avoid_parse_require = require\nconst _M_ = avoid_parse_require(${JSON.stringify(module.exportId)})\n${exports}`
+  const members = Object.getOwnPropertyNames(require(module.importId))
+  if (!members.includes('default')) {
+    members.push('default')
+  }
+
+  const aliases = members
+    .filter((member) => javascriptKeywords.includes(member))
+    .reduce<Record<string, string>>((memo, keyword) => {
+      memo[keyword] = `keyword_${keyword}`
+      return memo
+    }, {})
+
+  return [
+    'const avoid_parse_require = require',
+    `const _M_ = avoid_parse_require(${JSON.stringify(module.exportId)})`,
+    ...members.map((member) => {
+      const leftValue = aliases[member] ? `const ${aliases[member]}` : `export const ${member}`
+      const rightValue = member === 'default' ? '_M_.default || _M_' : `_M_.${member}`
+      return `${leftValue} = ${rightValue}`
+    }),
+    Object.keys(aliases).length > 0
+      ? [
+          'export {',
+          ...Object.entries(aliases).map(([member, alias]) => `  ${alias} as ${member},`),
+          '}',
+        ].join('\n')
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 async function getPreBundleSnippet(options: {
@@ -396,20 +425,24 @@ async function buildRendererModuleWithRolldown(options: {
       {
         name: `${RENDERER_PLUGIN_NAME}:prebundle-entry`,
         enforce: 'pre',
-        resolveId(id) {
-          if (id === virtualEntryId) {
-            return id
-          }
+        resolveId: {
+          handler(id) {
+            if (id === virtualEntryId) {
+              return id
+            }
+          },
         },
-        load(id) {
-          if (id === virtualEntryId) {
-            const source = JSON.stringify(options.module)
-            return [
-              `import * as moduleExports from ${source}`,
-              `export * from ${source}`,
-              'export default moduleExports.default ?? moduleExports',
-            ].join('\n')
-          }
+        load: {
+          handler(id) {
+            if (id === virtualEntryId) {
+              const source = JSON.stringify(options.module)
+              return [
+                `import * as moduleExports from ${source}`,
+                `export * from ${source}`,
+                'export default moduleExports.default ?? moduleExports',
+              ].join('\n')
+            }
+          },
         },
       },
     ],
@@ -424,68 +457,6 @@ async function buildRendererModuleWithRolldown(options: {
   }
 
   await builder.build(environment)
-}
-
-function libEsm(options: {
-  window?: string
-  require?: string
-  exports?: string[]
-  conflict?: string
-}): {
-  window: string
-  require: string
-  exports: string
-  keywords: Record<string, string>
-} {
-  const {
-    window,
-    require: requireId,
-    exports: members = [],
-    conflict = '',
-  } = options
-  const target = `_M_${conflict}`
-  const windowSnippet = window ? `const ${target} = window[${JSON.stringify(window)}]` : ''
-  const requireSnippet = requireId
-    ? [
-        'import module from "node:module"',
-        `const ${target} = module.createRequire(import.meta.url)(${JSON.stringify(requireId)})`,
-      ].join('\n')
-    : ''
-
-  if (!members.includes('default')) {
-    members.push('default')
-  }
-
-  const aliases = members
-    .filter((member) => javascriptKeywords.includes(member))
-    .reduce<Record<string, string>>((memo, keyword) => {
-      memo[keyword] = `keyword_${keyword}${conflict}`
-      return memo
-    }, {})
-
-  const exportsSnippet = [
-    ...members.map((member) => {
-      const leftValue = aliases[member] ? `const ${aliases[member]}` : `export const ${member}`
-      const rightValue = member === 'default' ? `${target}.default || ${target}` : `${target}.${member}`
-      return `${leftValue} = ${rightValue}`
-    }),
-    Object.keys(aliases).length > 0
-      ? [
-          'export {',
-          ...Object.entries(aliases).map(([member, alias]) => `  ${alias} as ${member},`),
-          '}',
-        ].join('\n')
-      : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
-
-  return {
-    window: windowSnippet,
-    require: requireSnippet,
-    exports: exportsSnippet,
-    keywords: aliases,
-  }
 }
 
 function findNodeModules(root: string, matches: string[] = []): string[] {
