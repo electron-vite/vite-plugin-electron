@@ -169,5 +169,57 @@ describe('src/plugin', () => {
       expect(bundle).toContain('require("node:fs")')
       expect(fs.existsSync(path.join(rendererResolveElectronOutDir, 'main.js'))).toBe(true)
     })
+
+    it('prebundles custom renderer modules with build callback plugins', async () => {
+      let transformTriggered = false
+
+      const builder = await createBuilder({
+        configFile: false,
+        root: rendererResolveBuildRoot,
+        build: {
+          outDir: rendererResolveBuildOutDir,
+          emptyOutDir: true,
+          minify: false,
+        },
+        plugins: await electronSimple({
+          main: {
+            entry: 'electron/main.ts',
+            vite: {
+              build: {
+                outDir: path.relative(rendererResolveBuildRoot, rendererResolveElectronOutDir),
+              },
+            },
+          },
+          renderer: {
+            resolve: {
+              'local-pkg': {
+                type: 'esm',
+                build: ({ esm }) =>
+                  esm('local-pkg', {
+                    plugins: [
+                      {
+                        name: 'renderer-build-callback-transform',
+                        transform(code, id) {
+                          if (id.includes('/node_modules/local-pkg/')) {
+                            transformTriggered = true
+                          }
+
+                          return code
+                        },
+                      },
+                    ],
+                  }),
+              },
+            },
+          },
+        }),
+        logLevel: 'silent',
+      })
+      await builder.buildApp()
+
+      expect(transformTriggered).toBe(true)
+      expect(fs.existsSync(localPkgCacheFile)).toBe(true)
+      expect(fs.existsSync(path.join(rendererResolveElectronOutDir, 'main.js'))).toBe(true)
+    })
   })
 })

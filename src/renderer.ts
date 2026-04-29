@@ -15,6 +15,7 @@ const RENDERER_PLUGIN_NAME = 'vite-plugin-electron-renderer'
 const VIRTUAL_ID_PREFIX = '\0vite-plugin-electron-renderer:'
 const BUILTIN_ID_PREFIX = `${VIRTUAL_ID_PREFIX}builtin:`
 const RESOLVE_ID_PREFIX = `${VIRTUAL_ID_PREFIX}resolve:`
+const RENDERER_MODULE_ID_FILTER = /^\0vite-plugin-electron-renderer:(builtin|resolve):/
 
 const javascriptKeywords = [
   'break',
@@ -109,6 +110,13 @@ export interface RendererOptions {
    * Explicitly tell Vite how to load modules, which is useful for C/C++ and ESM modules.
    */
   resolve?: Record<string, RendererResolveOptions>
+}
+
+interface RendererModuleLoadContext {
+  root: string
+  cacheDir: string
+  activeResolveOptions: Map<string, RendererResolveOptions>
+  moduleContents: Map<string, Promise<string>>
 }
 
 const builtinSet = new Set(
@@ -261,61 +269,19 @@ export default function renderer(options: RendererOptions = {}): Plugin {
     },
     load: {
       filter: {
-        id: /^\0vite-plugin-electron-renderer:(builtin|resolve):/,
+        id: RENDERER_MODULE_ID_FILTER,
       },
       async handler(id) {
         if (id.startsWith(BUILTIN_ID_PREFIX)) {
-          const source = id.slice(BUILTIN_ID_PREFIX.length)
-          return source === 'electron'
-            ? electron
-            : getCjsInteropSnippet({ importId: source, exportId: source })
+          return getBuiltinModuleSnippet(id.slice(BUILTIN_ID_PREFIX.length))
         }
 
-        const source = id.slice(RESOLVE_ID_PREFIX.length)
-        const resolveOptions = activeResolveOptions.get(source)
-
-        if (!resolveOptions) {
-          return
-        }
-
-        const cached = moduleContents.get(source)
-        if (cached) {
-          return cached
-        }
-
-        const loaded = (async () => {
-          if (resolveOptions.build) {
-            return resolveOptions.build({
-              cjs: (module) => getCjsInteropSnippet({ importId: module, exportId: module }),
-              esm: (module, buildOptions) =>
-                getPreBundleSnippet({
-                  module,
-                  outdir: cacheDir,
-                  root,
-                  buildOptions,
-                }),
-            })
-          }
-
-          if (resolveOptions.type === 'cjs') {
-            return getCjsInteropSnippet({ importId: source, exportId: source })
-          }
-
-          return getPreBundleSnippet({
-            module: source,
-            outdir: cacheDir,
-            root,
-          })
-        })()
-
-        moduleContents.set(source, loaded)
-
-        try {
-          return await loaded
-        } catch (error) {
-          moduleContents.delete(source)
-          throw error
-        }
+        return loadResolvedRendererModule(id.slice(RESOLVE_ID_PREFIX.length), {
+          root,
+          cacheDir,
+          activeResolveOptions,
+          moduleContents,
+        })
       },
     },
   }
@@ -371,6 +337,66 @@ function getCjsInteropSnippet(module: { importId: string; exportId: string }): s
     .join('\n')
 }
 
+function getBuiltinModuleSnippet(source: string): string {
+  return source === 'electron'
+    ? electron
+    : getCjsInteropSnippet({ importId: source, exportId: source })
+}
+
+async function loadResolvedRendererModule(
+  source: string,
+  context: RendererModuleLoadContext,
+): Promise<string | undefined> {
+  const resolveOptions = context.activeResolveOptions.get(source)
+  if (!resolveOptions) {
+    return
+  }
+
+  const cached = context.moduleContents.get(source)
+  if (cached) {
+    return cached
+  }
+
+  const loaded = getResolvedRendererModuleSnippet(source, resolveOptions, context)
+  context.moduleContents.set(source, loaded)
+
+  try {
+    return await loaded
+  } catch (error) {
+    context.moduleContents.delete(source)
+    throw error
+  }
+}
+
+function getResolvedRendererModuleSnippet(
+  source: string,
+  resolveOptions: RendererResolveOptions,
+  context: Pick<RendererModuleLoadContext, 'root' | 'cacheDir'>,
+): Promise<string> {
+  if (resolveOptions.build) {
+    return resolveOptions.build({
+      cjs: (module) => getCjsInteropSnippet({ importId: module, exportId: module }),
+      esm: (module, buildOptions) =>
+        getPreBundleSnippet({
+          module,
+          outdir: context.cacheDir,
+          root: context.root,
+          buildOptions,
+        }),
+    })
+  }
+
+  if (resolveOptions.type === 'cjs') {
+    return Promise.resolve(getCjsInteropSnippet({ importId: source, exportId: source }))
+  }
+
+  return getPreBundleSnippet({
+    module: source,
+    outdir: context.cacheDir,
+    root: context.root,
+  })
+}
+
 async function getPreBundleSnippet(options: {
   module: string
   outdir: string
@@ -399,6 +425,7 @@ async function buildRendererModuleWithRolldown(options: {
   buildOptions?: RendererModuleBuildOptions
 }): Promise<void> {
   const virtualEntryId = `${VIRTUAL_ID_PREFIX}entry:${options.module}`
+  const virtualEntryFilter = createExactIdFilter(virtualEntryId)
   const buildConfig = withExternalBuiltins({
     configFile: false,
     publicDir: false,
@@ -428,6 +455,9 @@ async function buildRendererModuleWithRolldown(options: {
         name: `${RENDERER_PLUGIN_NAME}:prebundle-entry`,
         enforce: 'pre',
         resolveId: {
+          filter: {
+            id: virtualEntryFilter,
+          },
           handler(id) {
             if (id === virtualEntryId) {
               return id
@@ -437,23 +467,19 @@ async function buildRendererModuleWithRolldown(options: {
           },
         },
         load: {
+          filter: {
+            id: virtualEntryFilter,
+          },
           handler(id) {
             if (id === virtualEntryId) {
-              const source = JSON.stringify(options.module)
-              return [
-                `import * as moduleExports from ${source}`,
-                `export * from ${source}`,
-                'export default moduleExports.default ?? moduleExports',
-              ].join('\n')
+              return getRendererEntryModuleSnippet(options.module)
             }
           },
         },
       },
     ],
   })
-  const builder = await createBuilder(
-    buildConfig,
-  )
+  const builder = await createBuilder(buildConfig)
 
   const environment = builder.environments.client
   if (!environment) {
@@ -461,6 +487,15 @@ async function buildRendererModuleWithRolldown(options: {
   }
 
   await builder.build(environment)
+}
+
+function getRendererEntryModuleSnippet(module: string): string {
+  const source = JSON.stringify(module)
+  return [
+    `import * as moduleExports from ${source}`,
+    `export * from ${source}`,
+    'export default moduleExports.default ?? moduleExports',
+  ].join('\n')
 }
 
 function findNodeModules(root: string, matches: string[] = []): string[] {
@@ -490,4 +525,12 @@ function ensureDir(dirname: string): void {
   if (!fs.existsSync(dirname)) {
     fs.mkdirSync(dirname, { recursive: true })
   }
+}
+
+function createExactIdFilter(id: string): RegExp {
+  return new RegExp(`^${escapeRegExp(id)}$`)
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
