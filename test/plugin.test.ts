@@ -166,7 +166,7 @@ describe('src/plugin', () => {
 
       const bundle = fs.readFileSync(localPkgCacheFile, 'utf-8')
       expect(bundle).toContain('loadPackageJSON')
-      expect(bundle).toContain('exports.default')
+      expect(bundle).toContain('require("node:fs")')
       expect(fs.existsSync(path.join(rendererResolveElectronOutDir, 'main.js'))).toBe(true)
     })
   })
