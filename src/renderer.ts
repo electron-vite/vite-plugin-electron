@@ -255,6 +255,8 @@ export default function renderer(options: RendererOptions = {}): Plugin {
         if (activeResolveOptions.has(source)) {
           return `${RESOLVE_ID_PREFIX}${source}`
         }
+
+        return
       },
     },
     load: {
@@ -430,6 +432,8 @@ async function buildRendererModuleWithRolldown(options: {
             if (id === virtualEntryId) {
               return id
             }
+
+            return
           },
         },
         load: {
