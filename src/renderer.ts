@@ -384,9 +384,9 @@ async function buildRendererModuleWithRolldown(options: {
           input: { entry: virtualEntryId },
           platform: 'node',
           output: {
+            codeSplitting: false,
             entryFileNames: path.basename(options.outfile),
             format: 'cjs',
-            inlineDynamicImports: true,
           },
         } satisfies Pick<RolldownOptions, 'input' | 'output' | 'platform'>,
         options.buildOptions ?? {},

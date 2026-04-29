@@ -1,3 +1,3 @@
-import { loadPackageJSONSync } from 'local-pkg'
+import localPkg from 'local-pkg'
 
-document.querySelector<HTMLElement>('#app')!.textContent = typeof loadPackageJSONSync
+document.querySelector<HTMLElement>('#app')!.textContent = typeof localPkg
