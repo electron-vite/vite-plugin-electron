@@ -12,8 +12,6 @@ import { withExternalBuiltins } from './utils'
 const require = createRequire(import.meta.url)
 
 const CACHE_DIR = '.vite-electron-renderer'
-const NODE_MODULES_DIRNAME = 'node_modules'
-const NODE_MODULES_SEGMENT = `${path.posix.sep}${NODE_MODULES_DIRNAME}${path.posix.sep}`
 const RENDERER_PLUGIN_NAME = 'vite-plugin-electron-renderer'
 const VIRTUAL_ID_PREFIX = '\0vite-plugin-electron-renderer:'
 const BUILTIN_ID_PREFIX = `${VIRTUAL_ID_PREFIX}builtin:`
@@ -499,8 +497,8 @@ function getRendererEntryModuleSnippet(module: string): string {
 
 function resolveNodeModules(root: string): string | undefined {
   let current = normalizePath(root)
-  while (true) {
-    const nodeModulesDir = path.posix.join(current, NODE_MODULES_DIRNAME)
+  while (current) {
+    const nodeModulesDir = path.posix.join(current, 'node_modules')
     if (fs.existsSync(nodeModulesDir) && fs.statSync(nodeModulesDir).isDirectory()) {
       return nodeModulesDir
     }
@@ -518,13 +516,12 @@ function resolveNodeModules(root: string): string | undefined {
     return
   }
 
-  const normalizedEntry = normalizePath(localPkgEntry)
-  const nodeModulesIndex = normalizedEntry.indexOf(NODE_MODULES_SEGMENT)
-  if (nodeModulesIndex === -1) {
+  const [workspaceRoot, subpath] = normalizePath(localPkgEntry).split('/node_modules/', 2)
+  if (!subpath) {
     return
   }
 
-  return normalizedEntry.slice(0, nodeModulesIndex + NODE_MODULES_SEGMENT.length - 1)
+  return path.posix.join(workspaceRoot, 'node_modules')
 }
 
 function ensureRelativePath(relativePath: string): string {
