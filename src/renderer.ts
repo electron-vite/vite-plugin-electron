@@ -2,7 +2,6 @@ import fs from 'node:fs'
 import { builtinModules, createRequire } from 'node:module'
 import path from 'node:path'
 
-import { resolveModule } from 'local-pkg'
 import { createBuilder, mergeConfig, normalizePath } from 'vite'
 import type { Plugin, UserConfig } from 'vite'
 
@@ -244,7 +243,7 @@ export default function renderer(options: RendererOptions = {}): Plugin {
     enforce: 'pre',
     config(config) {
       root = normalizePath(config.root ? path.resolve(config.root) : process.cwd())
-      cacheDir = path.posix.join(resolveNodeModules(root) ?? root, CACHE_DIR)
+      cacheDir = path.posix.join(findNodeModules(root)[0] ?? root, CACHE_DIR)
       activeResolveOptions.clear()
       moduleContents.clear()
 
@@ -495,33 +494,19 @@ function getRendererEntryModuleSnippet(module: string): string {
   ].join('\n')
 }
 
-function resolveNodeModules(root: string): string | undefined {
-  let current = normalizePath(root)
-  while (current) {
-    const nodeModulesDir = path.posix.join(current, 'node_modules')
-    if (fs.existsSync(nodeModulesDir) && fs.statSync(nodeModulesDir).isDirectory()) {
-      return nodeModulesDir
-    }
-
-    const parent = path.posix.dirname(current)
-    if (parent === current) {
-      break
-    }
-
-    current = parent
+function findNodeModules(root: string, matches: string[] = []): string[] {
+  if (!root) {
+    return matches
   }
 
-  const localPkgEntry = resolveModule('local-pkg', { paths: [root] })
-  if (!localPkgEntry) {
-    return
+  const normalizedRoot = normalizePath(root)
+  const nodeModulesDir = path.posix.join(normalizedRoot, 'node_modules')
+  if (fs.existsSync(nodeModulesDir) && fs.statSync(nodeModulesDir).isDirectory()) {
+    matches.push(nodeModulesDir)
   }
 
-  const [workspaceRoot, subpath] = normalizePath(localPkgEntry).split('/node_modules/', 2)
-  if (!subpath) {
-    return
-  }
-
-  return path.posix.join(workspaceRoot, 'node_modules')
+  const parent = path.posix.dirname(normalizedRoot)
+  return parent === normalizedRoot ? matches : findNodeModules(parent, matches)
 }
 
 function ensureRelativePath(relativePath: string): string {
