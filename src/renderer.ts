@@ -13,6 +13,7 @@ const require = createRequire(import.meta.url)
 
 const CACHE_DIR = '.vite-electron-renderer'
 const NODE_MODULES_DIRNAME = 'node_modules'
+const NODE_MODULES_PATH_SUFFIX = `${path.posix.sep}${NODE_MODULES_DIRNAME}`
 const NODE_MODULES_SEGMENT = `${path.posix.sep}${NODE_MODULES_DIRNAME}${path.posix.sep}`
 const RENDERER_PLUGIN_NAME = 'vite-plugin-electron-renderer'
 const VIRTUAL_ID_PREFIX = '\0vite-plugin-electron-renderer:'
@@ -524,7 +525,7 @@ function resolveNodeModules(root: string): string | undefined {
     return
   }
 
-  return normalizedEntry.slice(0, nodeModulesIndex + NODE_MODULES_SEGMENT.length - 1)
+  return normalizedEntry.slice(0, nodeModulesIndex + NODE_MODULES_PATH_SUFFIX.length)
 }
 
 function ensureRelativePath(relativePath: string): string {
