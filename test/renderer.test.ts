@@ -1,5 +1,7 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { build, normalizePath } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,7 +19,6 @@ const rendererCacheDir = path.join(
   'node_modules',
   '.vite-electron-renderer',
 )
-const localPkgCacheFile = path.join(rendererCacheDir, 'local-pkg.cjs')
 
 async function cleanupRendererCompat() {
   await Promise.all([
@@ -25,7 +26,7 @@ async function cleanupRendererCompat() {
     fs.promises.rm(rendererResolveCjsOutDir, { recursive: true, force: true }),
     fs.promises.rm(rendererResolveEsmOutDir, { recursive: true, force: true }),
     fs.promises.rm(rendererResolveBuildCallbackOutDir, { recursive: true, force: true }),
-    fs.promises.rm(localPkgCacheFile, { force: true }),
+    fs.promises.rm(rendererCacheDir, { recursive: true, force: true }),
   ])
 }
 
@@ -54,6 +55,17 @@ function readJavascriptBundle(outDir: string): string {
     .filter((file) => file.endsWith('.js'))
     .map((file) => fs.readFileSync(path.join(assetDir, file), 'utf-8'))
     .join('\n')
+}
+
+function findRendererCacheFiles(): string[] {
+  if (!fs.existsSync(rendererCacheDir)) {
+    return []
+  }
+
+  return fs
+    .readdirSync(rendererCacheDir, { recursive: true })
+    .filter((entry) => typeof entry === 'string' && entry.endsWith('.cjs'))
+    .map((entry) => path.join(rendererCacheDir, entry))
 }
 
 describe('src/renderer compatibility', () => {
@@ -95,7 +107,7 @@ describe('src/renderer compatibility', () => {
 
     expect(bundle).toContain('loadPackageJSON')
     expect(bundle).not.toContain('.vite-electron-renderer/local-pkg.cjs')
-    expect(fs.existsSync(localPkgCacheFile)).toBe(false)
+    expect(findRendererCacheFiles()).toEqual([])
   })
 
   it('matches the documented resolve.type=esm prebundle handling', async () => {
@@ -111,9 +123,10 @@ describe('src/renderer compatibility', () => {
       },
     })
 
-    expect(fs.existsSync(localPkgCacheFile)).toBe(true)
+    const cacheFiles = findRendererCacheFiles()
+    expect(cacheFiles).toHaveLength(1)
 
-    const bundle = fs.readFileSync(localPkgCacheFile, 'utf-8')
+    const bundle = fs.readFileSync(cacheFiles[0], 'utf-8')
     expect(bundle).toContain('loadPackageJSON')
     expect(bundle).toContain('require("node:fs")')
   })
@@ -149,25 +162,35 @@ describe('src/renderer compatibility', () => {
     })
 
     expect(transformTriggered).toBe(true)
-    expect(fs.existsSync(localPkgCacheFile)).toBe(true)
+    expect(findRendererCacheFiles()).toHaveLength(1)
   })
 
   it('keeps the worker ipcRenderer fallback behavior', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vite-plugin-electron-renderer-'))
+    const tempModulePath = path.join(tempDir, 'electron-worker.mjs')
 
     try {
-      const moduleUrl = `data:text/javascript;base64,${Buffer.from(electronModuleSource).toString('base64')}`
-      const electronModule = await import(moduleUrl)
+      await fs.promises.writeFile(
+        tempModulePath,
+        `const require = undefined\n${electronModuleSource}`,
+        'utf-8',
+      )
+
+      const electronModule = await import(pathToFileURL(tempModulePath).href)
 
       expect(electronModule.default).toEqual({})
       expect(errorSpy).toHaveBeenCalledWith(
         'If you need to use "electron" in the Renderer process, make sure that "nodeIntegration" is enabled in the Main process.',
       )
-      expect(() => electronModule.ipcRenderer.send()).toThrowError(
-        "ipcRenderer doesn't work in a Web Worker.\nYou can see https://github.com/electron-vite/vite-plugin-electron/issues/69",
-      )
+      for (const method of ['send', 'on', 'once', 'invoke'] as const) {
+        expect(() => electronModule.ipcRenderer[method]()).toThrowError(
+          "ipcRenderer doesn't work in a Web Worker.\nYou can see https://github.com/electron-vite/vite-plugin-electron/issues/69",
+        )
+      }
     } finally {
       errorSpy.mockRestore()
+      await fs.promises.rm(tempDir, { recursive: true, force: true })
     }
   })
 })
