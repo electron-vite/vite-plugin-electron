@@ -3,49 +3,44 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { getPackageInfoSync } from 'local-pkg'
 import { build, normalizePath } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import renderer, { electron as electronModuleSource } from '../src/renderer'
 
-const rendererBuildRoot = path.join(__dirname, 'fixtures/renderer-build')
-const rendererBuildOutDir = path.join(__dirname, 'dist-renderer-compat-build')
-const rendererResolveBuildRoot = path.join(__dirname, 'fixtures/renderer-compat-resolve-build')
-const rendererResolveCjsOutDir = path.join(__dirname, 'dist-renderer-compat-cjs')
-const rendererResolveEsmOutDir = path.join(__dirname, 'dist-renderer-compat-esm')
-const rendererResolveBuildCallbackOutDir = path.join(__dirname, 'dist-renderer-compat-build-callback')
-const rendererCacheDir = path.join(
-  rendererResolveBuildRoot,
-  'node_modules',
-  '.vite-electron-renderer',
-)
+const rendererBuildFixtureRoot = path.join(__dirname, 'fixtures/renderer-build')
+const rendererResolveFixtureRoot = path.join(__dirname, 'fixtures/renderer-compat-resolve-build')
+const rendererWorkspaceDirs = new Set<string>()
 
 async function cleanupRendererCompat() {
-  await Promise.all([
-    fs.promises.rm(rendererBuildOutDir, { recursive: true, force: true }),
-    fs.promises.rm(rendererResolveCjsOutDir, { recursive: true, force: true }),
-    fs.promises.rm(rendererResolveEsmOutDir, { recursive: true, force: true }),
-    fs.promises.rm(rendererResolveBuildCallbackOutDir, { recursive: true, force: true }),
-    fs.promises.rm(rendererCacheDir, { recursive: true, force: true }),
-  ])
+  await Promise.all(
+    [...rendererWorkspaceDirs].map(async (workspaceDir) => {
+      rendererWorkspaceDirs.delete(workspaceDir)
+      await fs.promises.rm(workspaceDir, { recursive: true, force: true })
+    }),
+  )
 }
 
 async function buildRendererFixture(options: {
-  root: string
-  outDir: string
+  fixtureRoot: string
   rendererOptions?: Parameters<typeof renderer>[0]
 }) {
+  const workspace = await createRendererFixtureWorkspace(options.fixtureRoot)
+
   await build({
     configFile: false,
-    root: options.root,
+    root: workspace.root,
     build: {
-      outDir: options.outDir,
+      outDir: workspace.outDir,
       emptyOutDir: true,
       minify: false,
     },
     plugins: [renderer(options.rendererOptions)],
     logLevel: 'silent',
   })
+
+  return workspace
 }
 
 function readJavascriptBundle(outDir: string): string {
@@ -57,18 +52,48 @@ function readJavascriptBundle(outDir: string): string {
     .join('\n')
 }
 
-function findRendererCacheFiles(): string[] {
-  if (!fs.existsSync(rendererCacheDir)) {
+function findRendererCacheFiles(cacheDir: string): string[] {
+  if (!fs.existsSync(cacheDir)) {
     return []
   }
 
   return fs
-    .readdirSync(rendererCacheDir, { recursive: true })
+    .readdirSync(cacheDir, { recursive: true })
     .filter((entry) => typeof entry === 'string' && entry.endsWith('.cjs'))
-    .map((entry) => path.join(rendererCacheDir, entry))
+    .map((entry) => path.join(cacheDir, entry))
 }
 
-describe('src/renderer compatibility', () => {
+async function createRendererFixtureWorkspace(fixtureRoot: string) {
+  const workspaceRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vite-plugin-electron-renderer-'))
+  rendererWorkspaceDirs.add(workspaceRoot)
+  await fs.promises.cp(fixtureRoot, workspaceRoot, { recursive: true })
+  await ensureRendererFixtureNodeModules(workspaceRoot)
+
+  return {
+    root: workspaceRoot,
+    outDir: path.join(workspaceRoot, 'dist'),
+    cacheDir: path.join(workspaceRoot, 'node_modules', '.vite-electron-renderer'),
+  }
+}
+
+async function ensureRendererFixtureNodeModules(root: string) {
+  const localPkgInfo = getPackageInfoSync('local-pkg', { paths: [__dirname] })
+  if (!localPkgInfo) {
+    throw new Error('Unable to resolve local-pkg for renderer compatibility tests.')
+  }
+
+  const fixtureNodeModulesDir = path.join(root, 'node_modules')
+  const fixtureLocalPkgPath = path.join(fixtureNodeModulesDir, 'local-pkg')
+  await fs.promises.mkdir(fixtureNodeModulesDir, { recursive: true })
+  await fs.promises.rm(fixtureLocalPkgPath, { recursive: true, force: true })
+  await fs.promises.symlink(
+    localPkgInfo.rootPath,
+    fixtureLocalPkgPath,
+    process.platform === 'win32' ? 'junction' : 'dir',
+  )
+}
+
+describe.sequential('src/renderer compatibility', () => {
   beforeEach(async () => {
     await cleanupRendererCompat()
   })
@@ -78,12 +103,11 @@ describe('src/renderer compatibility', () => {
   })
 
   it('matches the documented electron import behavior', async () => {
-    await buildRendererFixture({
-      root: rendererBuildRoot,
-      outDir: rendererBuildOutDir,
+    const workspace = await buildRendererFixture({
+      fixtureRoot: rendererBuildFixtureRoot,
     })
 
-    const bundle = readJavascriptBundle(rendererBuildOutDir)
+    const bundle = readJavascriptBundle(workspace.outDir)
 
     expect(bundle).toContain('requireElectron')
     expect(bundle).toContain('vite-plugin-electron-renderer:builtin:electron')
@@ -91,9 +115,8 @@ describe('src/renderer compatibility', () => {
   })
 
   it('matches the documented resolve.type=cjs module handling', async () => {
-    await buildRendererFixture({
-      root: rendererResolveBuildRoot,
-      outDir: rendererResolveCjsOutDir,
+    const workspace = await buildRendererFixture({
+      fixtureRoot: rendererResolveFixtureRoot,
       rendererOptions: {
         resolve: {
           'local-pkg': {
@@ -103,17 +126,16 @@ describe('src/renderer compatibility', () => {
       },
     })
 
-    const bundle = readJavascriptBundle(rendererResolveCjsOutDir)
+    const bundle = readJavascriptBundle(workspace.outDir)
 
     expect(bundle).toContain('loadPackageJSON')
     expect(bundle).not.toContain('.vite-electron-renderer/local-pkg.cjs')
-    expect(findRendererCacheFiles()).toEqual([])
+    expect(findRendererCacheFiles(workspace.cacheDir)).toEqual([])
   })
 
   it('matches the documented resolve.type=esm prebundle handling', async () => {
-    await buildRendererFixture({
-      root: rendererResolveBuildRoot,
-      outDir: rendererResolveEsmOutDir,
+    const workspace = await buildRendererFixture({
+      fixtureRoot: rendererResolveFixtureRoot,
       rendererOptions: {
         resolve: {
           'local-pkg': {
@@ -123,7 +145,7 @@ describe('src/renderer compatibility', () => {
       },
     })
 
-    const cacheFiles = findRendererCacheFiles()
+    const cacheFiles = findRendererCacheFiles(workspace.cacheDir)
     expect(cacheFiles).toHaveLength(1)
 
     const bundle = fs.readFileSync(cacheFiles[0], 'utf-8')
@@ -134,9 +156,8 @@ describe('src/renderer compatibility', () => {
   it('matches the documented custom build callback behavior', async () => {
     let transformTriggered = false
 
-    await buildRendererFixture({
-      root: rendererResolveBuildRoot,
-      outDir: rendererResolveBuildCallbackOutDir,
+    const workspace = await buildRendererFixture({
+      fixtureRoot: rendererResolveFixtureRoot,
       rendererOptions: {
         resolve: {
           'local-pkg': {
@@ -162,7 +183,7 @@ describe('src/renderer compatibility', () => {
     })
 
     expect(transformTriggered).toBe(true)
-    expect(findRendererCacheFiles()).toHaveLength(1)
+    expect(findRendererCacheFiles(workspace.cacheDir)).toHaveLength(1)
   })
 
   it('keeps the worker ipcRenderer fallback behavior', async () => {
