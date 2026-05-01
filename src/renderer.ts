@@ -17,7 +17,7 @@ const BUILTIN_ID_PREFIX = `${VIRTUAL_ID_PREFIX}builtin:`
 const RESOLVE_ID_PREFIX = `${VIRTUAL_ID_PREFIX}resolve:`
 const RENDERER_MODULE_ID_FILTER = createIdPrefixFilter(BUILTIN_ID_PREFIX, RESOLVE_ID_PREFIX)
 
-const javascriptKeywords = [
+const javascriptKeywords = new Set([
   'break',
   'case',
   'catch',
@@ -88,7 +88,7 @@ const javascriptKeywords = [
   'get',
   'of',
   'set',
-]
+])
 
 interface RendererModuleBuildHelpers {
   cjs: (module: string) => string
@@ -263,8 +263,6 @@ export default function renderer(options: RendererOptions = {}): Plugin {
         if (activeResolveOptions.has(source)) {
           return `${RESOLVE_ID_PREFIX}${source}`
         }
-
-        return
       },
     },
     load: {
@@ -311,7 +309,7 @@ function getCjsInteropSnippet(module: { importId: string; exportId: string }): s
   }
 
   const aliases = members
-    .filter((member) => javascriptKeywords.includes(member))
+    .filter((member) => javascriptKeywords.has(member))
     .reduce<Record<string, string>>((memo, keyword) => {
       memo[keyword] = `keyword_${keyword}`
       return memo
