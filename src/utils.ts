@@ -31,6 +31,7 @@ function resolveBuiltinExternals(
     'electron/renderer',
     'electron/common',
     'electron/utility',
+    'original-fs',
     ...builtinModules,
     /^node:/,
   ]
