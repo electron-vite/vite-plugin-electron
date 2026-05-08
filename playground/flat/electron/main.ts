@@ -1,4 +1,5 @@
-import { join } from 'node:path'
+import path, { join } from 'node:path'
+import { Worker } from 'node:worker_threads'
 
 import { app, BrowserWindow, ipcMain } from 'electron'
 // @ts-expect-error virtual module
@@ -36,6 +37,11 @@ const createWindow = () => {
   } else {
     window.loadFile(join(currentDir, '../dist/index.html'))
   }
+
+  const worker = new Worker(path.join(__dirname, './worker.js'))
+  worker.on('message', (value) => {
+    console.log('[worker message]:', value)
+  })
 }
 
 app.whenReady().then(createWindow)

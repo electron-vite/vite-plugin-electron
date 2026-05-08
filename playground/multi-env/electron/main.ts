@@ -1,5 +1,6 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Worker } from 'node:worker_threads'
 
 import { app, BrowserWindow, ipcMain } from 'electron'
 
@@ -39,10 +40,13 @@ const createWindow = () => {
 
   if (process.env.VITE_DEV_SERVER_URL) {
     void window.loadURL(process.env.VITE_DEV_SERVER_URL)
-    return
+  } else {
+    void window.loadFile(join(__dirname, '../dist/index.html'))
   }
-
-  void window.loadFile(join(__dirname, '../dist/index.html'))
+  const worker = new Worker(join(__dirname, './worker.js'))
+  worker.on('message', (value) => {
+    console.log('[worker message]:', value)
+  })
 }
 
 app.whenReady().then(createWindow)

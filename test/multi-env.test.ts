@@ -230,7 +230,7 @@ describe('src/multi-env', () => {
     })
     await builder.buildApp()
 
-    expect(fs.existsSync(path.join(appOutDir, 'index.html'))).toBe(true)
+    expect(fs.existsSync(path.join(appOutDir, 'index.html'))).toBe(false)
     expect(fs.existsSync(path.join(electronOutDir, 'main.js'))).toBe(true)
 
     const mainCode = fs

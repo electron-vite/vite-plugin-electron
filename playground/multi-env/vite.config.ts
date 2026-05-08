@@ -10,7 +10,7 @@ export default defineConfig({
     electron(
       simpleOptions({
         main: {
-          input: 'electron/main.ts',
+          input: ['electron/main.ts', 'electron/worker.ts'],
           options: {
             define: {
               __PLAYGROUND_MULTI_ENV_MAIN_LABEL__: JSON.stringify('main-env-ready'),
