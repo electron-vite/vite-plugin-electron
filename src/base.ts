@@ -7,6 +7,7 @@ import type {
   MinimalPluginContextWithoutEnvironment,
 } from 'vite'
 
+import { startup } from './startup'
 import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule } from './utils'
 
 interface FactoryOptions {
@@ -55,6 +56,7 @@ export function createElectronPlugin({
             await cleanupMock()
             cleanupMock = undefined
           }
+          startup.exit()
         })
 
         server.httpServer?.once('listening', async () => {

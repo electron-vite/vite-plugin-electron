@@ -3,8 +3,6 @@ import path from 'node:path'
 
 import type { ViteDevServer, MinimalPluginContextWithoutEnvironment } from 'vite'
 
-import { treeKillSync } from './utils'
-
 interface StartupFn {
   (
     argv?: string[],
@@ -13,7 +11,7 @@ interface StartupFn {
   ): Promise<void>
   send: (message: string) => void
   hookedProcessExit: boolean
-  exit: () => Promise<void>
+  exit: () => void
 }
 /**
  * Electron App startup function.
@@ -67,7 +65,7 @@ export const startup: StartupFn = async (
 
   const electronPath = electron.default ?? electron
 
-  await startup.exit()
+  startup.exit()
 
   // Start Electron.app
   const stdio: StdioOptions =
@@ -81,12 +79,7 @@ export const startup: StartupFn = async (
   })
 
   // Exit command after Electron.app exits
-  process.electronApp.once('exit', process.exit)
-
-  if (!startup.hookedProcessExit) {
-    startup.hookedProcessExit = true
-    process.once('exit', startup.exit)
-  }
+  process.electronApp.on('exit', process.exit)
 }
 startup.send = (message: string) => {
   if (process.electronApp) {
@@ -95,25 +88,9 @@ startup.send = (message: string) => {
   }
 }
 startup.hookedProcessExit = false
-startup.exit = async () => {
-  if (process.electronApp) {
-    await new Promise((resolve) => {
-      process.electronApp.removeAllListeners()
-
-      if (process.electronApp.exitCode !== null) {
-        resolve(undefined)
-        return
-      }
-      process.electronApp.once('exit', resolve)
-
-      try {
-        treeKillSync(process.electronApp.pid!)
-      } catch {
-        // Windows: taskkill exit code 128 = process already gone
-        resolve(undefined)
-      }
-    })
-  }
+startup.exit = () => {
+  process.electronApp?.removeAllListeners()
+  process.electronApp?.kill()
 }
 
 export interface OnStartOptions {
