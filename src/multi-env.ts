@@ -121,7 +121,7 @@ export default function electron(
 
   // Build each electron environment from the given builder in declaration order.
   const buildElectronEnvironments = async (builder: ViteBuilder): Promise<void> => {
-    for (const name of Object.keys(builder.environments)) {
+    for (const name of envNames) {
       const env = builder.environments[name]
       if (env && !env.isBuilt) {
         await builder.build(env)
