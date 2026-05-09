@@ -77,3 +77,4 @@ pnpm build
 - `flat/` exercises the flat API with `onstart`, full app restart behavior, and array-based Electron entries.
 - `multi-env/` exercises `vite-plugin-electron/multi-env` with named Vite environments for `main` and `preload`.
 - `simple/` exercises the simple API with preload rebuild hot reload behavior.
+- `worker/` exercises multiple entries.

@@ -57,9 +57,11 @@
     "play": "pnpm --dir playground/flat dev",
     "play:multi-env": "pnpm --dir playground/multi-env dev",
     "play:simple": "pnpm --dir playground/simple dev",
+    "play:worker": "pnpm --dir playground/worker dev",
     "play:build": "pnpm --dir playground/flat build",
     "play:build:multi-env": "pnpm --dir playground/multi-env build",
     "play:build:simple": "pnpm --dir playground/simple build",
+    "play:build:worker": "pnpm --dir playground/worker build",
     "release": "pnpm run lint && pnpm run format && pnpm run prepublishOnly && bumpp --all",
     "prepublishOnly": "pnpm run build && pnpm run test"
   },
@@ -70,13 +72,13 @@
     "@subf/config": "^0.2.1",
     "@types/node": "^24.12.0",
     "bumpp": "^11.0.1",
-    "oxfmt": "^0.45.0",
-    "oxlint": "^1.60.0",
-    "tsdown": "^0.21.7",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0",
+    "tsdown": "^0.22.0",
     "typescript": "^5.9.3",
-    "vite": "^8.0.8",
-    "vite-plugin-electron-renderer": "^0.14.6",
-    "vitest": "^4.1.4"
+    "vite": "^8.0.11",
+    "vite-plugin-electron-renderer": "^1.0.0-beta.2",
+    "vitest": "^4.1.5"
   },
   "peerDependencies": {
     "vite-plugin-electron-renderer": "*"

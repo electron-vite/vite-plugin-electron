@@ -10,3 +10,4 @@ catalog:
 
 overrides:
   '@electron/get': 5.0.0
+  rolldown: 1.0.0
