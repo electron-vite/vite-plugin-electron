@@ -3,6 +3,14 @@ import path from 'node:path'
 
 import type { ViteDevServer, MinimalPluginContextWithoutEnvironment } from 'vite'
 
+const startupEnv = {
+  REMOTE_DEBUGGING_PORT: '--remote-debugging-port',
+  ELECTRON_IGNORE_CERTIFICATE_ERRORS: '--ignore-certificate-errors',
+  ELECTRON_DISABLE_WEB_SECURITY: '--disable-web-security',
+  ELECTRON_INSPECT: '--inspect',
+  ELECTRON_INSPECT_BRK: '--inspect-brk',
+} as const
+
 interface StartupFn {
   (
     argv?: string[],
@@ -17,6 +25,15 @@ interface StartupFn {
  * Electron App startup function.
  * It will mount the Electron App child-process to `process.electronApp`.
  * @param argv default value `['.', '--no-sandbox']`
+ * `1` or `true` turns a flag on, `0` or `false` turns it off, and any other non-empty
+ * value is appended as `=<value>`.
+ *
+ * Supported env vars:
+ * - `REMOTE_DEBUGGING_PORT` appends `--remote-debugging-port=<value>`
+ * - `ELECTRON_IGNORE_CERTIFICATE_ERRORS` appends `--ignore-certificate-errors`
+ * - `ELECTRON_DISABLE_WEB_SECURITY` appends `--disable-web-security`
+ * - `ELECTRON_INSPECT` appends `--inspect` or `--inspect=<value>`
+ * - `ELECTRON_INSPECT_BRK` appends `--inspect-brk` or `--inspect-brk=<value>`
  * @param options options for `child_process.spawn`
  * @param customElectronPkg custom electron package name (default: 'electron')
  */
@@ -73,7 +90,22 @@ export const startup: StartupFn = async (
       ? // reserve file descriptor 3 for Chromium; put Node IPC on file descriptor 4
         ['inherit', 'inherit', 'inherit', 'ignore', 'ipc']
       : ['inherit', 'inherit', 'inherit', 'ipc']
-  process.electronApp = spawn(electronPath, argv, {
+
+  const targetArgv = [...argv]
+
+  for (const [envName, flag] of Object.entries(startupEnv)) {
+    const value = process.env[envName]?.trim()
+    if (!value) {
+      continue
+    }
+    if (value === 'true' || value === '1') {
+      targetArgv.push(flag)
+    } else if (value !== 'false' && value !== '0') {
+      targetArgv.push(`${flag}=${value}`)
+    }
+  }
+
+  process.electronApp = spawn(electronPath, targetArgv, {
     stdio,
     ...options,
   })
@@ -104,6 +136,18 @@ export interface OnStartOptions {
     /**
      * Electron App startup function.
      * It will mount the Electron App child-process to `process.electronApp`.
+     *
+     * You can also set environment variables to control the Electron CLI flags.
+     * `1` or `true` turns a flag on, `0` or `false` turns it off, and any other non-empty
+     * value is appended as `=<value>`.
+     *
+     * Supported env vars:
+     * - `REMOTE_DEBUGGING_PORT` appends `--remote-debugging-port=<value>`
+     * - `ELECTRON_IGNORE_CERTIFICATE_ERRORS` appends `--ignore-certificate-errors`
+     * - `ELECTRON_DISABLE_WEB_SECURITY` appends `--disable-web-security`
+     * - `ELECTRON_INSPECT` appends `--inspect` or `--inspect=<value>`
+     * - `ELECTRON_INSPECT_BRK` appends `--inspect-brk` or `--inspect-brk=<value>`
+     *
      * @param argv default value `['.', '--no-sandbox']`
      * @param options options for `child_process.spawn`
      * @param customElectronPkg custom electron package name (default: 'electron')

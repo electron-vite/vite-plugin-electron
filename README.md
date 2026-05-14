@@ -150,6 +150,18 @@ export interface ElectronOptions {
     /**
      * Electron App startup function.
      * It will mount the Electron App child-process to `process.electronApp`.
+     *
+      * You can also set environment variables to control the Electron CLI flags.
+      * Supported env vars:
+      * - `REMOTE_DEBUGGING_PORT`
+      * - `ELECTRON_IGNORE_CERTIFICATE_ERRORS`
+      * - `ELECTRON_DISABLE_WEB_SECURITY`
+      * - `ELECTRON_INSPECT`
+      * - `ELECTRON_INSPECT_BRK`
+      *
+      * `1` or `true` turns a flag on, `0` or `false` turns it off, and any other non-empty
+      * value is appended as `=<value>`.
+     *
      * @param argv default value `['.', '--no-sandbox']`
      * @param options options for `child_process.spawn`
      * @param customElectronPkg custom electron package name (default: 'electron')
@@ -347,6 +359,16 @@ build({
   },
 })
 ```
+
+### Startup Env Vars
+
+`startup()` uses these env vars. `1` or `true` turns a flag on, `0` or `false` turns it off, and any other non-empty value is appended as `=<value>`.
+
+- `REMOTE_DEBUGGING_PORT` appends `--remote-debugging-port=<value>`
+- `ELECTRON_IGNORE_CERTIFICATE_ERRORS` appends `--ignore-certificate-errors`
+- `ELECTRON_DISABLE_WEB_SECURITY` appends `--disable-web-security`
+- `ELECTRON_INSPECT` appends `--inspect` or `--inspect=<value>`
+- `ELECTRON_INSPECT_BRK` appends `--inspect-brk` or `--inspect-brk=<value>`
 
 **Hot Reload**
 
