@@ -151,16 +151,16 @@ export interface ElectronOptions {
      * Electron App startup function.
      * It will mount the Electron App child-process to `process.electronApp`.
      *
-      * You can also set environment variables to control the Electron CLI flags.
-      * Supported env vars:
-      * - `REMOTE_DEBUGGING_PORT`
-      * - `ELECTRON_IGNORE_CERTIFICATE_ERRORS`
-      * - `ELECTRON_DISABLE_WEB_SECURITY`
-      * - `ELECTRON_INSPECT`
-      * - `ELECTRON_INSPECT_BRK`
-      *
-      * `1` or `true` turns a flag on, `0` or `false` turns it off, and any other non-empty
-      * value is appended as `=<value>`.
+     * You can also set environment variables to control the Electron CLI flags.
+     * Supported env vars:
+     * - `REMOTE_DEBUGGING_PORT`
+     * - `ELECTRON_IGNORE_CERTIFICATE_ERRORS`
+     * - `ELECTRON_DISABLE_WEB_SECURITY`
+     * - `ELECTRON_INSPECT`
+     * - `ELECTRON_INSPECT_BRK`
+     *
+     * `1` or `true` turns a flag on, `0` or `false` turns it off, and any other non-empty
+     * value is appended as `=<value>`.
      *
      * @param argv default value `['.', '--no-sandbox']`
      * @param options options for `child_process.spawn`

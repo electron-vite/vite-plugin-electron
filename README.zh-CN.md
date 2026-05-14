@@ -127,14 +127,14 @@ export interface ElectronOptions {
      * Electron App startup function.
      * It will mount the Electron App child-process to `process.electronApp`.
      *
-      * `1` 或 `true` 表示开启，`0` 或 `false` 表示关闭，其它非空值会追加为 `=<value>`。
-      *
-      * 支持的环境变量：
-      * - `REMOTE_DEBUGGING_PORT` 追加 `--remote-debugging-port=<value>`
-      * - `ELECTRON_IGNORE_CERTIFICATE_ERRORS` 追加 `--ignore-certificate-errors`
-      * - `ELECTRON_DISABLE_WEB_SECURITY` 追加 `--disable-web-security`
-      * - `ELECTRON_INSPECT` 追加 `--inspect` 或 `--inspect=<value>`
-      * - `ELECTRON_INSPECT_BRK` 追加 `--inspect-brk` 或 `--inspect-brk=<value>`
+     * `1` 或 `true` 表示开启，`0` 或 `false` 表示关闭，其它非空值会追加为 `=<value>`。
+     *
+     * 支持的环境变量：
+     * - `REMOTE_DEBUGGING_PORT` 追加 `--remote-debugging-port=<value>`
+     * - `ELECTRON_IGNORE_CERTIFICATE_ERRORS` 追加 `--ignore-certificate-errors`
+     * - `ELECTRON_DISABLE_WEB_SECURITY` 追加 `--disable-web-security`
+     * - `ELECTRON_INSPECT` 追加 `--inspect` 或 `--inspect=<value>`
+     * - `ELECTRON_INSPECT_BRK` 追加 `--inspect-brk` 或 `--inspect-brk=<value>`
      *
      * @param argv default value `['.', '--no-sandbox']`
      * @param options options for `child_process.spawn`
