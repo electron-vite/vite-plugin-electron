@@ -2,6 +2,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { app, BrowserWindow } from 'electron'
+import { version } from 'typescript'
+
+console.log(version)
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 

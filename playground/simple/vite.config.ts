@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 
+import { notBundle } from '../../src/plugin'
 import electronSimple from '../../src/simple'
 
 export default defineConfig({
@@ -10,6 +11,9 @@ export default defineConfig({
     electronSimple({
       main: {
         entry: 'electron/main.ts',
+        vite: {
+          plugins: [notBundle()],
+        },
       },
       preload: {
         input: 'electron/preload.ts',

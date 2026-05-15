@@ -8,6 +8,7 @@
     "build": "vite build"
   },
   "devDependencies": {
-    "electron": "catalog:"
+    "electron": "catalog:",
+    "typescript": "^5.9.3"
   }
 }

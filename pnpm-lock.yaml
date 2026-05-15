@@ -73,6 +73,9 @@ importers:
       electron:
         specifier: 'catalog:'
         version: 40.9.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   playground/worker:
     devDependencies:

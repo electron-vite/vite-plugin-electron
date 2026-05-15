@@ -60,6 +60,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
             triggerStartup(pluginContext, server, options)
           },
         })
+        console.log('[TARGET PLUGINS]', JSON.stringify(options.vite.plugins))
         await buildBase(isESM, options)
       }
     },
