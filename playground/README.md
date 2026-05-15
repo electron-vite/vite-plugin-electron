@@ -1,6 +1,6 @@
 # Playground
 
-This folder holds three separate demo packages that import the plugin source from the repo root.
+This folder holds four separate demo packages that import the plugin source from the repo root.
 
 ## Install
 
@@ -16,6 +16,7 @@ If you want to work on a single demo package directly, you can also run installs
 pnpm --dir playground/flat install
 pnpm --dir playground/multi-env install
 pnpm --dir playground/simple install
+pnpm --dir playground/worker install
 ```
 
 ## Run Flat Demo
@@ -38,7 +39,7 @@ pnpm build
 
 ## Run Multi-Env Demo
 
-The multi-env demo lives in `playground/multi-env/` and uses `playground/multi-env/vite.config.ts` to import [src/multi-env.ts](../src/multi-env.ts).
+The multi-env demo lives in `playground/multi-env/` and uses `playground/multi-env/vite.config.ts` to import [src/multi-env.ts](../src/multi-env.ts). It configures named Electron environments through `simpleOptions()` for `main` and `preload`, and builds both `electron/main.ts` and `electron/worker.ts` as main-process entries.
 
 From the repo root:
 
@@ -72,9 +73,27 @@ pnpm dev
 pnpm build
 ```
 
+## Run Worker Demo
+
+The worker demo lives in `playground/worker/` and uses `playground/worker/vite.config.ts` to import [src/index.ts](../src/index.ts). It verifies the flat API with multiple Electron entries.
+
+From the repo root:
+
+```sh
+pnpm play:worker
+pnpm play:build:worker
+```
+
+Or from inside `playground/worker/`:
+
+```sh
+pnpm dev
+pnpm build
+```
+
 ## What Each Demo Covers
 
 - `flat/` exercises the flat API with `onstart`, full app restart behavior, and array-based Electron entries.
-- `multi-env/` exercises `vite-plugin-electron/multi-env` with named Vite environments for `main` and `preload`.
+- `multi-env/` exercises `vite-plugin-electron/multi-env` with named Vite environments, per-environment `define` values, preload reload behavior, and a worker thread entry.
 - `simple/` exercises the simple API with preload rebuild hot reload behavior.
 - `worker/` exercises multiple entries.

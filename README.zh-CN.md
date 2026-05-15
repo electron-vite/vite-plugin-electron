@@ -120,21 +120,23 @@ export interface ElectronOptions {
    * Triggered when Vite is built every time -- `vite serve` command only.
    *
    * If this `onstart` is passed, Electron App will not start automatically.
-   * However, you can start Electroo App via `startup` function.
+   * However, you can start Electron App via `startup` function.
    */
   onstart?: (args: {
     /**
      * Electron App startup function.
      * It will mount the Electron App child-process to `process.electronApp`.
      *
-     * `1` 或 `true` 表示开启，`0` 或 `false` 表示关闭，其它非空值会追加为 `=<value>`。
+     * You can also set environment variables to control the Electron CLI flags.
+     * Supported env vars:
+     * - `REMOTE_DEBUGGING_PORT`
+     * - `ELECTRON_IGNORE_CERTIFICATE_ERRORS`
+     * - `ELECTRON_DISABLE_WEB_SECURITY`
+     * - `ELECTRON_INSPECT`
+     * - `ELECTRON_INSPECT_BRK`
      *
-     * 支持的环境变量：
-     * - `REMOTE_DEBUGGING_PORT` 追加 `--remote-debugging-port=<value>`
-     * - `ELECTRON_IGNORE_CERTIFICATE_ERRORS` 追加 `--ignore-certificate-errors`
-     * - `ELECTRON_DISABLE_WEB_SECURITY` 追加 `--disable-web-security`
-     * - `ELECTRON_INSPECT` 追加 `--inspect` 或 `--inspect=<value>`
-     * - `ELECTRON_INSPECT_BRK` 追加 `--inspect-brk` 或 `--inspect-brk=<value>`
+     * `1` or `true` turns a flag on, `0` or `false` turns it off, and any other non-empty
+     * value is appended as `=<value>`.
      *
      * @param argv default value `['.', '--no-sandbox']`
      * @param options options for `child_process.spawn`
@@ -157,54 +159,73 @@ export interface ElectronOptions {
 > `vite-plugin-electron/multi-env` 只在 `vite-plugin-electron@>=1.0.0` 中提供。
 > `0.x` 版本没有这个入口。
 
-当你希望每个 Electron 构建目标都映射到一个明确的 Vite environment 时，使用 `/multi-env` 会更直接。它使用 Vite 的 Environment API 来构建 Electron 目标，是更面向未来的多目标构建方式。
+使用 Vite 的 Environment API 构建 Electron 目标，而不是手动调用 `build()`。这是更面向未来的多目标构建方式，配置也更简洁、更易维护：使用 `rolldownOptions.input` 指定入口，并为每个目标提供可覆盖的 environment 配置。
+
+Flat API:
 
 ```js
-import electron, { simpleOptions } from 'vite-plugin-electron/multi-env'
+import electron from 'vite-plugin-electron/multi-env'
 
 export default {
   plugins: [
-    electron(
-      simpleOptions({
-        main: {
-          input: 'electron/main.ts',
-          options: {
-            define: {
-              __ELECTRON_TARGET__: JSON.stringify('main'),
-            },
-          },
-        },
-        preload: {
-          input: 'electron/preload.ts',
-          onstart({ reload }) {
-            reload()
-          },
-          options: {
-            define: {
-              __ELECTRON_TARGET__: JSON.stringify('preload'),
-            },
-            build: {
-              rolldownOptions: {
-                output: {
-                  format: 'cjs',
-                  codeSplitting: false,
-                },
-              },
-            },
-          },
-        },
-      }),
-    ),
+    electron([
+      {
+        input: 'electron/main.ts',
+      },
+      {
+        input: 'electron/preload.ts',
+      },
+    ]),
   ],
 }
 ```
 
-`simpleOptions()` 可以把一个按环境名分组的对象转换成 `electron()` 需要的数组。`main` 和 `preload` 这两个 key 还会复用 `simple` API 的默认预设，这样你既能按 key 组织配置，又不会失去这些便利配置。
+Simple API:
+
+```js
+import { electronSimple } from 'vite-plugin-electron/multi-env'
+
+export default {
+  plugins: [
+    electronSimple({
+      main: {
+        input: 'electron/main.ts',
+        options: {
+          define: {
+            __ELECTRON_TARGET__: JSON.stringify('main'),
+          },
+        },
+      },
+      preload: {
+        input: 'electron/preload.ts',
+        options: {
+          define: {
+            __ELECTRON_TARGET__: JSON.stringify('preload'),
+          },
+        },
+      },
+      // 也可以添加自定义目标。它们会像主进程一样构建，但可以使用不同的环境变量。
+      custom: {
+        input: 'electron/custom.ts',
+        options: {
+          define: {
+            __ELECTRON_TARGET__: JSON.stringify('custom'),
+          },
+        },
+      },
+    }),
+  ],
+}
+```
+
+`electronSimple()` 接受一个按 environment 名分组的对象。`main` 和 `preload` 这两个 key 会复用 `vite-plugin-electron/simple` 的默认预设；自定义 key 会像主进程目标一样构建，并使用各自的 environment 配置。
+
+### 配置
 
 ```ts
 export interface MultiEnvElectronOptions {
   /**
-   * Optional name for the Electron environment.
+   * Optional name for the Electron environment `electron_${name}`.
    *
    * By default, the plugin will generate environment names like `electron_0`,
    * `electron_1`, etc. based on the order of the options provided.
@@ -279,7 +300,7 @@ export interface MultiEnvElectronOptions {
 
 ## Playground
 
-本地演示套件位于 [playground/](playground/README.md)，包含 flat、simple 和 multi-env 三种模式，它们会直接从这个仓库导入插件源码。
+本地演示套件位于 [playground/](playground/README.md)，包含 flat、simple、multi-env 和 worker 模式，它们会直接从这个仓库导入插件源码。
 
 ## JavaScript API
 

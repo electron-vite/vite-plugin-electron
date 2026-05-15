@@ -126,7 +126,7 @@ export default {
 ## Flat API vs Simple API
 
 - Simple API is based on the Flat API
-- Simple API incluess some Preload scripts preset configs.
+- Simple API includes some Preload scripts preset configs.
 - Flat API provides some more general APIs, which you can use for secondary encapsulation, such as [nuxt-electron](https://github.com/caoxiemeihao/nuxt-electron).
 
 ## Flat API <sub><sup>(Define)</sup></sub>
@@ -144,7 +144,7 @@ export interface ElectronOptions {
    * Triggered when Vite is built every time -- `vite serve` command only.
    *
    * If this `onstart` is passed, Electron App will not start automatically.
-   * However, you can start Electroo App via `startup` function.
+   * However, you can start Electron App via `startup` function.
    */
   onstart?: (args: {
     /**
@@ -183,7 +183,7 @@ export interface ElectronOptions {
 > `vite-plugin-electron/multi-env` is only available in `vite-plugin-electron@>=1.0.0`.
 > It does not exist in `0.x` releases.
 
-Using Vite's Environment API to build Electron targets instead of manually calling `build()` . It is the future-facing way to handle multi-target builds, and the configuration is more concise and easier to maintain: use `rolldownOption.input` to specify the entry and overidable environment config for each target.
+Using Vite's Environment API to build Electron targets instead of manually calling `build()`. It is the future-facing way to handle multi-target builds, and the configuration is more concise and easier to maintain: use `rolldownOptions.input` to specify the entry and overridable environment config for each target.
 
 Flat API:
 
@@ -192,9 +192,14 @@ import electron from 'vite-plugin-electron/multi-env'
 
 export default {
   plugins: [
-    electron({
-      input: 'electron/main.ts',
-    }),
+    electron([
+      {
+        input: 'electron/main.ts',
+      },
+      {
+        input: 'electron/preload.ts',
+      },
+    ]),
   ],
 }
 ```
@@ -222,7 +227,7 @@ export default {
             __ELECTRON_TARGET__: JSON.stringify('preload'),
           },
         },
-      }),
+      },
       // You can also add custom targets, and they will be built in the same way as the main process, but with different environment variables.
       custom: {
         input: 'electron/custom.ts',
@@ -232,10 +237,12 @@ export default {
           },
         },
       },
-    ),
+    }),
   ],
 }
 ```
+
+`electronSimple()` accepts an object grouped by environment name. The `main` and `preload` keys reuse the same default presets as `vite-plugin-electron/simple`, while custom keys are built like main-process targets with their own environment options.
 
 ### Configuration
 
@@ -317,7 +324,7 @@ There are many cases here 👉 [electron-vite-samples](https://github.com/caoxie
 
 ## Playground
 
-The local demo suite lives in [playground/](playground/README.md) and includes flat, simple, and multi-env modes that import the plugin source directly from this repo.
+The local demo suite lives in [playground/](playground/README.md) and includes flat, simple, multi-env, and worker modes that import the plugin source directly from this repo.
 
 ## JavaScript API
 

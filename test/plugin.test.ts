@@ -52,27 +52,25 @@ describe('src/plugin', () => {
 
     expect(normalSnapMain).toMatchSnapshot()
   })
-  describe('src/index', () => {
-    it('mockHtml', async () => {
-      // Ensure no index.html exists before the test
-      expect(fs.existsSync(mockHtmlPath)).toBe(false)
+  it('mockHtml', async () => {
+    // Ensure no index.html exists before the test
+    expect(fs.existsSync(mockHtmlPath)).toBe(false)
 
-      // Pass empty array to test mock HTML lifecycle without triggering Electron builds.
-      await build({
-        configFile: false,
-        root: mockHtmlRoot,
-        build: {
-          outDir: mockHtmlOutDir,
-          emptyOutDir: true,
-          minify: false,
-        },
-        plugins: electron([]),
-        logLevel: 'silent',
-      })
-
-      // Both the source mock and its built copy must be cleaned up
-      expect(fs.existsSync(mockHtmlPath)).toBe(false)
-      expect(fs.existsSync(mockHtmlDistPath)).toBe(false)
+    // Pass empty array to test mock HTML lifecycle without triggering Electron builds.
+    await build({
+      configFile: false,
+      root: mockHtmlRoot,
+      build: {
+        outDir: mockHtmlOutDir,
+        emptyOutDir: true,
+        minify: false,
+      },
+      plugins: electron([]),
+      logLevel: 'silent',
     })
+
+    // Both the source mock and its built copy must be cleaned up
+    expect(fs.existsSync(mockHtmlPath)).toBe(false)
+    expect(fs.existsSync(mockHtmlDistPath)).toBe(false)
   })
 })
