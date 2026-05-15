@@ -359,7 +359,6 @@ build({
 
 这通过在运行 `vite serve` 时跳过依赖打包，可以让启动速度更快。对于生产构建，让打包正常进行即可。
 
-
 ```js
 import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
@@ -370,9 +369,7 @@ export default defineConfig(({ command }) => ({
     electron({
       entry: 'electron/main.ts',
       vite: {
-        plugins: [
-          command === 'serve' && notBundle(),
-        ],
+        plugins: [command === 'serve' && notBundle()],
       },
     }),
   ],
@@ -417,6 +414,44 @@ process.on('message', (msg) => {
   }
 })
 ```
+
+### `esmShim()`
+
+使用 `esmShim()` 为依赖这些 CJS 全局变量的 ESM Electron 入口注入 `__dirname` 和 `__filename` 的 shim。
+
+只有实际引用了 `__dirname` 或 `__filename` 的文件才会被转换，因此对不需要它的文件没有额外开销。
+
+```js
+import { defineConfig } from 'vite'
+import electron from 'vite-plugin-electron'
+import { esmShim, notBundle } from 'vite-plugin-electron/plugin'
+
+export default defineConfig(({ command }) => ({
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [command === 'serve' && notBundle(), esmShim()],
+      },
+    }),
+  ],
+}))
+```
+
+**工作原理**
+
+对每个匹配的文件，会在头部插入以下 shim：
+
+```js
+import { fileURLToPath } from 'node:url'
+import { dirname } from 'node:path'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+```
+
+**API**
+
+`esmShim()` — 无配置项，直接加入 `plugins` 即可。
 
 ## 如何工作
 

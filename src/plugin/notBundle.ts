@@ -1,7 +1,7 @@
 import { loadPackageJSONSync } from 'local-pkg'
 import type { Plugin } from 'vite'
 
-import type { RolldownOptions } from './utils'
+import type { RolldownOptions } from '../utils'
 
 export interface NotBundleOptions {
   /**

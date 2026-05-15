@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 
-import { notBundle } from '../../src/plugin'
+import { esmShim, notBundle } from '../../src/plugin'
 import electronSimple from '../../src/simple'
 
 export default defineConfig(({ command }) => ({
@@ -12,7 +12,7 @@ export default defineConfig(({ command }) => ({
       main: {
         entry: 'electron/main.ts',
         vite: {
-          plugins: [command === 'serve' && notBundle()],
+          plugins: [command === 'serve' && notBundle(), esmShim()],
         },
       },
       preload: {

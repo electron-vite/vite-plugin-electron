@@ -384,7 +384,6 @@ Use `notBundle()` in development to externalize dependencies in Electron entries
 This keeps startup fast by skipping dependency bundling while running `vite serve`.
 For production builds, let bundling run as usual.
 
-
 ```js
 import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
@@ -395,9 +394,7 @@ export default defineConfig(({ command }) => ({
     electron({
       entry: 'electron/main.ts',
       vite: {
-        plugins: [
-          command === 'serve' && notBundle(),
-        ],
+        plugins: [command === 'serve' && notBundle()],
       },
     }),
   ],
@@ -442,6 +439,44 @@ process.on('message', (msg) => {
   }
 })
 ```
+
+### `esmShim()`
+
+Use `esmShim()` to inject `__dirname` and `__filename` shims for ESM Electron entries that rely on these CJS globals.
+
+Only files that actually reference `__dirname` or `__filename` are transformed, so there is no overhead for files that don't need it.
+
+```js
+import { defineConfig } from 'vite'
+import electron from 'vite-plugin-electron'
+import { esmShim, notBundle } from 'vite-plugin-electron/plugin'
+
+export default defineConfig(({ command }) => ({
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [command === 'serve' && notBundle(), esmShim()],
+      },
+    }),
+  ],
+}))
+```
+
+**Under the Hood**
+
+For each matching file, the following shim is prepended:
+
+```js
+import { fileURLToPath } from 'node:url'
+import { dirname } from 'node:path'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+```
+
+**API**
+
+`esmShim()` — no options, just add it to `plugins`.
 
 ## How to work
 
@@ -499,4 +534,3 @@ export default {
 ```
 
 <!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
-

@@ -1,12 +1,9 @@
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 
 import { app, BrowserWindow } from 'electron'
 import { version } from 'typescript'
 
 console.log(version)
-
-const currentDir = dirname(fileURLToPath(import.meta.url))
 
 process.on('message', (message) => {
   if (message !== 'electron-vite&type=hot-reload') {
@@ -19,15 +16,13 @@ process.on('message', (message) => {
 })
 
 const createWindow = () => {
-  const preloadPath = fileURLToPath(new URL('./preload.mjs', import.meta.url))
-
   const window = new BrowserWindow({
     width: 1120,
     height: 780,
     title: `Simple playground - pid ${process.pid}`,
     webPreferences: {
       contextIsolation: true,
-      preload: preloadPath,
+      preload: join(__dirname, 'preload.mjs'),
     },
   })
 
@@ -36,7 +31,7 @@ const createWindow = () => {
     return
   }
 
-  void window.loadFile(join(currentDir, '../dist/index.html'))
+  void window.loadFile(join(__dirname, '../dist/index.html'))
 }
 
 app.whenReady().then(createWindow)
