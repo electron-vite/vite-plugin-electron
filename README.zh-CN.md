@@ -353,6 +353,53 @@ build({
 - `ELECTRON_INSPECT` 追加 `--inspect` 或 `--inspect=<value>`
 - `ELECTRON_INSPECT_BRK` 追加 `--inspect-brk` 或 `--inspect-brk=<value>`
 
+## 内置插件
+
+在开发阶段使用 `notBundle()` 来外部化 Electron 入口的依赖项。
+
+这通过在运行 `vite serve` 时跳过依赖打包，可以让启动速度更快。对于生产构建，让打包正常进行即可。
+
+
+```js
+import { defineConfig } from 'vite'
+import electron from 'vite-plugin-electron'
+import { notBundle } from 'vite-plugin-electron/plugin'
+
+export default defineConfig(({ command }) => ({
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [
+          command === 'serve' && notBundle(),
+        ],
+      },
+    }),
+  ],
+}))
+```
+
+**工作原理**
+
+使用 `build.rolldownOptions.external` 来外部化 package.json 中的依赖
+
+**API**
+
+`notBundle(options?: NotBundleOptions)`
+
+```ts
+export interface NotBundleOptions {
+  /**
+   * 覆盖 `build.rolldownOptions.external`。
+   *
+   * 如果未提供，package.json 中的依赖
+   * (dependencies/devDependencies/peerDependencies/optionalDependencies)
+   * 会自动外部化。
+   */
+  filter?: import('vite').RolldownOptions['external']
+}
+```
+
 **热重载**
 
 从 `v0.29.0` 开始，当 preload 脚本重新构建时，它们会向主进程发送一个 `electron-vite&type=hot-reload` 事件。
@@ -427,56 +474,3 @@ export default {
 ```
 
 <!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
-
-<!--
-
-## Not Bundle
-
-> Added in: v0.13.0 | Experimental
-
-During the development phase, we can exclude the `cjs` format of npm-pkg from bundle. Like Vite's [👉 Not Bundle](https://vitejs.dev/guide/why.html#why-not-bundle-with-esbuild). **It's fast**!
-
-```js
-import electron from 'vite-plugin-electron'
-import { notBundle } from 'vite-plugin-electron/plugin'
-
-export default defineConfig(({ command }) => ({
-  plugins: [
-    electron({
-      entry: 'electron/main.ts',
-      vite: {
-        plugins: [
-          command === 'serve' && notBundle(/* NotBundleOptions */),
-        ],
-      },
-    }),
-  ],
-}))
-```
-
-**API**
-
-`notBundle(/* NotBundleOptions */)`
-
-```ts
-export interface NotBundleOptions {
-  filter?: (id: string) => void | false
-}
-```
-
-**How to work**
-
-Let's use the `electron-log` as an examples.
-
-```js
-┏—————————————————————————————————————┓
-│ import log from 'electron-log'      │
-┗—————————————————————————————————————┛
-                   ↓
-Modules in `node_modules` are not bundled during development, it's fast!
-                   ↓
-┏—————————————————————————————————————┓
-│ const log = require('electron-log') │
-┗—————————————————————————————————————┛
-```
--->

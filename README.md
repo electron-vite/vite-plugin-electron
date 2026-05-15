@@ -377,6 +377,54 @@ build({
 - `ELECTRON_INSPECT` appends `--inspect` or `--inspect=<value>`
 - `ELECTRON_INSPECT_BRK` appends `--inspect-brk` or `--inspect-brk=<value>`
 
+## Builtin Plugins
+
+Use `notBundle()` in development to externalize dependencies in Electron entries.
+
+This keeps startup fast by skipping dependency bundling while running `vite serve`.
+For production builds, let bundling run as usual.
+
+
+```js
+import { defineConfig } from 'vite'
+import electron from 'vite-plugin-electron'
+import { notBundle } from 'vite-plugin-electron/plugin'
+
+export default defineConfig(({ command }) => ({
+  plugins: [
+    electron({
+      entry: 'electron/main.ts',
+      vite: {
+        plugins: [
+          command === 'serve' && notBundle(),
+        ],
+      },
+    }),
+  ],
+}))
+```
+
+**Under the Hood**
+
+Use `build.rolldownOptions.external` to externalize dependencies from package.json
+
+**API**
+
+`notBundle(options?: NotBundleOptions)`
+
+```ts
+export interface NotBundleOptions {
+  /**
+   * Override `build.rolldownOptions.external`.
+   *
+   * If omitted, dependencies from package.json
+   * (dependencies/devDependencies/peerDependencies/optionalDependencies)
+   * are externalized automatically.
+   */
+  filter?: import('vite').RolldownOptions['external']
+}
+```
+
 **Hot Reload**
 
 Since `v0.29.0`, when preload scripts are rebuilt, they will send an `electron-vite&type=hot-reload` event to the main process.
@@ -452,55 +500,3 @@ export default {
 
 <!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
 
-<!--
-
-## Not Bundle
-
-> Added in: v0.13.0 | Experimental
-
-During the development phase, we can exclude the `cjs` format of npm-pkg from bundle. Like Vite's [👉 Not Bundle](https://vitejs.dev/guide/why.html#why-not-bundle-with-esbuild). **It's fast**!
-
-```js
-import electron from 'vite-plugin-electron'
-import { notBundle } from 'vite-plugin-electron/plugin'
-
-export default defineConfig(({ command }) => ({
-  plugins: [
-    electron({
-      entry: 'electron/main.ts',
-      vite: {
-        plugins: [
-          command === 'serve' && notBundle(/* NotBundleOptions */),
-        ],
-      },
-    }),
-  ],
-}))
-```
-
-**API**
-
-`notBundle(/* NotBundleOptions */)`
-
-```ts
-export interface NotBundleOptions {
-  filter?: (id: string) => void | false
-}
-```
-
-**How to work**
-
-Let's use the `electron-log` as an examples.
-
-```js
-┏—————————————————————————————————————┓
-│ import log from 'electron-log'      │
-┗—————————————————————————————————————┛
-                   ↓
-Modules in `node_modules` are not bundled during development, it's fast!
-                   ↓
-┏—————————————————————————————————————┓
-│ const log = require('electron-log') │
-┗—————————————————————————————————————┛
-```
-->
