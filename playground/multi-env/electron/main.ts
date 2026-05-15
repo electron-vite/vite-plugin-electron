@@ -3,6 +3,9 @@ import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
 
 import { app, BrowserWindow, ipcMain } from 'electron'
+import { version } from 'typescript'
+
+console.log(version)
 
 declare const __PLAYGROUND_MULTI_ENV_MAIN_LABEL__: string
 declare const __PLAYGROUND_MULTI_ENV_MAIN_NAME__: string

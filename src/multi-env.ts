@@ -102,7 +102,7 @@ export default function electron(
   const isESM = checkESModule()
 
   // Shared: create per-environment EnvironmentOptions from the options array.
-  const defaultEnvs = Object.fromEntries(
+  const defaultEnvs = Object.fromEntries<EnvironmentOptions>(
     environmentOptions.map((opt) => {
       const defaultConfig = createElectronViteDefaults(isESM, {
         input: opt.input,
@@ -182,6 +182,12 @@ export default function electron(
     buildConfig(config) {
       if (optionsArray.length === 0) {
         return
+      }
+
+      // In build mode, all deps should be bundled.
+      for (const envCfg of Object.values(defaultEnvs)) {
+        envCfg.resolve ??= {}
+        envCfg.resolve.noExternal ??= true
       }
 
       return withExternalBuiltins({
