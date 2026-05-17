@@ -71,14 +71,14 @@
   "devDependencies": {
     "@subf/config": "^0.2.1",
     "@types/node": "^24.12.0",
-    "bumpp": "^11.0.1",
-    "oxfmt": "^0.48.0",
-    "oxlint": "^1.63.0",
+    "bumpp": "^11.1.0",
+    "oxfmt": "^0.50.0",
+    "oxlint": "^1.65.0",
     "tsdown": "^0.22.0",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.11",
-    "vite-plugin-electron-renderer": "^1.0.0-beta.2",
-    "vitest": "^4.1.5"
+    "typescript": "^6.0.3",
+    "vite": "^8.0.13",
+    "vite-plugin-electron-renderer": "^1.0.0-beta.3",
+    "vitest": "^4.1.6"
   },
   "peerDependencies": {
     "vite-plugin-electron-renderer": "*"
