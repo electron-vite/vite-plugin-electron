@@ -16,15 +16,24 @@ interface StartupFn {
     argv?: string[],
     options?: import('node:child_process').SpawnOptions,
     customElectronPkg?: string,
-  ): Promise<void>
+  ): Promise<boolean>
   send: (message: string) => void
+  /**
+   * If `prevent` is set to `true`, the startup function will not start the Electron app, and you can control when to start it by calling the `startup` function. This is useful when you want to do some preparation work before starting the Electron app, such as waiting for a server to be ready.
+   */
+  prevent: boolean
+  /**
+   * @deprecated No use
+   */
   hookedProcessExit: boolean
   exit: () => void
 }
+
 /**
  * Electron App startup function.
  * It will mount the Electron App child-process to `process.electronApp`.
- * @param argv default value `['.', '--no-sandbox']`
+ *
+ * You can also set environment variables to control the Electron CLI flags.
  * `1` or `true` turns a flag on, `0` or `false` turns it off, and any other non-empty
  * value is appended as `=<value>`.
  *
@@ -34,15 +43,24 @@ interface StartupFn {
  * - `ELECTRON_DISABLE_WEB_SECURITY` appends `--disable-web-security`
  * - `ELECTRON_INSPECT` appends `--inspect` or `--inspect=<value>`
  * - `ELECTRON_INSPECT_BRK` appends `--inspect-brk` or `--inspect-brk=<value>`
+ * @param argv default value `['.', '--no-sandbox']`
  * @param options options for `child_process.spawn`
  * @param customElectronPkg custom electron package name (default: 'electron')
+ * @returns `true` if the Electron app is started, or `false` if the startup is prevented by `startup.prevent` or `ELECTRON_STARTUP_PREVENT` env var.
  */
-
 export const startup: StartupFn = async (
   argv = ['.', '--no-sandbox'],
   options?: SpawnOptions,
   customElectronPkg?: string,
 ) => {
+  if (
+    startup.prevent ||
+    process.env.ELECTRON_STARTUP_PREVENT === 'true' ||
+    process.env.ELECTRON_STARTUP_PREVENT === '1'
+  ) {
+    process.electronApp = undefined
+    return false
+  }
   const { spawn } = await import('node:child_process')
   const { createRequire } = await import('node:module')
   const electronPackage = customElectronPkg ?? 'electron'
@@ -74,6 +92,7 @@ export const startup: StartupFn = async (
   }
 
   if (!electron) {
+    process.electronApp = undefined
     throw new Error(
       `Unable to resolve "${electronPackage}". Install it in the app project or pass startup(..., ..., customElectronPkg).`,
       { cause: resolutionError as Error },
@@ -112,6 +131,8 @@ export const startup: StartupFn = async (
 
   // Exit command after Electron.app exits
   process.electronApp.on('exit', process.exit)
+
+  return true
 }
 startup.send = (message: string) => {
   if (process.electronApp) {
@@ -119,7 +140,7 @@ startup.send = (message: string) => {
     process.electronApp.send?.(message)
   }
 }
-startup.hookedProcessExit = false
+startup.hookedProcessExit = startup.prevent = false
 startup.exit = () => {
   process.electronApp?.removeAllListeners()
   process.electronApp?.kill()
@@ -151,12 +172,13 @@ export interface OnStartOptions {
      * @param argv default value `['.', '--no-sandbox']`
      * @param options options for `child_process.spawn`
      * @param customElectronPkg custom electron package name (default: 'electron')
+     * @returns `true` if the Electron app is started, or `false` if startup is prevented by `startup.prevent` or `ELECTRON_STARTUP_PREVENT`.
      */
     startup: (
       argv?: string[],
       options?: import('node:child_process').SpawnOptions,
       customElectronPkg?: string,
-    ) => Promise<void>
+    ) => Promise<boolean>
     /** Reload Electron-Renderer */
     reload: () => void
   }) => void | Promise<void>

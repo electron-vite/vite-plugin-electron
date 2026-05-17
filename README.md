@@ -165,12 +165,13 @@ export interface ElectronOptions {
      * @param argv default value `['.', '--no-sandbox']`
      * @param options options for `child_process.spawn`
      * @param customElectronPkg custom electron package name (default: 'electron')
+     * @returns `true` if the Electron app is started, or `false` if the startup is prevented by `startup.prevent` or `ELECTRON_STARTUP_PREVENT` env var.
      */
     startup: (
       argv?: string[],
       options?: import('node:child_process').SpawnOptions,
       customElectronPkg?: string,
-    ) => Promise<void>
+    ) => Promise<boolean>
     /** Reload Electron-Renderer */
     reload: () => void
   }) => void | Promise<void>
@@ -394,6 +395,18 @@ build({
 - `ELECTRON_DISABLE_WEB_SECURITY` appends `--disable-web-security`
 - `ELECTRON_INSPECT` appends `--inspect` or `--inspect=<value>`
 - `ELECTRON_INSPECT_BRK` appends `--inspect-brk` or `--inspect-brk=<value>`
+
+### Startup Controls
+
+Use `startup.prevent = true`, `ELECTRON_STARTUP_PREVENT=1`, or `ELECTRON_STARTUP_PREVENT=true` to disable automatic electron app startup. This lets you decide when to call `startup.prevent = false; startup()` manually (for example, after waiting for another local service).
+
+Await return value of `startup()` to know if the startup was triggered or prevented by the controls.
+
+### Custom Electron Package Resolution
+
+`startup(argv, options, customElectronPkg)` supports custom Electron forks. The package is resolved from app roots (`process.cwd()`, `options.cwd`, and `INIT_CWD`) before falling back to standard module resolution.
+
+If the package cannot be resolved, `startup()` throws an error describing how to install or pass the package explicitly.
 
 ## Builtin Plugins
 

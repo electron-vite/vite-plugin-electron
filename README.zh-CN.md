@@ -141,12 +141,13 @@ export interface ElectronOptions {
      * @param argv default value `['.', '--no-sandbox']`
      * @param options options for `child_process.spawn`
      * @param customElectronPkg custom electron package name (default: 'electron')
+     * @returns `true` if the Electron app is started, or `false` if the startup is prevented by `startup.prevent` or `ELECTRON_STARTUP_PREVENT` env var.
      */
     startup: (
       argv?: string[],
       options?: import('node:child_process').SpawnOptions,
       customElectronPkg?: string,
-    ) => Promise<void>
+    ) => Promise<boolean>
     /** Reload Electron-Renderer */
     reload: () => void
   }) => void | Promise<void>
@@ -370,6 +371,18 @@ build({
 - `ELECTRON_DISABLE_WEB_SECURITY` 追加 `--disable-web-security`
 - `ELECTRON_INSPECT` 追加 `--inspect` 或 `--inspect=<value>`
 - `ELECTRON_INSPECT_BRK` 追加 `--inspect-brk` 或 `--inspect-brk=<value>`
+
+### 启动控制
+
+可以使用 `startup.prevent = true`, `ELECTRON_STARTUP_PREVENT=1`, 或 `ELECTRON_STARTUP_PREVENT=true` 在开发期间禁用自动启动。这样你可以按自己的时机手动调用 `startup.prevent = false; startup()`（例如先等待某个本地服务就绪）。
+
+Await `startup()` 的返回值可以知道是否触发了启动，或者被控制选项阻止了。
+
+### 自定义 Electron 包解析
+
+`startup(argv, options, customElectronPkg)` 支持自定义 Electron fork。插件会优先在应用根目录上下文中解析该包（`process.cwd()`、`options.cwd`、`INIT_CWD`），然后再回退到标准模块解析。
+
+如果仍然无法解析，`startup()` 会抛出错误，并提示安装方式或显式传入包名。
 
 ## 内置插件
 
