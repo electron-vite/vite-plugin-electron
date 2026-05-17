@@ -247,6 +247,24 @@ export interface MultiEnvElectronOptions {
 }
 ```
 
+## 热重载预加载脚本
+
+从 `v0.29.0` 开始，当 preload 脚本重新构建时，它们会向主进程发送一个 `electron-vite&type=hot-reload` 事件。
+如果你的应用不需要渲染进程，这就可以实现 **热重载**。
+
+```js
+// electron/main.ts
+
+process.on('message', (msg) => {
+  if (msg === 'electron-vite&type=hot-reload') {
+    for (const win of BrowserWindow.getAllWindows()) {
+      // 热重载 preload 脚本
+      win.webContents.reload()
+    }
+  }
+})
+```
+
 ## 推荐目录结构
 
 下面以基于 `create vite` 的官方 [template-vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-vanilla-ts) 模板为例。
@@ -355,6 +373,8 @@ build({
 
 ## 内置插件
 
+### `notBundle()` 插件
+
 在开发阶段使用 `notBundle()` 来外部化 Electron 入口的依赖项。
 
 这通过在运行 `vite serve` 时跳过依赖打包，可以让启动速度更快。对于生产构建，让打包正常进行即可。
@@ -397,25 +417,7 @@ export interface NotBundleOptions {
 }
 ```
 
-**热重载**
-
-从 `v0.29.0` 开始，当 preload 脚本重新构建时，它们会向主进程发送一个 `electron-vite&type=hot-reload` 事件。
-如果你的应用不需要渲染进程，这就可以实现 **热重载**。
-
-```js
-// electron/main.ts
-
-process.on('message', (msg) => {
-  if (msg === 'electron-vite&type=hot-reload') {
-    for (const win of BrowserWindow.getAllWindows()) {
-      // Hot reload preload scripts
-      win.webContents.reload()
-    }
-  }
-})
-```
-
-### `esmShim()`
+### `esmShim()` 插件
 
 使用 `esmShim()` 为依赖这些 CJS 全局变量的 ESM Electron 入口注入 `__dirname` 和 `__filename` 的 shim。
 
@@ -479,7 +481,6 @@ export default {
       vite: {
         build: {
           rolldownOptions: {
-            // 在 Vite < 8 中这里也可以写成 rollupOptions.external
             // Here are some C/C++ modules them can't be built properly
             external: ['serialport', 'sqlite3'],
           },

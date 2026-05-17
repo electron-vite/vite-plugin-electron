@@ -65,7 +65,7 @@ export default {
         entry: 'electron/main.ts',
       },
       preload: {
-        // Shortcut of `build.rolldownOptions.input` / `build.rollupOptions.input` on Vite < 8
+        // Shortcut of `build.rolldownOptions.input` (`build.rollupOptions.input` on Vite < 8)
         input: 'electron/preload.ts',
       },
       // Optional: Use Node.js API in the Renderer process
@@ -271,6 +271,24 @@ export interface MultiEnvElectronOptions {
 }
 ```
 
+## Hot Reload Preload Scripts
+
+Since `v0.29.0`, when preload scripts are rebuilt, they will send an `electron-vite&type=hot-reload` event to the main process.
+If your App doesn't need a renderer process, this will give you **hot-reload**.
+
+```js
+// electron/main.ts
+
+process.on('message', (msg) => {
+  if (msg === 'electron-vite&type=hot-reload') {
+    for (const win of BrowserWindow.getAllWindows()) {
+      // Hot reload preload scripts
+      win.webContents.reload()
+    }
+  }
+})
+```
+
 ## Recommend Structure
 
 Let's use the official [template-vanilla-ts](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-vanilla-ts) created based on `create vite` as an example
@@ -379,6 +397,8 @@ build({
 
 ## Builtin Plugins
 
+### notBundle Plugin
+
 Use `notBundle()` in development to externalize dependencies in Electron entries.
 
 This keeps startup fast by skipping dependency bundling while running `vite serve`.
@@ -422,25 +442,7 @@ export interface NotBundleOptions {
 }
 ```
 
-**Hot Reload**
-
-Since `v0.29.0`, when preload scripts are rebuilt, they will send an `electron-vite&type=hot-reload` event to the main process.
-If your App doesn't need a renderer process, this will give you **hot-reload**.
-
-```js
-// electron/main.ts
-
-process.on('message', (msg) => {
-  if (msg === 'electron-vite&type=hot-reload') {
-    for (const win of BrowserWindow.getAllWindows()) {
-      // Hot reload preload scripts
-      win.webContents.reload()
-    }
-  }
-})
-```
-
-### `esmShim()`
+### esmShim Plugin
 
 Use `esmShim()` to inject `__dirname` and `__filename` shims for ESM Electron entries that rely on these CJS globals.
 
