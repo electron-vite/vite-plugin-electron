@@ -11,6 +11,16 @@ const startupEnv = {
   ELECTRON_INSPECT_BRK: '--inspect-brk',
 } as const
 
+function parseEnvVar(value: string | undefined): boolean | string {
+  if (value === 'true' || value === '1') {
+    return true
+  }
+  if (value === 'false' || value === '0' || value === '' || value === undefined) {
+    return false
+  }
+  return value
+}
+
 interface StartupFn {
   (
     argv?: string[],
@@ -53,11 +63,7 @@ export const startup: StartupFn = async (
   options?: SpawnOptions,
   customElectronPkg?: string,
 ) => {
-  if (
-    startup.prevent ||
-    process.env.ELECTRON_STARTUP_PREVENT === 'true' ||
-    process.env.ELECTRON_STARTUP_PREVENT === '1'
-  ) {
+  if (startup.prevent || parseEnvVar(process.env.ELECTRON_STARTUP_PREVENT?.trim())) {
     process.electronApp = undefined
     return false
   }
@@ -113,13 +119,13 @@ export const startup: StartupFn = async (
   const targetArgv = [...argv]
 
   for (const [envName, flag] of Object.entries(startupEnv)) {
-    const value = process.env[envName]?.trim()
+    const value = parseEnvVar(process.env[envName]?.trim())
     if (!value) {
       continue
     }
-    if (value === 'true' || value === '1') {
+    if (value === true) {
       targetArgv.push(flag)
-    } else if (value !== 'false' && value !== '0') {
+    } else {
       targetArgv.push(`${flag}=${value}`)
     }
   }
