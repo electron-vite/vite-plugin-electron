@@ -1,13 +1,14 @@
 import { loadPackageJSONSync } from 'local-pkg'
 import type { Plugin } from 'vite'
 
-import type { RolldownOptions } from '../utils'
+import { compatRollupOptions } from '../utils'
+import type { RolldownOrRollupOptions } from '../utils'
 
 export interface NotBundleOptions {
   /**
-   * Manually override of `build.rollupOptions.external`.
+   * Manually override of `build.rolldownOptions.external` (`build.rollupOptions.external` on Vite < 8).
    */
-  filter?: RolldownOptions['external']
+  filter?: RolldownOrRollupOptions['external']
 }
 
 /**
@@ -24,7 +25,7 @@ export function notBundle(options: NotBundleOptions = {}): Plugin {
     // Run before the builtin plugin 'vite:resolve'
     enforce: 'pre',
     config(cfg) {
-      let external: RolldownOptions['external']
+      let external: RolldownOrRollupOptions['external']
       if (!options.filter) {
         const pkg = loadPackageJSONSync(cfg.root)
         if (pkg) {
@@ -44,11 +45,11 @@ export function notBundle(options: NotBundleOptions = {}): Plugin {
         external = options.filter
       }
       return {
-        build: {
+        build: compatRollupOptions({
           rolldownOptions: {
             external,
           },
-        },
+        }),
       }
     },
   }

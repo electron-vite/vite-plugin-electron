@@ -4,14 +4,8 @@ import type { AddressInfo } from 'node:net'
 import path from 'node:path'
 
 import { loadPackageJSONSync } from 'local-pkg'
-import { mergeConfig } from 'vite'
-import type {
-  BuildEnvironmentOptions,
-  InlineConfig,
-  Logger,
-  ResolvedConfig,
-  ViteDevServer,
-} from 'vite'
+import { mergeConfig, version } from 'vite'
+import type { InlineConfig, Logger, ResolvedConfig, ViteDevServer } from 'vite'
 
 import type { ElectronOptions } from '.'
 
@@ -22,8 +16,8 @@ export interface PidTree {
 }
 
 function resolveBuiltinExternals(
-  external: RolldownOptions['external'],
-): RolldownOptions['external'] {
+  external: RolldownOrRollupOptions['external'],
+): RolldownOrRollupOptions['external'] {
   const builtins: (string | RegExp)[] = [
     'electron',
     'electron/main',
@@ -56,26 +50,67 @@ function resolveBuiltinExternals(
   return builtins
 }
 
+/**
+ * Normalize the build config key for the current Vite version.
+ * Vite 8+ reads `build.rolldownOptions`, while Vite < 8 reads `build.rollupOptions`.
+ */
+function getBuildOptions(build: InlineConfig['build']): RolldownOrRollupOptions | undefined {
+  if (!build) {
+    return
+  }
+  return build.rolldownOptions || build.rollupOptions
+}
+
+/**
+ * Keep only the build config key supported by the current Vite version.
+ * This converts the user-facing config shape between `rolldownOptions` and `rollupOptions`
+ * without changing the actual option payload.
+ */
+function setBuildOptions(build: InlineConfig['build'], viteVersion: string = version): void {
+  if (!build) {
+    return
+  }
+  const options = getBuildOptions(build)
+
+  if (options) {
+    if (Number.parseInt(viteVersion) < 8) {
+      delete build.rolldownOptions
+      build.rollupOptions = options
+    } else {
+      delete build.rollupOptions
+      build.rolldownOptions = options
+    }
+  }
+}
+
+export function compatRollupOptions(
+  options: NonNullable<InlineConfig['build']>,
+  viteVersion: string = version,
+): InlineConfig['build'] {
+  setBuildOptions(options, viteVersion)
+  return options
+}
+
 export function checkESModule(): boolean {
   return loadPackageJSONSync()?.type === 'module'
 }
 
 export const defaultMainSimpleConfig: InlineConfig = {
-  build: {
+  build: compatRollupOptions({
     rolldownOptions: {
       platform: 'node',
     },
-  },
+  }),
 }
 
 export function createDefaultPreloadConfig(
   esmodule: boolean,
-  input?: RolldownOptions['input'],
+  input?: RolldownOrRollupOptions['input'],
 ): InlineConfig {
   const fileExt = esmodule ? 'mjs' : 'js'
 
   return {
-    build: {
+    build: compatRollupOptions({
       rolldownOptions: {
         // `rolldownOptions.input` has higher priority than `build.lib`.
         // @see - https://github.com/vitejs/vite/blob/v5.0.9/packages/vite/src/node/build.ts#L482
@@ -122,14 +157,14 @@ export function createDefaultPreloadConfig(
           assetFileNames: '[name].[ext]',
         },
       },
-    },
+    }),
   }
 }
 
 interface ElectronViteDefaultsOptions {
   entry?: ElectronOptions['entry']
-  input?: RolldownOptions['input']
-  plugins?: RolldownOptions['plugins']
+  input?: RolldownOrRollupOptions['input']
+  plugins?: RolldownOrRollupOptions['plugins']
 }
 
 export function createElectronViteDefaults(
@@ -137,7 +172,7 @@ export function createElectronViteDefaults(
   options: ElectronViteDefaultsOptions = {},
 ): InlineConfig {
   return {
-    build: {
+    build: compatRollupOptions({
       lib: options.entry
         ? {
             entry: options.entry,
@@ -159,7 +194,7 @@ export function createElectronViteDefaults(
           : {}),
         ...(options.plugins !== undefined ? { plugins: options.plugins } : {}),
       },
-    },
+    }),
     resolve: {
       conditions: ['node'],
       // #98
@@ -189,20 +224,22 @@ export function resolveViteConfigBase(esmodule: boolean, options: ElectronOption
   return mergeConfig(defaultConfig, options?.vite || {})
 }
 
+/**
+ * Externalize Electron and Node builtins in both build modes.
+ * The build config keeps `rolldownOptions` on Vite 8+ and `rollupOptions` on Vite < 8.
+ */
 export function withExternalBuiltins(config: InlineConfig): InlineConfig {
   config.build ??= {}
-  config.build.rolldownOptions ??= {}
-  config.build.rolldownOptions.external = resolveBuiltinExternals(
-    config.build.rolldownOptions.external,
-  )
+  const buildOptions = getBuildOptions(config.build) || {}
+  buildOptions.external = resolveBuiltinExternals(buildOptions.external)
+  setBuildOptions(config.build)
 
   if (config.environments) {
     for (const environment of Object.values(config.environments)) {
       environment.build ??= {}
-      environment.build.rolldownOptions ??= {}
-      environment.build.rolldownOptions.external = resolveBuiltinExternals(
-        environment.build.rolldownOptions.external,
-      )
+      const environmentBuildOptions = getBuildOptions(environment.build) || {}
+      environmentBuildOptions.external = resolveBuiltinExternals(environmentBuildOptions.external)
+      setBuildOptions(environment.build)
     }
   }
 
@@ -243,19 +280,47 @@ export function resolveServerUrl(server: ViteDevServer): string | undefined {
   }
 }
 
-export type RolldownOptions = Exclude<BuildEnvironmentOptions['rolldownOptions'], undefined>
+type BuildOptions = NonNullable<InlineConfig['build']>
+/**
+ * Build options exposed by Vite's build config in either compatibility shape.
+ * This alias lets callers accept both Vite 7 and Vite 8 build key variants.
+ */
+export type RolldownOrRollupOptions = NonNullable<
+  BuildOptions extends { rolldownOptions: infer U } ? U : BuildOptions['rollupOptions']
+>
 
 /** @see https://github.com/vitejs/vite/blob/v5.4.9/packages/vite/src/node/build.ts#L489-L504 */
 export function resolveInput(
   config: ResolvedConfig,
-): RolldownOptions['input'] | string | undefined {
+): RolldownOrRollupOptions['input'] | string | undefined {
   const options = config.build
   const { root } = config
   const libOptions = options.lib
+  const buildOptions = getBuildOptions(options)
 
   const resolve = (p: string) => path.resolve(root, p)
+  const normalizeInput = (
+    input: RolldownOrRollupOptions['input'] | string | undefined,
+  ): RolldownOrRollupOptions['input'] | string | undefined => {
+    if (typeof input === 'string') {
+      return resolve(input)
+    }
+
+    if (Array.isArray(input)) {
+      return input.map((file) => resolve(file))
+    }
+
+    if (input && typeof input === 'object') {
+      return Object.fromEntries(
+        Object.entries(input).map(([alias, file]) => [alias, resolve(file)]),
+      )
+    }
+
+    return input
+  }
+
   const input = libOptions
-    ? options.rolldownOptions?.input ||
+    ? normalizeInput(buildOptions?.input) ||
       (typeof libOptions.entry === 'string'
         ? resolve(libOptions.entry)
         : Array.isArray(libOptions.entry)
@@ -263,7 +328,7 @@ export function resolveInput(
           : Object.fromEntries(
               Object.entries(libOptions.entry).map(([alias, file]) => [alias, resolve(file)]),
             ))
-    : options.rolldownOptions?.input
+    : normalizeInput(buildOptions?.input)
 
   if (input) {
     return input

@@ -8,7 +8,13 @@ import { checkESModule, resolveViteConfigBase, withExternalBuiltins } from './ut
 
 // public utils
 export { startup } from './startup'
-export { resolveViteConfig, withExternalBuiltins } from './utils'
+export {
+  resolveViteConfig,
+  withExternalBuiltins,
+  compatRollupOptions,
+  checkESModule,
+} from './utils'
+export type { RolldownOrRollupOptions } from './utils'
 export { loadPackageJSON, loadPackageJSONSync } from 'local-pkg'
 
 export interface ElectronOptions extends OnStartOptions {

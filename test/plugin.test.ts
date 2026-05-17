@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import electron from '../src'
 import { notBundle } from '../src/plugin'
+import { compatRollupOptions, resolveInput } from '../src/utils'
 
 const pluginNotBundle = notBundle()
 pluginNotBundle.apply = undefined
@@ -32,6 +33,37 @@ afterEach(async () => {
 })
 
 describe('src/plugin', () => {
+  it('compatRollupOptions keeps only the active build key', () => {
+    const build = compatRollupOptions({
+      rolldownOptions: {
+        external: ['vite'],
+      },
+    }) as {
+      rolldownOptions?: { external?: string[] }
+      rollupOptions?: { external?: string[] }
+    }
+
+    expect(build.rolldownOptions?.external).toEqual(['vite'])
+    expect(build.rollupOptions).toBeUndefined()
+  })
+
+  it('compatRollupOptions keeps only rollupOptions on Vite 7', async () => {
+    const build = compatRollupOptions(
+      {
+        rolldownOptions: {
+          external: ['vite'],
+        },
+      },
+      '7.2.7',
+    ) as {
+      rolldownOptions?: { external?: string[] }
+      rollupOptions?: { external?: string[] }
+    }
+
+    expect(build.rollupOptions?.external).toEqual(['vite'])
+    expect(build.rolldownOptions).toBeUndefined()
+  })
+
   it('notBundle', async () => {
     await build({
       configFile: false,
@@ -52,6 +84,20 @@ describe('src/plugin', () => {
 
     expect(normalSnapMain).toMatchSnapshot()
   })
+
+  it('resolveInput reads rollupOptions.input', () => {
+    const input = resolveInput({
+      root: __dirname,
+      build: {
+        rollupOptions: {
+          input: 'fixtures/external-main.ts',
+        },
+      },
+    } as never)
+
+    expect(input).toBe(path.resolve(__dirname, 'fixtures/external-main.ts'))
+  })
+
   it('mockHtml', async () => {
     // Ensure no index.html exists before the test
     expect(fs.existsSync(mockHtmlPath)).toBe(false)

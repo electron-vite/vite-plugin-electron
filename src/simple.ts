@@ -3,7 +3,7 @@ import type { Plugin } from 'vite'
 
 import { defaultPreloadOnstart } from './startup'
 import { checkESModule, createDefaultPreloadConfig, defaultMainSimpleConfig } from './utils'
-import type { RolldownOptions } from './utils'
+import type { RolldownOrRollupOptions } from './utils'
 
 import electron from './index'
 import type { ElectronOptions } from './index'
@@ -12,11 +12,11 @@ export interface ElectronSimpleOptions {
   main: ElectronOptions
   preload?: Omit<ElectronOptions, 'entry'> & {
     /**
-     * Shortcut of `build.rolldownOptions.input`.
+     * Shortcut of `build.rolldownOptions.input` (`build.rollupOptions.input` on Vite < 8).
      *
-     * Preload scripts may contain Web assets, so use the `build.rolldownOptions.input` instead `build.lib.entry`.
+     * Preload scripts may contain Web assets, so use the build input option instead of `build.lib.entry`.
      */
-    input: RolldownOptions['input']
+    input: RolldownOrRollupOptions['input']
   }
   /**
    * Support use Node.js API in Electron-Renderer

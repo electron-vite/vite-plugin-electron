@@ -11,7 +11,7 @@ import {
   defaultMainSimpleConfig,
   withExternalBuiltins,
 } from './utils'
-import type { RolldownOptions } from './utils'
+import type { RolldownOrRollupOptions } from './utils'
 
 export type MultiEnvElectronOptionName = 'main' | 'preload' | (string & {})
 
@@ -24,13 +24,13 @@ export interface MultiEnvElectronOptions extends OnStartOptions {
    */
   name?: string
   /**
-   * Shortcut of `options.build.rolldownOptions.input`
+   * Shortcut of `options.build.rolldownOptions.input` (`options.build.rollupOptions.input` on Vite < 8)
    */
-  input?: RolldownOptions['input']
+  input?: RolldownOrRollupOptions['input']
   /**
-   * Shortcut of `options.build.rolldownOptions.plugins`
+   * Shortcut of `options.build.rolldownOptions.plugins` (`options.build.rollupOptions.plugins` on Vite < 8)
    */
-  plugins?: RolldownOptions['plugins']
+  plugins?: RolldownOrRollupOptions['plugins']
   /**
    * Per-environment Vite options.
    */

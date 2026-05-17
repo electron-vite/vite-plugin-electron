@@ -1,4 +1,3 @@
-import { version } from 'vite'
 import type {
   Plugin,
   ConfigEnv,
@@ -30,12 +29,6 @@ export function createElectronPlugin({
   let userConfig: UserConfig
   let configEnv: ConfigEnv
   let cleanupMock: (() => Promise<void>) | undefined
-
-  if (Number.parseInt(version) < 8) {
-    throw new Error(
-      `[vite-plugin-electron] Vite v${version} does not support \`rolldownOptions\`, please install \`vite@>=8\` or use \`vite-plugin-electron@0.29.1\`.`,
-    )
-  }
 
   const isESM = checkESModule()
 

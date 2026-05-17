@@ -29,8 +29,8 @@
 In short, `vite-plugin-electron` makes developing Electron apps as easy as normal Vite projects.
 
 > [!important]
-> This project will drop support for `vite@<8` in the upcoming `v1` release.
-> For users needing Vite 7 compatibility, use `v0.29.1`. it is stable and production-ready.
+> This plugin supports both Vite 7 and Vite 8.
+> Build config keys are adapted automatically, using `rolldownOptions` on Vite 8+ and `rollupOptions` on Vite < 8.
 
 ## Features
 
@@ -65,7 +65,7 @@ export default {
         entry: 'electron/main.ts',
       },
       preload: {
-        // Shortcut of `build.rollupOptions.input`
+        // Shortcut of `build.rolldownOptions.input` / `build.rollupOptions.input` on Vite < 8
         input: 'electron/preload.ts',
       },
       // Optional: Use Node.js API in the Renderer process
@@ -183,7 +183,7 @@ export interface ElectronOptions {
 > `vite-plugin-electron/multi-env` is only available in `vite-plugin-electron@>=1.0.0`.
 > It does not exist in `0.x` releases.
 
-Using Vite's Environment API to build Electron targets instead of manually calling `build()`. It is the future-facing way to handle multi-target builds, and the configuration is more concise and easier to maintain: use `rolldownOptions.input` to specify the entry and overridable environment config for each target.
+Using Vite's Environment API to build Electron targets instead of manually calling `build()`. It is the future-facing way to handle multi-target builds, and the configuration is more concise and easier to maintain: use `rolldownOptions.input` on Vite 8+ or `rollupOptions.input` on Vite < 8 to specify the entry and overridable environment config for each target.
 
 Flat API:
 
@@ -256,11 +256,11 @@ export interface MultiEnvElectronOptions {
    */
   name?: string
   /**
-   * Shortcut of `options.build.rolldownOptions.input`
+   * Shortcut of `options.build.rolldownOptions.input` (`options.build.rollupOptions.input` on Vite < 8)
    */
   input?: import('vite').BuildEnvironmentOptions['rolldownOptions']['input']
   /**
-   * Shortcut of `options.build.rolldownOptions.plugins`
+   * Shortcut of `options.build.rolldownOptions.plugins` (`options.build.rollupOptions.plugins` on Vite < 8)
    */
   plugins?: import('vite').BuildEnvironmentOptions['rolldownOptions']['plugins']
   /**
@@ -403,7 +403,7 @@ export default defineConfig(({ command }) => ({
 
 **Under the Hood**
 
-Use `build.rolldownOptions.external` to externalize dependencies from package.json
+Use `build.rolldownOptions.external` on Vite 8+ or `build.rollupOptions.external` on Vite < 8 to externalize dependencies from package.json
 
 **API**
 
@@ -412,7 +412,7 @@ Use `build.rolldownOptions.external` to externalize dependencies from package.js
 ```ts
 export interface NotBundleOptions {
   /**
-   * Override `build.rolldownOptions.external`.
+   * Override `build.rolldownOptions.external` (`build.rollupOptions.external` on Vite < 8).
    *
    * If omitted, dependencies from package.json
    * (dependencies/devDependencies/peerDependencies/optionalDependencies)

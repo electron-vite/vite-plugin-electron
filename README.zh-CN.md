@@ -5,8 +5,8 @@
 简而言之，`vite-plugin-electron` 让开发 Electron 应用和普通 Vite 项目一样简单。
 
 > [!important]
-> 在即将到来的 `v1` 版本中，本项目将停止支持 `vite@<8`。
-> 如需继续使用 Vite 7，请改用 `v0.29.1`。它已经稳定且可用于生产环境。
+> 本插件同时支持 Vite 7 和 Vite 8。
+> 构建配置会自动适配：Vite 8+ 使用 `rolldownOptions`，Vite < 8 使用 `rollupOptions`。
 
 ## 特性
 
@@ -41,7 +41,7 @@ export default {
         entry: 'electron/main.ts',
       },
       preload: {
-        // Shortcut of `build.rollupOptions.input`
+        // Shortcut of `build.rolldownOptions.input` (`build.rollupOptions.input` on Vite < 8)
         input: 'electron/preload.ts',
       },
       // Optional: Use Node.js API in the Renderer process
@@ -159,7 +159,7 @@ export interface ElectronOptions {
 > `vite-plugin-electron/multi-env` 只在 `vite-plugin-electron@>=1.0.0` 中提供。
 > `0.x` 版本没有这个入口。
 
-使用 Vite 的 Environment API 构建 Electron 目标，而不是手动调用 `build()`。这是更面向未来的多目标构建方式，配置也更简洁、更易维护：使用 `rolldownOptions.input` 指定入口，并为每个目标提供可覆盖的 environment 配置。
+使用 Vite 的 Environment API 构建 Electron 目标，而不是手动调用 `build()`。这是更面向未来的多目标构建方式，配置也更简洁、更易维护：在 Vite 8+ 中使用 `rolldownOptions.input`，在 Vite < 8 中使用 `rollupOptions.input` 指定入口，并为每个目标提供可覆盖的 environment 配置。
 
 Flat API:
 
@@ -232,11 +232,11 @@ export interface MultiEnvElectronOptions {
    */
   name?: string
   /**
-   * Shortcut of `options.build.rolldownOptions.input`
+   * Shortcut of `options.build.rolldownOptions.input` (`options.build.rollupOptions.input` on Vite < 8)
    */
   input?: import('vite').BuildEnvironmentOptions['rolldownOptions']['input']
   /**
-   * Shortcut of `options.build.rolldownOptions.plugins`
+   * Shortcut of `options.build.rolldownOptions.plugins` (`options.build.rollupOptions.plugins` on Vite < 8)
    */
   plugins?: import('vite').BuildEnvironmentOptions['rolldownOptions']['plugins']
   /**
@@ -378,7 +378,7 @@ export default defineConfig(({ command }) => ({
 
 **工作原理**
 
-使用 `build.rolldownOptions.external` 来外部化 package.json 中的依赖
+在 Vite 8+ 中使用 `build.rolldownOptions.external`，在 Vite < 8 中使用 `build.rollupOptions.external` 来外部化 package.json 中的依赖
 
 **API**
 
@@ -387,7 +387,7 @@ export default defineConfig(({ command }) => ({
 ```ts
 export interface NotBundleOptions {
   /**
-   * 覆盖 `build.rolldownOptions.external`。
+   * 覆盖 `build.rolldownOptions.external` / `build.rollupOptions.external`（Vite < 8）。
    *
    * 如果未提供，package.json 中的依赖
    * (dependencies/devDependencies/peerDependencies/optionalDependencies)
@@ -479,6 +479,7 @@ export default {
       vite: {
         build: {
           rolldownOptions: {
+            // 在 Vite < 8 中这里也可以写成 rollupOptions.external
             // Here are some C/C++ modules them can't be built properly
             external: ['serialport', 'sqlite3'],
           },
