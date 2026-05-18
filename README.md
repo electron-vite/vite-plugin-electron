@@ -123,13 +123,13 @@ export default {
 }
 ```
 
-## Flat API vs Simple API
+### Flat API vs Simple API
 
 - Simple API is based on the Flat API
 - Simple API includes some Preload scripts preset configs.
 - Flat API provides some more general APIs, which you can use for secondary encapsulation, such as [nuxt-electron](https://github.com/caoxiemeihao/nuxt-electron).
 
-## Flat API <sub><sup>(Define)</sup></sub>
+### Types
 
 `electron(options: ElectronOptions | ElectronOptions[])`
 
@@ -178,7 +178,7 @@ export interface ElectronOptions {
 }
 ```
 
-## `/multi-env`
+## Environment API
 
 > [!important]
 > `vite-plugin-electron/multi-env` is only available in `vite-plugin-electron@>=1.0.0`.
@@ -245,7 +245,7 @@ export default {
 
 `electronSimple()` accepts an object grouped by environment name. The `main` and `preload` keys reuse the same default presets as `vite-plugin-electron/simple`, while custom keys are built like main-process targets with their own environment options.
 
-### Configuration
+### Types
 
 ```ts
 export interface MultiEnvElectronOptions {
@@ -393,8 +393,8 @@ build({
 - `REMOTE_DEBUGGING_PORT` appends `--remote-debugging-port=<value>`
 - `ELECTRON_IGNORE_CERTIFICATE_ERRORS` appends `--ignore-certificate-errors`
 - `ELECTRON_DISABLE_WEB_SECURITY` appends `--disable-web-security`
-- `ELECTRON_INSPECT` appends `--inspect` or `--inspect=<value>`
-- `ELECTRON_INSPECT_BRK` appends `--inspect-brk` or `--inspect-brk=<value>`
+- `ELECTRON_INSPECT` appends `--inspect=<value>`
+- `ELECTRON_INSPECT_BRK` appends `--inspect-brk=<value>`
 
 ### Startup Controls
 
@@ -456,6 +456,10 @@ export interface NotBundleOptions {
 ```
 
 ### esmShim Plugin
+
+> [!important]
+> `esmShim` plugin is only available in `vite-plugin-electron@>=1.0.0`.
+> It does not exist in `0.x` releases.
 
 Use `esmShim()` to inject `__dirname` and `__filename` shims for ESM Electron entries that rely on these CJS globals.
 
