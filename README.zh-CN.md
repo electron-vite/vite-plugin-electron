@@ -154,7 +154,6 @@ export interface ElectronOptions {
 }
 ```
 
-
 ## Environment API
 
 > [!important]
@@ -219,7 +218,6 @@ export default {
   ],
 }
 ```
-
 
 `electronSimple()` 接受一个以环境名分组的对象。`main` 和 `preload` 会复用 simple API 的默认预设，其他自定义 key 会像主进程一样构建，并使用各自的环境配置。
 
