@@ -91,7 +91,7 @@ export default function electron(
     const name = `electron_${opt.name || i}`
     if (envNames.has(name)) {
       throw new Error(
-        `[vite-plugin-electron] Duplicate environment name "${name}". Please provide unique "name" properties for each environment in the options array.`,
+        `[vite-plugin-electron] Duplicate environment name "${opt.name || i}". Please provide unique "name" properties for each environment in the options array.`,
       )
     }
     envNames.add(name)
@@ -121,7 +121,7 @@ export default function electron(
 
   // Build each electron environment from the given builder in declaration order.
   const buildElectronEnvironments = async (builder: ViteBuilder): Promise<void> => {
-    for (const name of envNames) {
+    for (const { name } of environmentOptions) {
       const env = builder.environments[name]
       if (env && !env.isBuilt) {
         await builder.build(env)
