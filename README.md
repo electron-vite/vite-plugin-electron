@@ -28,7 +28,7 @@
 
 In short, `vite-plugin-electron` makes developing Electron apps as easy as normal Vite projects.
 
-> [!important]
+> [!note]
 > This plugin supports both Vite 7 and Vite 8.
 > Build config keys are adapted automatically, using `rolldownOptions` on Vite 8+ and `rollupOptions` on Vite < 8.
 
@@ -400,7 +400,7 @@ build({
 
 Use `startup.prevent = true`, `ELECTRON_STARTUP_PREVENT=1`, or `ELECTRON_STARTUP_PREVENT=true` to disable automatic electron app startup. This lets you decide when to call `startup.prevent = false; startup()` manually (for example, after waiting for another local service).
 
-Await return value of `startup()` to know if the startup was triggered or prevented by the controls.
+Await the return value of `startup()` to know if the startup was triggered or prevented by the controls.
 
 ### Custom Electron Package Resolution
 
@@ -468,14 +468,14 @@ Only files that actually reference `__dirname` or `__filename` are transformed, 
 ```js
 import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
-import { esmShim, notBundle } from 'vite-plugin-electron/plugin'
+import { esmShim } from 'vite-plugin-electron/plugin'
 
 export default defineConfig(({ command }) => ({
   plugins: [
     electron({
       entry: 'electron/main.ts',
       vite: {
-        plugins: [command === 'serve' && notBundle(), esmShim()],
+        plugins: [esmShim()],
       },
     }),
   ],

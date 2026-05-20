@@ -157,7 +157,7 @@ export interface OnStartOptions {
    * Triggered when Vite is built every time -- `vite serve` command only.
    *
    * If this `onstart` is passed, Electron App will not start automatically.
-   * However, you can start Electroo App via `startup` function.
+   * However, you can start Electron App via `startup` function.
    */
   onstart?: (args: {
     /**
