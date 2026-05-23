@@ -91,9 +91,8 @@ const PLUGIN_PREFIX = 'vite-plugin-electron-multi-env'
 export default function electron(
   options: MultiEnvElectronOptions | MultiEnvElectronOptions[],
 ): Plugin[] {
-  const optionsArray = Array.isArray(options) ? options : [options]
   const envNames = new Set<string>()
-  const environmentOptions = optionsArray.map((opt, i) => {
+  const environmentOptions = (Array.isArray(options) ? options : [options]).map((opt, i) => {
     const name = `electron_${opt.name || i}`
     if (envNames.has(name)) {
       throw new Error(
@@ -102,7 +101,7 @@ export default function electron(
     }
     envNames.add(name)
 
-    return { ...opt, name } as const
+    return Object.assign(opt, { name })
   })
 
   const isESM = checkESModule()
@@ -138,7 +137,7 @@ export default function electron(
   return createElectronPlugin({
     prefix: PLUGIN_PREFIX,
     async dev(pluginContext, server) {
-      if (optionsArray.length === 0) {
+      if (environmentOptions.length === 0) {
         return
       }
 
@@ -169,7 +168,7 @@ export default function electron(
               return {
                 name: `${PLUGIN_PREFIX}:startup-hook:${name}`,
                 closeBundle() {
-                  if (++builtCount < optionsArray.length) {
+                  if (++builtCount < environmentOptions.length) {
                     return
                   }
                   triggerStartup(pluginContext, server, opt)
@@ -186,7 +185,7 @@ export default function electron(
     async build() {},
     // Use the config() hook to inject electron environments
     buildConfig(config) {
-      if (optionsArray.length === 0) {
+      if (environmentOptions.length === 0) {
         return
       }
 
