@@ -6,9 +6,9 @@ import { defaultPreloadOnstart, triggerStartup } from './startup'
 import type { OnStartOptions } from './startup'
 import {
   checkESModule,
+  compatRollupOptions,
   createDefaultPreloadConfig,
   createElectronViteDefaults,
-  defaultMainSimpleConfig,
   withExternalBuiltins,
 } from './utils'
 import type { RolldownOrRollupOptions } from './utils'
@@ -52,7 +52,13 @@ export function simpleOptions(options: MultiEnvElectronOptionsRecord): MultiEnvE
         return Object.assign(rest, {
           name,
           options: mergeConfig<EnvironmentOptions, EnvironmentOptions>(
-            defaultMainSimpleConfig,
+            {
+              build: compatRollupOptions({
+                rolldownOptions: {
+                  platform: 'node',
+                },
+              }),
+            },
             options ?? {},
           ),
         })

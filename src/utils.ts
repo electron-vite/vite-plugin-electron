@@ -95,14 +95,6 @@ export function checkESModule(): boolean {
   return loadPackageJSONSync()?.type === 'module'
 }
 
-export const defaultMainSimpleConfig: InlineConfig = {
-  build: compatRollupOptions({
-    rolldownOptions: {
-      platform: 'node',
-    },
-  }),
-}
-
 export function createDefaultPreloadConfig(
   esmodule: boolean,
   input?: RolldownOrRollupOptions['input'],

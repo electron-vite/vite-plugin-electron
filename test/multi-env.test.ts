@@ -142,6 +142,54 @@ describe('src/multi-env', () => {
     expect(reload).toHaveBeenCalledTimes(1)
   })
 
+  it('simpleOptions does not share state between calls', () => {
+    const first = simpleOptions({
+      main: { input: 'electron/main.ts' },
+      preload: { input: 'electron/preload.ts' },
+    })
+
+    const firstMainBuild = (first[0].options as { build: Record<string, unknown> }).build
+    firstMainBuild.minify = 'first-mutated'
+    ;(firstMainBuild.rolldownOptions as Record<string, unknown>).platform = 'mutated'
+
+    const firstPreloadOutput = (
+      (first[1].options as { build: { rolldownOptions: { output: Record<string, unknown> } } }).build
+        .rolldownOptions.output
+    )
+    firstPreloadOutput.entryFileNames = 'mutated.[name].mjs'
+
+    const second = simpleOptions({
+      main: { input: 'electron/main.ts' },
+      preload: { input: 'electron/preload.ts' },
+    })
+
+    expect(second[0]).toMatchObject({
+      name: 'main',
+      options: {
+        build: {
+          rolldownOptions: {
+            platform: 'node',
+          },
+        },
+      },
+    })
+    expect((second[0].options as { build: Record<string, unknown> }).build.minify).toBeUndefined()
+
+    expect(second[1]).toMatchObject({
+      name: 'preload',
+      options: {
+        build: {
+          rolldownOptions: {
+            platform: 'node',
+            output: {
+              entryFileNames: '[name].mjs',
+            },
+          },
+        },
+      },
+    })
+  })
+
   it('mockHtml', async () => {
     trackDirs(mockHtmlOutDir)
 

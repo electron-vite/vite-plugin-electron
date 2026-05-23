@@ -2,10 +2,10 @@ import { mergeConfig } from 'vite'
 import type { Plugin } from 'vite'
 
 import { defaultPreloadOnstart } from './startup'
-import { checkESModule, createDefaultPreloadConfig, defaultMainSimpleConfig } from './utils'
+import { checkESModule, createDefaultPreloadConfig } from './utils'
 import type { RolldownOrRollupOptions } from './utils'
 
-import electron from './index'
+import electron, { compatRollupOptions } from './index'
 import type { ElectronOptions } from './index'
 
 export interface ElectronSimpleOptions {
@@ -30,7 +30,18 @@ export interface ElectronSimpleOptions {
 export default async function electronSimple(options: ElectronSimpleOptions): Promise<Plugin[]> {
   const esmodule = checkESModule()
   const flatApiOptions = [
-    mergeConfig<ElectronOptions, ElectronOptions>({ vite: defaultMainSimpleConfig }, options.main),
+    mergeConfig<ElectronOptions, ElectronOptions>(
+      {
+        vite: {
+          build: compatRollupOptions({
+            rolldownOptions: {
+              platform: 'node',
+            },
+          }),
+        },
+      },
+      options.main,
+    ),
   ]
 
   if (options.preload) {
