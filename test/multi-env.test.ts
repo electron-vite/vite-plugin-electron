@@ -153,9 +153,8 @@ describe('src/multi-env', () => {
     ;(firstMainBuild.rolldownOptions as Record<string, unknown>).platform = 'mutated'
 
     const firstPreloadOutput = (
-      (first[1].options as { build: { rolldownOptions: { output: Record<string, unknown> } } }).build
-        .rolldownOptions.output
-    )
+      first[1].options as { build: { rolldownOptions: { output: Record<string, unknown> } } }
+    ).build.rolldownOptions.output
     firstPreloadOutput.entryFileNames = 'mutated.[name].mjs'
 
     const second = simpleOptions({
