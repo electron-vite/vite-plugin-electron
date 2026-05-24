@@ -39,7 +39,7 @@ export function notBundle(options: NotBundleOptions = {}): Plugin {
           console.warn(
             '[vite-plugin-electron:not-bundle] No package.json found in the project root and no filter option provided. All dependencies will be bundled.',
           )
-          external = []
+          return
         }
       } else {
         external = options.filter

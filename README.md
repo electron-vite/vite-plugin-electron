@@ -386,7 +386,17 @@ build({
 })
 ```
 
+### Custom Electron Package Resolution
+
+`startup(argv, options, customElectronPkg)` supports custom Electron forks. The package is resolved from app roots (`process.cwd()`, `options.cwd`, and `INIT_CWD`) before falling back to standard module resolution.
+
+If the package cannot be resolved, `startup()` throws an error describing how to install or pass the package explicitly.
+
 ### Startup Env Vars
+
+> [!important]
+> Environment variables are only available in `vite-plugin-electron@>=1.0.0`.
+> They do not exist in `0.x` releases.
 
 `startup()` uses these env vars. `1` or `true` turns a flag on, `0` or `false` turns it off, and any other non-empty value is appended as `=<value>`.
 
@@ -398,15 +408,13 @@ build({
 
 ### Startup Controls
 
+> [!important]
+> Startup controls are only available in `vite-plugin-electron@>=1.0.0`.
+> They do not exist in `0.x` releases.
+
 Use `startup.prevent = true`, `ELECTRON_STARTUP_PREVENT=1`, or `ELECTRON_STARTUP_PREVENT=true` to disable automatic electron app startup. This lets you decide when to call `startup.prevent = false; startup()` manually (for example, after waiting for another local service).
 
 Await the return value of `startup()` to know if the startup was triggered or prevented by the controls.
-
-### Custom Electron Package Resolution
-
-`startup(argv, options, customElectronPkg)` supports custom Electron forks. The package is resolved from app roots (`process.cwd()`, `options.cwd`, and `INIT_CWD`) before falling back to standard module resolution.
-
-If the package cannot be resolved, `startup()` throws an error describing how to install or pass the package explicitly.
 
 ## Builtin Plugins
 
@@ -416,6 +424,10 @@ Use `notBundle()` in development to externalize dependencies in Electron entries
 
 This keeps startup fast by skipping dependency bundling while running `vite serve`.
 For production builds, let bundling run as usual.
+
+> [!important]
+> **Behavior change in `v1.0.0`**: `notBundle()` now configures `build.rolldownOptions.external` (or `build.rollupOptions.external` on Vite < 8) from your `package.json` once at config time, instead of verifying each import is CommonJS-loadable on every `resolveId`.
+> Every package listed in `dependencies`/`devDependencies`/`peerDependencies`/`optionalDependencies` is externalized unconditionally — if a package is missing at runtime, the failure now surfaces at runtime rather than being silently bundled. Use the `filter` option to narrow or override the externalized set.
 
 ```js
 import { defineConfig } from 'vite'
