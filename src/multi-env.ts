@@ -9,6 +9,7 @@ import {
   compatRollupOptions,
   createDefaultPreloadConfig,
   createElectronViteDefaults,
+  toArray,
   withExternalBuiltins,
 } from './utils'
 import type { RolldownOrRollupOptions } from './utils'
@@ -92,7 +93,7 @@ export default function electron(
   options: MultiEnvElectronOptions | MultiEnvElectronOptions[],
 ): Plugin[] {
   const envNames = new Set<string>()
-  const environmentOptions = (Array.isArray(options) ? options : [options]).map((opt, i) => {
+  const environmentOptions = toArray(options).map((opt, i) => {
     const name = `electron_${opt.name || i}`
     if (envNames.has(name)) {
       throw new Error(

@@ -9,10 +9,11 @@ import type { InlineConfig, Logger, ResolvedConfig, ViteDevServer } from 'vite'
 
 import type { ElectronOptions } from '.'
 
-export interface PidTree {
-  pid: number
-  ppid: number
-  children?: PidTree[]
+export function toArray<T>(item: T | T[] | undefined): T[] {
+  if (item === undefined) {
+    return []
+  }
+  return Array.isArray(item) ? item : [item]
 }
 
 function resolveBuiltinExternals(
@@ -76,6 +77,12 @@ function setBuildOptions(build: InlineConfig['build'], viteVersion: string = ver
     if (Number.parseInt(viteVersion) < 8) {
       delete build.rolldownOptions
       build.rollupOptions = options
+      for (const output of toArray(options.output)) {
+        // Rollup doesn't support `output.codeSplitting`. Map to its inverse `output.inlineDynamicImports`.
+        if (typeof output.codeSplitting === 'boolean') {
+          output.inlineDynamicImports = !output.codeSplitting
+        }
+      }
     } else {
       delete build.rollupOptions
       build.rolldownOptions = options
