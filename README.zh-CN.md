@@ -409,16 +409,16 @@ import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
 import { notBundle } from 'vite-plugin-electron/plugin'
 
-export default defineConfig(({ command }) => ({
+export default defineConfig({
   plugins: [
     electron({
       entry: 'electron/main.ts',
       vite: {
-        plugins: [command === 'serve' && notBundle()],
+        plugins: [notBundle()],
       },
     }),
   ],
-}))
+})
 ```
 
 **原理说明**
@@ -442,6 +442,8 @@ export interface NotBundleOptions {
 }
 ```
 
+当 `notBundle()` 在 `vite-plugin-electron` 中使用时，它永远只在开发环境生效。
+
 ### esmShim 插件
 
 使用 `esmShim()` 为依赖这些 CJS 全局变量的 ESM Electron 入口注入 `__dirname` 和 `__filename` 的 shim。
@@ -453,16 +455,16 @@ import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
 import { esmShim, notBundle } from 'vite-plugin-electron/plugin'
 
-export default defineConfig(({ command }) => ({
+export default defineConfig({
   plugins: [
     electron({
       entry: 'electron/main.ts',
       vite: {
-        plugins: [command === 'serve' && notBundle(), esmShim()],
+        plugins: [notBundle(), esmShim()],
       },
     }),
   ],
-}))
+})
 ```
 
 **原理说明**

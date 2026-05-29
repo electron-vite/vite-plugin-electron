@@ -1,7 +1,7 @@
 import { loadPackageJSONSync } from 'local-pkg'
 import type { Plugin } from 'vite'
 
-import { compatRollupOptions } from '../utils'
+import { compatRollupOptions, getIsViteDev } from '../utils'
 import type { RolldownOrRollupOptions } from '../utils'
 
 export interface NotBundleOptions {
@@ -24,6 +24,7 @@ export function notBundle(options: NotBundleOptions = {}): Plugin {
     name: 'vite-plugin-electron:not-bundle',
     // Run before the builtin plugin 'vite:resolve'
     enforce: 'pre',
+    apply: getIsViteDev() ? () => true : undefined,
     config(cfg) {
       let external: RolldownOrRollupOptions['external']
       if (!options.filter) {

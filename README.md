@@ -434,16 +434,16 @@ import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
 import { notBundle } from 'vite-plugin-electron/plugin'
 
-export default defineConfig(({ command }) => ({
+export default defineConfig({
   plugins: [
     electron({
       entry: 'electron/main.ts',
       vite: {
-        plugins: [command === 'serve' && notBundle()],
+        plugins: [notBundle()],
       },
     }),
   ],
-}))
+})
 ```
 
 **Under the Hood**
@@ -467,6 +467,8 @@ export interface NotBundleOptions {
 }
 ```
 
+`notBundle()` is always development-only inside `vite-plugin-electron`.
+
 ### esmShim Plugin
 
 > [!important]
@@ -482,7 +484,7 @@ import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
 import { esmShim } from 'vite-plugin-electron/plugin'
 
-export default defineConfig(({ command }) => ({
+export default defineConfig({
   plugins: [
     electron({
       entry: 'electron/main.ts',
@@ -491,7 +493,7 @@ export default defineConfig(({ command }) => ({
       },
     }),
   ],
-}))
+})
 ```
 
 **Under the Hood**

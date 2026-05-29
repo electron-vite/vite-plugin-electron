@@ -7,7 +7,7 @@ import type {
 } from 'vite'
 
 import { startup } from './startup'
-import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule } from './utils'
+import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule, setIsViteDev } from './utils'
 
 interface FactoryOptions {
   prefix: string
@@ -36,6 +36,11 @@ export function createElectronPlugin({
     {
       name: `${prefix}:dev`,
       apply: 'serve',
+      config(_, env) {
+        if (env.command === 'serve') {
+          setIsViteDev()
+        }
+      },
       configResolved(config) {
         // When there is no entry (no index.html and no configured input), write a
         // temporary mock so that Vite's dev server starts without errors.

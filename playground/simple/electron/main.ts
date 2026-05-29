@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
 import { version } from 'typescript'
 
-console.log(version)
+console.log(version, import.meta.env.MODE)
 
 process.on('message', (message) => {
   if (message !== 'electron-vite&type=hot-reload') {

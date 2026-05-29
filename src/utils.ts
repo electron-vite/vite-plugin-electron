@@ -379,3 +379,13 @@ export function setupMockHtml(
     }
   }
 }
+
+const VITE_IS_DEV = 'VITE_IS_DEV'
+
+export function setIsViteDev(): void {
+  process.env[VITE_IS_DEV] = 'true'
+}
+
+export function getIsViteDev(): boolean {
+  return ['1', 'true'].includes((process.env[VITE_IS_DEV] ?? '').trim().toLowerCase())
+}
