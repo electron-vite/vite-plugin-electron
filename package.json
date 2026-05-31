@@ -10,6 +10,9 @@
   ],
   "license": "MIT",
   "author": "Leo Wang(草鞋没号) <308487730@qq.com>",
+  "maintainers": [
+    "subframe7536"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/electron-vite/vite-plugin-electron.git"
