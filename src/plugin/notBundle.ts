@@ -20,6 +20,27 @@ export interface NotBundleOptions {
 }
 
 /**
+ * Default behavior of extracting external dependencies from package.json.
+ * - During development, `dependencies`, `devDependencies`, `peerDependencies`, and `optionalDependencies` are externalized.
+ * - During production, only `dependencies` are externalized.
+ * @param pkg package.json 's content
+ */
+export function extractExternalDeps(pkg: Record<string, any>): RolldownOrRollupOptions['external'] {
+  return Object.keys(
+    getIsViteDev()
+      ? {
+          ...pkg.dependencies,
+          ...pkg.devDependencies,
+          ...pkg.peerDependencies,
+          ...pkg.optionalDependencies,
+        }
+      : {
+          ...pkg.dependencies,
+        },
+  )
+}
+
+/**
  * @see https://github.com/vitejs/vite/blob/v4.4.7/packages/vite/src/node/utils.ts#L140
  */
 export const bareImportRE: RegExp = /^(?![a-zA-Z]:)[\w@](?!.*:\/\/)/
@@ -37,18 +58,7 @@ export function notBundle(options: NotBundleOptions = {}): Plugin {
       if (!options.filter) {
         const pkg = loadPackageJSONSync(cfg.root)
         if (pkg) {
-          external = Object.keys(
-            getIsViteDev()
-              ? {
-                  ...pkg.dependencies,
-                  ...pkg.devDependencies,
-                  ...pkg.peerDependencies,
-                  ...pkg.optionalDependencies,
-                }
-              : {
-                  ...pkg.dependencies,
-                },
-          )
+          external = extractExternalDeps(pkg)
         } else {
           console.warn(
             '[vite-plugin-electron:not-bundle] No package.json found in the project root and no filter option provided. All dependencies will be bundled.',

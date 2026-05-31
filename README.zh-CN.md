@@ -437,14 +437,26 @@ export interface NotBundleOptions {
   /**
    * 手动覆盖 `build.rolldownOptions.external`（Vite < 8 为 `build.rollupOptions.external`）。
    *
-   * 如果未提供，开发阶段会外部化 package.json 中的
-   * dependencies/devDependencies/peerDependencies/optionalDependencies。
-   * 生产阶段只外部化 dependencies。
+   * 如果未提供，开发阶段会 externalize package.json 中的 dependencies、devDependencies、peerDependencies、optionalDependencies。
+   * 生产阶段只 externalize dependencies。
    *
-   * 使用 `import { getIsViteDev } from 'vite-plugin-electron/plugin'` 来检测是否在开发阶段。
+   * 使用 `import { getIsViteDev } from 'vite-plugin-electron/plugin'` 检测是否为开发阶段。
    */
   filter?: RolldownOrRollupOptions['external']
 }
+```
+
+#### API: extractExternalDeps
+
+默认的外部化依赖逻辑。
+- 开发阶段 externalize 所有 dependencies、devDependencies、peerDependencies、optionalDependencies。
+- 生产阶段只 externalize dependencies。
+
+```ts
+/**
+ * @param pkg package.json 的内容
+ */
+export function extractExternalDeps(pkg: Record<string, any>): RolldownOrRollupOptions['external']
 ```
 
 ### esmShim 插件

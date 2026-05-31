@@ -462,7 +462,7 @@ export interface NotBundleOptions {
   /**
    * Manually override `build.rolldownOptions.external` (`build.rollupOptions.external` on Vite < 8).
    *
-   * If omitted, development externalizes dependencies, devDependencies,
+   * When omitted, development externalizes dependencies, devDependencies,
    * peerDependencies, and optionalDependencies from package.json.
    * Production only externalizes dependencies.
    *
@@ -470,6 +470,19 @@ export interface NotBundleOptions {
    */
   filter?: RolldownOrRollupOptions['external']
 }
+```
+
+#### API: extractExternalDeps
+
+Default behavior of extracting external dependencies from package.json.
+- During development, `dependencies`, `devDependencies`, `peerDependencies`, and `optionalDependencies` are externalized.
+- During production, only `dependencies` are externalized.
+
+```ts
+/**
+ * @param pkg package.json content
+ */
+export function extractExternalDeps(pkg: Record<string, any>): RolldownOrRollupOptions['external']
 ```
 
 ### esmShim Plugin
