@@ -99,11 +99,17 @@ app.whenReady().then(() => {
 
 ```diff
 {
-+ "main": "dist-electron/main.mjs"
++ "main": "dist-electron/main.js"
 }
 ```
 
 That's it! You can now use Electron in your Vite app ✨
+
+## How to work
+
+It just executes the `electron .` command in the Vite `closeBundle()` hook and then starts or restarts the Electron App.
+
+- 🚨 By default, the files in `electron` folder will be built into the `dist-electron` directory
 
 ## Flat API
 
@@ -475,6 +481,7 @@ export interface NotBundleOptions {
 #### API: extractExternalDeps
 
 Default behavior of extracting external dependencies from package.json.
+
 - During development, `dependencies`, `devDependencies`, `peerDependencies`, and `optionalDependencies` are externalized.
 - During production, only `dependencies` are externalized.
 
@@ -527,59 +534,43 @@ const __dirname = dirname(__filename)
 
 `esmShim()` — no options, just add it to `plugins`.
 
-## How to work
+## dependencies vs devDependencies
 
-It just executes the `electron .` command in the Vite build completion hook and then starts or restarts the Electron App.
+[electron-builder](https://github.com/electron-userland/electron-builder) packages `dependencies` into the final app, and Vite/Rolldown may also bundle `dependencies` into the renderer output. To avoid shipping the same code twice, native modules should stay in `dependencies` by default because electron-builder needs to collect their binary files. Other buildable modules should stay in `devDependencies`; otherwise, they can be bundled by Vite and packaged again by electron-builder.
 
-## Be aware
+<table>
+  <thead>
+    <th>Classify</th>
+    <th>e.g.</th>
+    <th>dependencies</th>
+    <th>devDependencies</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Node.js C/C++ native modules</td>
+      <td>serialport, sqlite3</td>
+      <td>✅</td>
+      <td>❌</td>
+    </tr>
+    <tr>
+      <td>Node.js CJS packages</td>
+      <td>electron-store</td>
+      <td>❌</td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td>Node.js ESM packages</td>
+      <td>execa, got, node-fetch</td>
+      <td>❌</td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td>Web packages</td>
+      <td>Vue, React</td>
+      <td>❌</td>
+      <td>✅</td>
+    </tr>
+  </tbody>
+</table>
 
-- 🚨 By default, the files in `electron` folder will be built into the `dist-electron`
-
-## C/C++ Native
-
-We have two ways to use C/C++ native modules
-
-**First way**
-
-In general, Vite may not correctly build Node.js packages, especially C/C++ native modules, but Vite can load them as external packages
-
-So, put your Node.js package in `dependencies`. Unless you know how to properly build them with Vite
-
-```js
-export default {
-  plugins: [
-    electron({
-      entry: 'electron/main.ts',
-      vite: {
-        build: {
-          rolldownOptions: {
-            // Here are some C/C++ modules them can't be built properly
-            external: ['serialport', 'sqlite3'],
-          },
-        },
-      },
-    }),
-  ],
-}
-```
-
-**Second way**
-
-Use 👉 [vite-plugin-native](https://github.com/vite-plugin/vite-plugin-native)
-
-```js
-import native from 'vite-plugin-native'
-
-export default {
-  plugins: [
-    electron({
-      entry: 'electron/main.ts',
-      vite: {
-        plugins: [native(/* options */)],
-      },
-    }),
-  ],
-}
-```
-
-<!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
+If you manually handle the binary files and runtime dependency layout for native modules, you can also move those native modules to `devDependencies` to further reduce the packaged app size.

@@ -57,6 +57,7 @@
     "test": "vitest run",
     "lint": "oxlint --fix",
     "format": "oxfmt",
+    "qa": "pnpm run lint && pnpm run format && pnpm run types && pnpm run test",
     "play": "pnpm --dir playground/flat dev",
     "play:multi-env": "pnpm --dir playground/multi-env dev",
     "play:simple": "pnpm --dir playground/simple dev",
@@ -65,22 +66,22 @@
     "play:build:multi-env": "pnpm --dir playground/multi-env build",
     "play:build:simple": "pnpm --dir playground/simple build",
     "play:build:worker": "pnpm --dir playground/worker build",
-    "release": "pnpm run lint && pnpm run format && pnpm run prepublishOnly && bumpp --all",
+    "release": "pnpm run qa && pnpm run prepublishOnly && bumpp --all",
     "prepublishOnly": "pnpm run build && pnpm run test"
   },
   "dependencies": {
-    "local-pkg": "^1.2.0"
+    "local-pkg": "^1.2.1"
   },
   "devDependencies": {
     "@subf/config": "^0.2.1",
     "@types/node": "^24.12.0",
     "bumpp": "^11.1.0",
     "oxfmt": "^0.51.0",
-    "oxlint": "^1.66.0",
-    "tsdown": "^0.22.0",
+    "oxlint": "^1.67.0",
+    "tsdown": "^0.22.1",
     "typescript": "^6.0.3",
-    "vite": "^8.0.13",
-    "vite-plugin-electron-renderer": "^1.0.0-beta.4",
+    "vite": "^8.0.14",
+    "vite-plugin-electron-renderer": "^1.0.0",
     "vitest": "^4.1.7"
   },
   "peerDependencies": {

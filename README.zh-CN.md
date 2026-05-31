@@ -75,11 +75,17 @@ app.whenReady().then(() => {
 
 ```diff
 {
-+ "main": "dist-electron/main.mjs"
++ "main": "dist-electron/main.js"
 }
 ```
 
 就是这样！现在你可以在 Vite 应用里使用 Electron 了 ✨
+
+## 工作原理
+
+插件会在 Vite 的 `closeBundle()` 钩子里执行 `electron .` 命令，然后启动或重启 Electron App。
+
+- 🚨 默认情况下，`electron` 文件夹下的文件会被构建到 `dist-electron` 目录
 
 ## Flat API
 
@@ -99,13 +105,13 @@ export default {
 }
 ```
 
-## Flat API vs Simple API
+### Flat API vs Simple API
 
 - Simple API 基于 Flat API
 - Simple API 包含一些 preload 脚本的预设配置。
 - Flat API 提供了更通用的一些 API，你可以用它做二次封装，比如 [nuxt-electron](https://github.com/caoxiemeihao/nuxt-electron)。
 
-## Flat API <sub><sup>(定义)</sup></sub>
+### 类型定义
 
 `electron(options: ElectronOptions | ElectronOptions[])`
 
@@ -449,6 +455,7 @@ export interface NotBundleOptions {
 #### API: extractExternalDeps
 
 默认的外部化依赖逻辑。
+
 - 开发阶段 externalize 所有 dependencies、devDependencies、peerDependencies、optionalDependencies。
 - 生产阶段只 externalize dependencies。
 
@@ -497,59 +504,43 @@ const __dirname = dirname(__filename)
 
 `esmShim()` —— 无需配置，直接加入 `plugins` 即可。
 
-## 工作原理
+## dependencies vs devDependencies
 
-插件会在 Vite 构建完成的钩子里执行 `electron .` 命令，然后启动或重启 Electron App。
+[electron-builder](https://github.com/electron-userland/electron-builder) 会把 `dependencies` 打包到最终应用中，Vite/Rolldown 也可能把 `dependencies` 打包到渲染进程产物里。为了避免同一份代码被重复打包，原生模块默认应该放在 `dependencies` 中，因为 electron-builder 需要收集它们的二进制文件。其他可构建模块应该放在 `devDependencies` 中，否则它们可能先被 Vite 打包，再被 electron-builder 打包一次。
 
-## 注意事项
+<table>
+  <thead>
+    <th>分类</th>
+    <th>示例</th>
+    <th>dependencies</th>
+    <th>devDependencies</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Node.js C/C++ 原生模块</td>
+      <td>serialport, sqlite3</td>
+      <td>✅</td>
+      <td>❌</td>
+    </tr>
+    <tr>
+      <td>Node.js CJS 包</td>
+      <td>electron-store</td>
+      <td>❌</td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td>Node.js ESM 包</td>
+      <td>execa, got, node-fetch</td>
+      <td>❌</td>
+      <td>✅</td>
+    </tr>
+    <tr>
+      <td>Web 包</td>
+      <td>Vue, React</td>
+      <td>❌</td>
+      <td>✅</td>
+    </tr>
+  </tbody>
+</table>
 
-- 🚨 默认情况下，`electron` 文件夹下的文件会被构建到 `dist-electron` 目录
-
-## C/C++ 原生模块
-
-我们有两种方式使用 C/C++ 原生模块：
-
-**第一种方式**
-
-通常 Vite 不能正确构建 Node.js 包，尤其是 C/C++ 原生模块，但可以将它们作为外部依赖加载。
-
-因此，请将你的 Node.js 包放到 `dependencies`，除非你非常清楚如何用 Vite 正确构建它们。
-
-```js
-export default {
-  plugins: [
-    electron({
-      entry: 'electron/main.ts',
-      vite: {
-        build: {
-          rolldownOptions: {
-            // Here are some C/C++ modules them can't be built properly
-            external: ['serialport', 'sqlite3'],
-          },
-        },
-      },
-    }),
-  ],
-}
-```
-
-**第二种方式**
-
-使用 👉 [vite-plugin-native](https://github.com/vite-plugin/vite-plugin-native)
-
-```js
-import native from 'vite-plugin-native'
-
-export default {
-  plugins: [
-    electron({
-      entry: 'electron/main.ts',
-      vite: {
-        plugins: [native(/* options */)],
-      },
-    }),
-  ],
-}
-```
-
-<!-- You can see 👉 [dependencies vs devDependencies](https://github.com/electron-vite/vite-plugin-electron-renderer#dependencies-vs-devdependencies) -->
+如果你手动处理原生模块的二进制文件和运行时依赖布局，也可以把这些原生模块移到 `devDependencies` 中，以进一步减少打包后的应用体积。
