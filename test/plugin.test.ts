@@ -6,15 +6,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import electron from '../src'
 import { notBundle } from '../src/plugin'
-import { compatRollupOptions, resolveInput } from '../src/utils'
+import { compatRollupOptions, resolveInput, withExternalBuiltins } from '../src/utils'
 
 const pluginNotBundle = notBundle()
 pluginNotBundle.apply = undefined
-const normalizingNewLineRE = /[\r\n]+/g
 const mockHtmlRoot = path.join(__dirname, 'fixtures/mock-html-plugin')
 const mockHtmlPath = path.join(mockHtmlRoot, 'index.html')
 const mockHtmlOutDir = path.join(__dirname, 'dist-mock-html-plugin')
 const mockHtmlDistPath = path.join(mockHtmlOutDir, 'index.html')
+const originalViteIsDev = process.env.VITE_IS_DEV
 
 async function cleanupMockHtml() {
   await Promise.all([
@@ -26,10 +26,20 @@ async function cleanupMockHtml() {
 beforeEach(async () => {
   await cleanupMockHtml()
   fs.mkdirSync(mockHtmlRoot, { recursive: true })
+  if (originalViteIsDev === undefined) {
+    delete process.env.VITE_IS_DEV
+  } else {
+    process.env.VITE_IS_DEV = originalViteIsDev
+  }
 })
 
 afterEach(async () => {
   await cleanupMockHtml()
+  if (originalViteIsDev === undefined) {
+    delete process.env.VITE_IS_DEV
+  } else {
+    process.env.VITE_IS_DEV = originalViteIsDev
+  }
 })
 
 describe('src/plugin', () => {
@@ -64,25 +74,47 @@ describe('src/plugin', () => {
     expect(build.rolldownOptions).toBeUndefined()
   })
 
-  it('notBundle', async () => {
-    await build({
-      configFile: false,
-      root: __dirname,
+  it('notBundle uses the wider default external set during development', () => {
+    process.env.VITE_IS_DEV = 'true'
+
+    const config = (pluginNotBundle.config as any)?.(
+      { root: __dirname } as never,
+      { command: 'serve', mode: 'development' } as never,
+    ) as { build?: { rolldownOptions?: { external?: unknown[] } } }
+
+    expect(config?.build?.rolldownOptions?.external).toEqual(
+      expect.arrayContaining(['local-pkg', '@types/node', 'vite-plugin-electron-renderer', 'vite']),
+    )
+  })
+
+  it('notBundle uses the narrower default external set during production', () => {
+    delete process.env.VITE_IS_DEV
+
+    const config = (pluginNotBundle.config as any)?.(
+      { root: __dirname } as never,
+      { command: 'build', mode: 'production' } as never,
+    ) as { build?: { rolldownOptions?: { external?: string[] } } }
+
+    expect(config?.build?.rolldownOptions?.external).toEqual(expect.arrayContaining(['local-pkg']))
+    expect(config?.build?.rolldownOptions?.external).not.toEqual(
+      expect.arrayContaining(['@types/node', 'vite-plugin-electron-renderer', 'vite']),
+    )
+  })
+
+  it('withExternalBuiltins keeps node protocol imports external with function external', () => {
+    const config = withExternalBuiltins({
       build: {
-        lib: {
-          entry: 'fixtures/external-main.ts',
-          formats: ['cjs'],
-          fileName: () => 'external-main.js',
+        rolldownOptions: {
+          external: () => false,
         },
-        minify: false,
       },
-      plugins: [pluginNotBundle],
-    })
+    }) as { build?: { rolldownOptions?: { external?: (pkg: string) => boolean } } }
 
-    const snapMain = fs.readFileSync(path.join(__dirname, 'dist/external-main.js'), 'utf-8')
-    const normalSnapMain = snapMain.replace(normalizingNewLineRE, '\n')
+    const external = config.build?.rolldownOptions?.external
 
-    expect(normalSnapMain).toMatchSnapshot()
+    expect(external?.('fs')).toBe(true)
+    expect(external?.('node:fs')).toBe(true)
+    expect(external?.('left-pad')).toBe(false)
   })
 
   it('resolveInput reads rollupOptions.input', () => {
