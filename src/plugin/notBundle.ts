@@ -14,6 +14,8 @@ export interface NotBundleOptions {
    * peerDependencies, and optionalDependencies from package.json.
    * Production only externalizes dependencies.
    *
+   * When provided, this replaces the default package.json-derived external set.
+   *
    * Use `import { getIsViteDev } from 'vite-plugin-electron/plugin'` to detect if it's during dev.
    */
   filter?: RolldownOrRollupOptions['external']

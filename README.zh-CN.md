@@ -8,6 +8,8 @@
 > 本插件同时支持 Vite 7 和 Vite 8。
 > 构建配置会自动适配：Vite 8+ 使用 `rolldownOptions`，Vite < 8 使用 `rollupOptions`。
 
+从 `0.x` 迁移？详细迁移指南请参见 [Migrate to v1](./migrate-to-v1.md)。
+
 ## 特性
 
 - [🔥 热重启 <sub><sup>(主进程)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-restart)
@@ -441,10 +443,12 @@ export default defineConfig({
 ```ts
 export interface NotBundleOptions {
   /**
-   * 手动覆盖 `build.rolldownOptions.external`（Vite < 8 为 `build.rollupOptions.external`）。
+   * 覆盖 `build.rolldownOptions.external`（Vite < 8 为 `build.rollupOptions.external`）。
    *
    * 如果未提供，开发阶段会 externalize package.json 中的 dependencies、devDependencies、peerDependencies、optionalDependencies。
    * 生产阶段只 externalize dependencies。
+   *
+   * 如果提供该选项，它会替换根据 package.json 自动生成的默认 external 集合。
    *
    * 使用 `import { getIsViteDev } from 'vite-plugin-electron/plugin'` 检测是否为开发阶段。
    */
@@ -467,6 +471,10 @@ export function extractExternalDeps(pkg: Record<string, any>): RolldownOrRollupO
 ```
 
 ### esmShim 插件
+
+> [!important]
+> `esmShim` 插件仅在 `vite-plugin-electron@>=1.0.0` 提供。
+> `0.x` 版本没有此功能。
 
 使用 `esmShim()` 为依赖这些 CJS 全局变量的 ESM Electron 入口注入 `__dirname` 和 `__filename` 的 shim。
 

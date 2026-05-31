@@ -32,6 +32,8 @@ In short, `vite-plugin-electron` makes developing Electron apps as easy as norma
 > This plugin supports both Vite 7 and Vite 8.
 > Build config keys are adapted automatically, using `rolldownOptions` on Vite 8+ and `rollupOptions` on Vite < 8.
 
+Migrating from `0.x`? See [Migrate to v1](./migrate-to-v1.md) for full migration guide.
+
 ## Features
 
 - [🔥 Hot Restart <sub><sup>(Main process)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-restart)
@@ -280,7 +282,7 @@ export interface MultiEnvElectronOptions {
 
 ## Hot Reload Preload Scripts
 
-Since `v0.29.0`, when preload scripts are rebuilt, they will send an `electron-vite&type=hot-reload` event to the main process.
+Since `v0.29.0`, when preload scripts are rebuilt, they send an `electron-vite&type=hot-reload` event to the main process.
 If your App doesn't need a renderer process, this will give you **hot-reload**.
 
 ```js
@@ -466,11 +468,13 @@ Use `build.rolldownOptions.external` on Vite 8+ or `build.rollupOptions.external
 ```ts
 export interface NotBundleOptions {
   /**
-   * Manually override `build.rolldownOptions.external` (`build.rollupOptions.external` on Vite < 8).
+   * Override `build.rolldownOptions.external` (`build.rollupOptions.external` on Vite < 8).
    *
    * When omitted, development externalizes dependencies, devDependencies,
    * peerDependencies, and optionalDependencies from package.json.
    * Production only externalizes dependencies.
+   *
+   * When provided, this replaces the default package.json-derived external set.
    *
    * Use `import { getIsViteDev } from 'vite-plugin-electron/plugin'` to detect if it's during dev.
    */
