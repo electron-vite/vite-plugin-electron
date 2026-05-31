@@ -426,8 +426,11 @@ This keeps startup fast by skipping dependency bundling while running `vite serv
 For production builds, let bundling run as usual.
 
 > [!important]
-> **Behavior change in `v1.0.0`**: `notBundle()` now configures `build.rolldownOptions.external` (or `build.rollupOptions.external` on Vite < 8) from your `package.json` once at config time, instead of verifying each import is CommonJS-loadable on every `resolveId`.
-> Every package listed in `dependencies`/`devDependencies`/`peerDependencies`/`optionalDependencies` is externalized unconditionally — if a package is missing at runtime, the failure now surfaces at runtime rather than being silently bundled. Use the `filter` option to narrow or override the externalized set.
+> **Behavior change in `v1.0.0`**:
+>
+> - `notBundle()` now configures `build.rolldownOptions.external` (or `build.rollupOptions.external` on Vite < 8) from your `package.json` once at config time, instead of verifying each import is CommonJS-loadable on every `resolveId`.
+> - Every package listed in `dependencies`/`devDependencies`/`peerDependencies`/`optionalDependencies` is externalized unconditionally. If a package is missing at runtime, the failure now surfaces at runtime rather than being silently bundled. Use the `filter` option to narrow or override the externalized set.
+> - By default, this plugin is only enabled during development. Use the `enable` option to force it on, turn it off, or decide dynamically.
 
 ```js
 import { defineConfig } from 'vite'
@@ -457,17 +460,22 @@ Use `build.rolldownOptions.external` on Vite 8+ or `build.rollupOptions.external
 ```ts
 export interface NotBundleOptions {
   /**
-   * Override `build.rolldownOptions.external` (`build.rollupOptions.external` on Vite < 8).
+   * Control when the plugin is active.
+   * By default, it's only enabled during dev.
+   */
+  enable?: boolean | (() => boolean)
+  /**
+   * Manually override `build.rolldownOptions.external` (`build.rollupOptions.external` on Vite < 8).
    *
    * If omitted, dependencies from package.json
    * (dependencies/devDependencies/peerDependencies/optionalDependencies)
    * are externalized automatically.
    */
-  filter?: import('vite').RolldownOptions['external']
+  filter?: RolldownOrRollupOptions['external']
 }
 ```
 
-`notBundle()` is always development-only inside `vite-plugin-electron`.
+By default, `notBundle()` is development-only inside `vite-plugin-electron`. Pass `enable` to override this behavior.
 
 ### esmShim Plugin
 

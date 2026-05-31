@@ -6,6 +6,11 @@ import type { RolldownOrRollupOptions } from '../utils'
 
 export interface NotBundleOptions {
   /**
+   * Control when the plugin is active.
+   * By default, it's only enabled during dev.
+   */
+  enable?: boolean | (() => boolean)
+  /**
    * Manually override of `build.rolldownOptions.external` (`build.rollupOptions.external` on Vite < 8).
    */
   filter?: RolldownOrRollupOptions['external']
@@ -24,7 +29,11 @@ export function notBundle(options: NotBundleOptions = {}): Plugin {
     name: 'vite-plugin-electron:not-bundle',
     // Run before the builtin plugin 'vite:resolve'
     enforce: 'pre',
-    apply: getIsViteDev() ? () => true : undefined,
+    apply: options.enable
+      ? typeof options.enable === 'function'
+        ? options.enable
+        : () => options.enable as boolean
+      : getIsViteDev,
     config(cfg) {
       let external: RolldownOrRollupOptions['external']
       if (!options.filter) {
