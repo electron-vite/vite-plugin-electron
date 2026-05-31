@@ -19,6 +19,7 @@ export function toArray<T>(item: T | T[] | undefined): T[] {
 function resolveBuiltinExternals(
   external: RolldownOrRollupOptions['external'],
 ): RolldownOrRollupOptions['external'] {
+  const nodeProtocolRE = /^node:/
   const builtins: (string | RegExp)[] = [
     'electron',
     'electron/main',
@@ -27,7 +28,7 @@ function resolveBuiltinExternals(
     'electron/utility',
     'original-fs',
     ...builtinModules,
-    /^node:/,
+    nodeProtocolRE,
   ]
 
   if (Array.isArray(external)) {
@@ -41,7 +42,7 @@ function resolveBuiltinExternals(
   if (typeof external === 'function') {
     const original = external
     return function (source, importer, isResolved) {
-      if (builtins.includes(source)) {
+      if (builtins.includes(source) || nodeProtocolRE.test(source)) {
         return true
       }
       return original(source, importer, isResolved)
