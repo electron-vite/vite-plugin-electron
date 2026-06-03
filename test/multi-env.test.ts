@@ -211,7 +211,7 @@ describe('src/multi-env', () => {
     expect(fs.existsSync(mockHtmlDistPath)).toBe(false)
   })
 
-  it('builds electron flat environments without rebuilding the renderer app', async () => {
+  it('builds electron flat environments with client renderer build', async () => {
     const root = path.join(__dirname, 'fixtures/flat-build')
     const appOutDir = path.join(__dirname, 'dist-flat-build-app')
     const electronOutDir = path.join(__dirname, 'dist-flat-build-electron')
@@ -277,7 +277,7 @@ describe('src/multi-env', () => {
     })
     await builder.buildApp()
 
-    expect(fs.existsSync(path.join(appOutDir, 'index.html'))).toBe(false)
+    expect(fs.existsSync(path.join(appOutDir, 'index.html'))).toBe(true)
     expect(fs.existsSync(path.join(electronOutDir, 'main.js'))).toBe(true)
 
     const mainCode = fs
