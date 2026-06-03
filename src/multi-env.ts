@@ -205,6 +205,11 @@ export default function electron(
               await prevBuildApp.call(this, builder)
             }
 
+            const client = builder.environments.client
+            if (client && !client.isBuilt) {
+              await builder.build(client)
+            }
+
             // Let the user's buildApp run first so the mock HTML remains available.
             await buildElectronEnvironments(builder)
           },
