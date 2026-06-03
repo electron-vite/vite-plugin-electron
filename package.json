@@ -74,15 +74,15 @@
   },
   "devDependencies": {
     "@subf/config": "^0.2.1",
-    "@types/node": "^24.12.0",
+    "@types/node": "^24.12.4",
     "bumpp": "^11.1.0",
     "oxfmt": "^0.51.0",
-    "oxlint": "^1.67.0",
+    "oxlint": "^1.68.0",
     "tsdown": "^0.22.1",
     "typescript": "^6.0.3",
-    "vite": "^8.0.14",
+    "vite": "^8.0.16",
     "vite-plugin-electron-renderer": "^1.0.0",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   },
   "peerDependencies": {
     "vite-plugin-electron-renderer": "*"
