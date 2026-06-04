@@ -30,7 +30,7 @@ export function createElectronPlugin({
   let configEnv: ConfigEnv
   let cleanupMock: (() => Promise<void>) | undefined
 
-  const isESM = checkESModule()
+  let isESM: boolean
 
   return [
     {
@@ -42,6 +42,7 @@ export function createElectronPlugin({
         }
       },
       configResolved(config) {
+        isESM = checkESModule(config.root)
         // When there is no entry (no index.html and no configured input), write a
         // temporary mock so that Vite's dev server starts without errors.
         if (!resolveInput(config)) {
@@ -80,6 +81,7 @@ export function createElectronPlugin({
         }
       },
       configResolved(config) {
+        isESM = checkESModule(config.root)
         // When there is no entry (no index.html and no configured input), write a
         // temporary mock so that Vite's build has a valid entry point.
         if (!resolveInput(config)) {

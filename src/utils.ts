@@ -99,8 +99,8 @@ export function compatRollupOptions(
   return options
 }
 
-export function checkESModule(): boolean {
-  return loadPackageJSONSync()?.type === 'module'
+export function checkESModule(root?: string): boolean {
+  return loadPackageJSONSync(root)?.type === 'module'
 }
 
 export function createDefaultPreloadConfig(
