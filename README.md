@@ -253,6 +253,43 @@ export default {
 
 `electronSimple()` accepts an object grouped by environment name. The `main` and `preload` keys reuse the same default presets as `vite-plugin-electron/simple`, while custom keys are built like main-process targets with their own environment options.
 
+### Factory Usage
+
+If you need to resolve Electron targets dynamically, use `electronPluginFactory()`. The factory receives the resolved project `root` and `packageJson`, and it can return a single option, an array of options, or a Promise that resolves to either shape.
+
+```js
+import { electronPluginFactory } from 'vite-plugin-electron/multi-env'
+
+export default {
+  plugins: [
+    electronPluginFactory(async ({ root, packageJson }) => {
+      const isESM = packageJson?.type === 'module'
+
+      return [
+        {
+          name: 'main',
+          input: 'electron/main.ts',
+          options: {
+            define: {
+              __APP_ROOT__: JSON.stringify(root),
+            },
+          },
+        },
+        {
+          name: 'preload',
+          input: 'electron/preload.ts',
+          options: {
+            build: {
+              minify: !isESM,
+            },
+          },
+        },
+      ]
+    }),
+  ],
+}
+```
+
 ### Types
 
 ```ts
@@ -278,6 +315,18 @@ export interface MultiEnvElectronOptions {
   options?: import('vite').EnvironmentOptions
   onstart?: ElectronOptions['onstart']
 }
+
+export interface ElectronFactoryContext {
+  root: string
+  packageJson?: PackageJson | null
+}
+
+export type MultiEnvElectronOptionsFactory = (
+  context: ElectronFactoryContext,
+) =>
+  | MultiEnvElectronOptions
+  | MultiEnvElectronOptions[]
+  | Promise<MultiEnvElectronOptions | MultiEnvElectronOptions[]>
 ```
 
 ## Hot Reload Preload Scripts

@@ -2,9 +2,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { build } from 'vite'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import electron from '../src'
+import { createElectronPlugin } from '../src/base'
 import { notBundle } from '../src/plugin'
 import { compatRollupOptions, resolveInput, withExternalBuiltins } from '../src/utils'
 
@@ -115,6 +116,37 @@ describe('src/plugin', () => {
     expect(external?.('fs')).toBe(true)
     expect(external?.('node:fs')).toBe(true)
     expect(external?.('left-pad')).toBe(false)
+  })
+
+  it('awaits async buildConfig results in production mode', async () => {
+    const buildConfig = vi.fn(async () => ({
+      define: {
+        __ASYNC_BUILD_CONFIG__: JSON.stringify('resolved'),
+      },
+    }))
+
+    const plugins = createElectronPlugin({
+      prefix: 'vite-plugin-electron-test',
+      dev: vi.fn(),
+      build: vi.fn(),
+      buildConfig,
+    })
+
+    const config = await (plugins[1].config as any)?.(
+      { root: __dirname } as never,
+      { command: 'build', mode: 'production' } as never,
+    )
+
+    expect(buildConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ root: __dirname }),
+      expect.objectContaining({ command: 'build', mode: 'production' }),
+    )
+    expect(config).toMatchObject({
+      base: './',
+      define: {
+        __ASYNC_BUILD_CONFIG__: '"resolved"',
+      },
+    })
   })
 
   it('resolveInput reads rollupOptions.input', () => {

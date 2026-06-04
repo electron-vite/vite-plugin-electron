@@ -17,7 +17,7 @@ interface FactoryOptions {
     isESM: boolean,
   ) => Promise<void> | void
   build: (userConfig: UserConfig, configEnv: ConfigEnv, isESM: boolean) => Promise<void> | void
-  buildConfig?: (config: UserConfig, env: ConfigEnv) => UserConfig | undefined
+  buildConfig?: (config: UserConfig, env: ConfigEnv) => Promise<UserConfig | undefined>
 }
 
 export function createElectronPlugin({
@@ -70,14 +70,14 @@ export function createElectronPlugin({
     {
       name: `${prefix}:prod`,
       apply: 'build',
-      config(config, env) {
+      async config(config, env) {
         userConfig = config
         configEnv = env
 
         return {
           // Make sure that Electron can be loaded into the local file using `loadFile` after packaging.
           ...(config.base ? {} : { base: './' }),
-          ...buildConfig?.(config, env),
+          ...(await buildConfig?.(config, env)),
         }
       },
       configResolved(config) {

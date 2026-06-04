@@ -5,7 +5,8 @@ import { createBuilder } from 'vite'
 import type { Plugin } from 'vite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import electron, { simpleOptions } from '../src/multi-env'
+import electron, { electronPluginFactory, simpleOptions } from '../src/multi-env'
+import type { ElectronFactoryContext } from '../src/multi-env'
 
 const normalizingNewLineRE = /[\r\n]+/g
 const mockHtmlRoot = path.join(__dirname, 'fixtures/mock-html-multi-env')
@@ -187,6 +188,62 @@ describe('src/multi-env', () => {
         },
       },
     })
+  })
+
+  it('electronPluginFactory resolves async options with package context', async () => {
+    const factoryRoot = path.join(__dirname, 'fixtures/electron-factory-root')
+    const appOutDir = path.join(__dirname, 'dist-electron-factory-app')
+    const electronOutDir = path.join(__dirname, 'dist-electron-factory-electron')
+    const inputFile = path.join(factoryRoot, 'env-main.ts')
+    const packageJsonFile = path.join(factoryRoot, 'package.json')
+
+    await resetDirs(factoryRoot, appOutDir, electronOutDir)
+    fs.mkdirSync(factoryRoot, { recursive: true })
+    fs.writeFileSync(packageJsonFile, JSON.stringify({ type: 'module' }), 'utf-8')
+    fs.writeFileSync(inputFile, 'export const envName = __ENV_NAME__\n', 'utf-8')
+
+    const capturedContexts: ElectronFactoryContext[] = []
+
+    const builder = await createBuilder({
+      configFile: false,
+      root: factoryRoot,
+      build: {
+        outDir: appOutDir,
+        emptyOutDir: true,
+        minify: false,
+      },
+      plugins: electronPluginFactory(async (context) => {
+        capturedContexts.push(context)
+
+        return {
+          name: 'main',
+          input: 'env-main.ts',
+          options: {
+            define: {
+              __ENV_NAME__: JSON.stringify(context.packageJson?.type ?? 'missing'),
+            },
+            build: {
+              minify: false,
+              outDir: electronOutDir,
+            },
+          },
+        }
+      }),
+      logLevel: 'silent',
+    })
+    await builder.buildApp()
+
+    const mainCode = fs
+      .readFileSync(path.join(electronOutDir, 'env-main.js'), 'utf-8')
+      .replace(normalizingNewLineRE, '\n')
+
+    expect(capturedContexts.length).toBeGreaterThan(0)
+    for (const context of capturedContexts) {
+      expect(context.root).toBe(factoryRoot)
+      expect(context.packageJson).not.toBeNull()
+      expect(context.packageJson?.type).toBe('module')
+    }
+    expect(mainCode).toContain('"module"')
   })
 
   it('mockHtml', async () => {

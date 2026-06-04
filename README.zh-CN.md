@@ -229,6 +229,43 @@ export default {
 
 `electronSimple()` 接受一个以环境名分组的对象。`main` 和 `preload` 会复用 simple API 的默认预设，其他自定义 key 会像主进程一样构建，并使用各自的环境配置。
 
+### Factory 用法
+
+如果你需要动态解析 Electron 目标，可以使用 `electronPluginFactory()`。这个工厂函数会接收解析后的 `root` 和 `packageJson`，并且可以返回单个选项、选项数组，或者解析为这两种形态之一的 Promise。
+
+```js
+import { electronPluginFactory } from 'vite-plugin-electron/multi-env'
+
+export default {
+  plugins: [
+    electronPluginFactory(async ({ root, packageJson }) => {
+      const isESM = packageJson?.type === 'module'
+
+      return [
+        {
+          name: 'main',
+          input: 'electron/main.ts',
+          options: {
+            define: {
+              __APP_ROOT__: JSON.stringify(root),
+            },
+          },
+        },
+        {
+          name: 'preload',
+          input: 'electron/preload.ts',
+          options: {
+            build: {
+              minify: !isESM,
+            },
+          },
+        },
+      ]
+    }),
+  ],
+}
+```
+
 ### 类型定义
 
 ```ts
@@ -254,6 +291,18 @@ export interface MultiEnvElectronOptions {
   options?: import('vite').EnvironmentOptions
   onstart?: ElectronOptions['onstart']
 }
+
+export interface ElectronFactoryContext {
+  root: string
+  packageJson?: PackageJson | null
+}
+
+export type MultiEnvElectronOptionsFactory = (
+  context: ElectronFactoryContext,
+) =>
+  | MultiEnvElectronOptions
+  | MultiEnvElectronOptions[]
+  | Promise<MultiEnvElectronOptions | MultiEnvElectronOptions[]>
 ```
 
 ## 热重载预加载脚本

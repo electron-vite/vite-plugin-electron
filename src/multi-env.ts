@@ -1,3 +1,6 @@
+import path from 'node:path'
+
+import { loadPackageJSONSync } from 'local-pkg'
 import { createBuilder, mergeConfig, perEnvironmentPlugin } from 'vite'
 import type { EnvironmentOptions, Plugin, ViteBuilder } from 'vite'
 
@@ -13,7 +16,6 @@ import {
   withExternalBuiltins,
 } from './utils'
 import type { RolldownOrRollupOptions } from './utils'
-
 export type MultiEnvElectronOptionName = 'main' | 'preload' | (string & {})
 
 export interface MultiEnvElectronOptions extends OnStartOptions {
@@ -89,44 +91,82 @@ export function electronSimple(options: MultiEnvElectronOptionsRecord): Plugin[]
 
 const PLUGIN_PREFIX = 'vite-plugin-electron-multi-env'
 
-export default function electron(
-  options: MultiEnvElectronOptions | MultiEnvElectronOptions[],
-): Plugin[] {
-  const envNames = new Set<string>()
-  const environmentOptions = toArray(options).map((opt, i) => {
-    const name = `electron_${opt.name || i}`
-    if (envNames.has(name)) {
-      throw new Error(
-        `[vite-plugin-electron] Duplicate environment name "${opt.name || i}". Please provide unique "name" properties for each environment in the options array.`,
-      )
+export interface ElectronFactoryContext {
+  root: string
+  packageJson?: ReturnType<typeof loadPackageJSONSync>
+}
+
+export type MultiEnvElectronOptionsFactory = (
+  context: ElectronFactoryContext,
+) =>
+  | MultiEnvElectronOptions
+  | MultiEnvElectronOptions[]
+  | Promise<MultiEnvElectronOptions | MultiEnvElectronOptions[]>
+
+interface ResolvedElectronOptions {
+  environmentOptions: Array<MultiEnvElectronOptions & { name: string }>
+  defaultEnvs: Record<string, EnvironmentOptions>
+}
+
+export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): Plugin[] {
+  const createContext = (root?: string): ElectronFactoryContext => {
+    const resolvedRoot = path.resolve(root ?? process.cwd())
+    return {
+      root: resolvedRoot,
+      packageJson: loadPackageJSONSync(resolvedRoot),
     }
-    envNames.add(name)
+  }
 
-    return Object.assign(opt, { name })
-  })
+  const resolveOptions = async (root?: string): Promise<ResolvedElectronOptions> => {
+    const context = createContext(root)
+    const rawOptions = await options(context)
+    const envNames = new Set<string>()
+    const environmentOptions = toArray(rawOptions).map((opt, i) => {
+      const optionName = opt.name || i
+      const name = `electron_${optionName}`
+      if (envNames.has(name)) {
+        throw new Error(
+          `[vite-plugin-electron] Duplicate environment name "${optionName}". Please provide unique "name" properties for each environment in the options array.`,
+        )
+      }
+      envNames.add(name)
 
-  const isESM = checkESModule()
+      return Object.assign({}, opt, { name })
+    })
 
-  // Shared: create per-environment EnvironmentOptions from the options array.
-  const defaultEnvs = Object.fromEntries<EnvironmentOptions>(
-    environmentOptions.map((opt) => {
-      const defaultConfig = createElectronViteDefaults(isESM, {
-        input: opt.input,
-        plugins: opt.plugins,
-      })
+    const isESM = context.packageJson
+      ? context.packageJson.type === 'module'
+      : checkESModule(context.root)
 
-      return [
-        opt.name,
-        mergeConfig<EnvironmentOptions, EnvironmentOptions>(
-          { consumer: 'server', ...defaultConfig },
-          opt.options ?? {},
-        ),
-      ]
-    }),
-  )
+    // Shared: create per-environment EnvironmentOptions from the options array.
+    const defaultEnvs = Object.fromEntries<EnvironmentOptions>(
+      environmentOptions.map((opt) => {
+        const defaultConfig = createElectronViteDefaults(isESM, {
+          input: opt.input,
+          plugins: opt.plugins,
+        })
+
+        return [
+          opt.name,
+          mergeConfig<EnvironmentOptions, EnvironmentOptions>(
+            { consumer: 'server', ...defaultConfig },
+            opt.options ?? {},
+          ),
+        ]
+      }),
+    )
+
+    return {
+      environmentOptions,
+      defaultEnvs,
+    }
+  }
 
   // Build each electron environment from the given builder in declaration order.
-  const buildElectronEnvironments = async (builder: ViteBuilder): Promise<void> => {
+  const buildElectronEnvironments = async (
+    builder: ViteBuilder,
+    environmentOptions: ResolvedElectronOptions['environmentOptions'],
+  ): Promise<void> => {
     for (const { name } of environmentOptions) {
       const env = builder.environments[name]
       if (env && !env.isBuilt) {
@@ -138,6 +178,7 @@ export default function electron(
   return createElectronPlugin({
     prefix: PLUGIN_PREFIX,
     async dev(pluginContext, server) {
+      const { environmentOptions, defaultEnvs } = await resolveOptions(server.config.root)
       if (environmentOptions.length === 0) {
         return
       }
@@ -180,12 +221,13 @@ export default function electron(
         }),
       )
 
-      await buildElectronEnvironments(builder)
+      await buildElectronEnvironments(builder, environmentOptions)
     },
     // Build is fully handled by the config() hook, so we can leave this empty.
     async build() {},
     // Use the config() hook to inject electron environments
-    buildConfig(config) {
+    async buildConfig(config) {
+      const { environmentOptions, defaultEnvs } = await resolveOptions(config.root)
       if (environmentOptions.length === 0) {
         return
       }
@@ -211,10 +253,16 @@ export default function electron(
             }
 
             // Let the user's buildApp run first so the mock HTML remains available.
-            await buildElectronEnvironments(builder)
+            await buildElectronEnvironments(builder, environmentOptions)
           },
         },
       })
     },
   })
+}
+
+export default function electron(
+  options: MultiEnvElectronOptions | MultiEnvElectronOptions[],
+): Plugin[] {
+  return electronPluginFactory(() => options)
 }
