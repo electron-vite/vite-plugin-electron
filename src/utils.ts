@@ -165,6 +165,7 @@ interface ElectronViteDefaultsOptions {
   entry?: ElectronOptions['entry']
   input?: RolldownOrRollupOptions['input']
   plugins?: RolldownOrRollupOptions['plugins']
+  external?: RolldownOrRollupOptions['external']
 }
 
 export function createElectronViteDefaults(
@@ -193,6 +194,7 @@ export function createElectronViteDefaults(
             }
           : {}),
         ...(options.plugins !== undefined ? { plugins: options.plugins } : {}),
+        ...(options.external !== undefined ? { external: options.external } : {}),
       },
     }),
     resolve: {

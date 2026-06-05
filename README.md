@@ -223,6 +223,9 @@ export default {
     electronSimple({
       main: {
         input: 'electron/main.ts',
+        // Externalize npm dependencies during dev (like Vite does for the browser).
+        // During production builds this is ignored — all deps are bundled.
+        notBundle: true,
         options: {
           define: {
             __ELECTRON_TARGET__: JSON.stringify('main'),
@@ -313,6 +316,17 @@ export interface MultiEnvElectronOptions {
    * Per-environment Vite options.
    */
   options?: import('vite').EnvironmentOptions
+  /**
+   * When `true`, externalize npm dependencies during development so they are
+   * not bundled, much like Vite does for the browser.
+   *
+   * Pass a custom `external` value to override the default package.json-derived set.
+   *
+   * During production builds this option is ignored — all dependencies are bundled.
+   *
+   * @default false
+   */
+  notBundle?: boolean | import('vite').BuildEnvironmentOptions['rolldownOptions']['external']
   onstart?: ElectronOptions['onstart']
 }
 
@@ -481,6 +495,24 @@ Use `notBundle()` to externalize dependencies in Electron entries.
 
 This keeps startup fast by skipping dependency bundling while running `vite serve`.
 In production builds, it still externalizes dependencies, but it uses a narrower default set.
+
+> [!tip]
+> **Using `vite-plugin-electron/multi-env`?**
+> You can use the built-in `notBundle: true` option on `MultiEnvElectronOptions` instead of importing the plugin separately:
+>
+> ```js
+> import { electronSimple } from 'vite-plugin-electron/multi-env'
+>
+> electronSimple({
+>   main: {
+>     input: 'electron/main.ts',
+>     notBundle: true, // ← built-in shortcut
+>   },
+> })
+> ```
+>
+> When `notBundle` is `true`, npm dependencies are externalized from `package.json` during dev.
+> You can also pass a custom `external` value (e.g. `notBundle: ['lodash']`) to override the default set.
 
 > [!important]
 > **Behavior change in `v1.0.0`**:

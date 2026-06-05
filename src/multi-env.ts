@@ -3,6 +3,7 @@ import { createBuilder, mergeConfig, perEnvironmentPlugin } from 'vite'
 import type { EnvironmentOptions, Plugin, ViteBuilder } from 'vite'
 
 import { createElectronPlugin } from './base'
+import { extractExternalDeps } from './plugin/notBundle'
 import { defaultPreloadOnstart, triggerStartup } from './startup'
 import type { OnStartOptions } from './startup'
 import {
@@ -36,6 +37,16 @@ export interface MultiEnvElectronOptions extends OnStartOptions {
    * Per-environment Vite options.
    */
   options?: EnvironmentOptions
+  /**
+   * When `true`, externalize npm dependencies during development so they are
+   * not bundled, much like Vite does for the browser.
+   *
+   * During production builds this option is ignored — all dependencies are
+   * bundled as usual.
+   *
+   * @default false
+   */
+  notBundle?: boolean | RolldownOrRollupOptions['external']
 }
 
 export type MultiEnvElectronOptionsRecord = Record<
@@ -140,6 +151,11 @@ export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): 
         const defaultConfig = createElectronViteDefaults(context.packageJson!.type === 'module', {
           input: opt.input,
           plugins: opt.plugins,
+          external: !opt.notBundle
+            ? undefined
+            : typeof opt.notBundle !== 'boolean'
+              ? opt.notBundle
+              : extractExternalDeps(context.packageJson!),
         })
 
         return [
