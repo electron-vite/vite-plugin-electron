@@ -106,4 +106,26 @@ describe('src/startup', () => {
       }),
     )
   })
+
+  it('resolves Electron from spawn cwd before process cwd', async () => {
+    createRequire.mockImplementation((filename: string) => {
+      if (filename === '/app/package.json') {
+        return () => '/app/electron'
+      }
+
+      return () => '/workspace/electron'
+    })
+
+    await startup(['.'], { cwd: '/app' })
+
+    expect(createRequire).toHaveBeenCalledWith('/app/package.json')
+    expect(spawn).toHaveBeenCalledWith(
+      '/app/electron',
+      ['.'],
+      expect.objectContaining({
+        cwd: '/app',
+        stdio: defaultStdio,
+      }),
+    )
+  })
 })

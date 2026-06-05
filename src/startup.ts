@@ -71,9 +71,9 @@ export const startup: StartupFn = async (
   const { createRequire } = await import('node:module')
   const electronPackage = customElectronPkg ?? 'electron'
   const roots = new Set<string>([
-    process.cwd(),
     ...(typeof options?.cwd === 'string' ? [options.cwd] : []),
     ...(process.env.INIT_CWD ? [process.env.INIT_CWD] : []),
+    process.cwd(),
   ])
 
   let electron: any
