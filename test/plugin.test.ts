@@ -118,6 +118,25 @@ describe('src/plugin', () => {
     expect(external?.('left-pad')).toBe(false)
   })
 
+  it('withExternalBuiltins writes external options when build options are empty', () => {
+    const config = withExternalBuiltins({
+      build: {},
+      environments: {
+        electron: {
+          build: {},
+        },
+      },
+    }) as {
+      build?: { rolldownOptions?: { external?: unknown[] } }
+      environments?: Record<string, { build?: { rolldownOptions?: { external?: unknown[] } } }>
+    }
+
+    expect(config.build?.rolldownOptions?.external).toEqual(expect.arrayContaining(['electron']))
+    expect(config.environments?.electron.build?.rolldownOptions?.external).toEqual(
+      expect.arrayContaining(['electron']),
+    )
+  })
+
   it('awaits async buildConfig results in production mode', async () => {
     const buildConfig = vi.fn(async () => ({
       define: {

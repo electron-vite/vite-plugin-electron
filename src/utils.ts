@@ -63,6 +63,14 @@ function getBuildOptions(build: InlineConfig['build']): RolldownOrRollupOptions 
   return build.rolldownOptions || build.rollupOptions
 }
 
+function ensureBuildOptions(build: NonNullable<InlineConfig['build']>): RolldownOrRollupOptions {
+  const options = getBuildOptions(build) || {}
+  if (!build.rolldownOptions && !build.rollupOptions) {
+    build.rolldownOptions = options
+  }
+  return options
+}
+
 /**
  * Keep only the build config key supported by the current Vite version.
  * This converts the user-facing config shape between `rolldownOptions` and `rollupOptions`
@@ -232,14 +240,14 @@ export function resolveViteConfigBase(esmodule: boolean, options: ElectronOption
  */
 export function withExternalBuiltins(config: InlineConfig): InlineConfig {
   config.build ??= {}
-  const buildOptions = getBuildOptions(config.build) || {}
+  const buildOptions = ensureBuildOptions(config.build)
   buildOptions.external = resolveBuiltinExternals(buildOptions.external)
   setBuildOptions(config.build)
 
   if (config.environments) {
     for (const environment of Object.values(config.environments)) {
       environment.build ??= {}
-      const environmentBuildOptions = getBuildOptions(environment.build) || {}
+      const environmentBuildOptions = ensureBuildOptions(environment.build)
       environmentBuildOptions.external = resolveBuiltinExternals(environmentBuildOptions.external)
       setBuildOptions(environment.build)
     }
