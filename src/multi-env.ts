@@ -190,7 +190,7 @@ export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): 
   return createElectronPlugin({
     prefix: PLUGIN_PREFIX,
     async dev(pluginContext, server) {
-      const { environmentOptions, defaultEnvs } = await resolveOptions(false, server.config.root)
+      const { environmentOptions, defaultEnvs } = await resolveOptions(true, server.config.root)
       if (environmentOptions.length === 0) {
         return
       }
@@ -240,7 +240,7 @@ export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): 
     // Use the config() hook to inject electron environments
     async buildConfig(config) {
       const { environmentOptions, defaultEnvs } = await resolveOptions(
-        true,
+        false,
         config.root || process.cwd(),
       )
       if (environmentOptions.length === 0) {
