@@ -1,5 +1,3 @@
-import path from 'node:path'
-
 import { loadPackageJSONSync } from 'local-pkg'
 import { createBuilder, mergeConfig, perEnvironmentPlugin } from 'vite'
 import type { EnvironmentOptions, Plugin, ViteBuilder } from 'vite'
@@ -94,6 +92,7 @@ const PLUGIN_PREFIX = 'vite-plugin-electron-multi-env'
 export interface ElectronFactoryContext {
   root: string
   packageJson?: ReturnType<typeof loadPackageJSONSync>
+  isDev: boolean
 }
 
 export type MultiEnvElectronOptionsFactory = (
@@ -109,16 +108,17 @@ interface ResolvedElectronOptions {
 }
 
 export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): Plugin[] {
-  const createContext = (root?: string): ElectronFactoryContext => {
-    const resolvedRoot = path.resolve(root ?? process.cwd())
-    return {
-      root: resolvedRoot,
-      packageJson: loadPackageJSONSync(resolvedRoot),
+  const resolveOptions = async (isDev: boolean, root: string): Promise<ResolvedElectronOptions> => {
+    const context: ElectronFactoryContext = {
+      root,
+      packageJson: loadPackageJSONSync(root),
+      isDev,
     }
-  }
 
-  const resolveOptions = async (root?: string): Promise<ResolvedElectronOptions> => {
-    const context = createContext(root)
+    if (!context.packageJson) {
+      throw new Error('[vite-plugin-electron] Cannot find package.json')
+    }
+
     const rawOptions = await options(context)
     const envNames = new Set<string>()
     const environmentOptions = toArray(rawOptions).map((opt, i) => {
@@ -134,14 +134,10 @@ export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): 
       return Object.assign({}, opt, { name })
     })
 
-    const isESM = context.packageJson
-      ? context.packageJson.type === 'module'
-      : checkESModule(context.root)
-
     // Shared: create per-environment EnvironmentOptions from the options array.
     const defaultEnvs = Object.fromEntries<EnvironmentOptions>(
       environmentOptions.map((opt) => {
-        const defaultConfig = createElectronViteDefaults(isESM, {
+        const defaultConfig = createElectronViteDefaults(context.packageJson!.type === 'module', {
           input: opt.input,
           plugins: opt.plugins,
         })
@@ -178,7 +174,7 @@ export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): 
   return createElectronPlugin({
     prefix: PLUGIN_PREFIX,
     async dev(pluginContext, server) {
-      const { environmentOptions, defaultEnvs } = await resolveOptions(server.config.root)
+      const { environmentOptions, defaultEnvs } = await resolveOptions(false, server.config.root)
       if (environmentOptions.length === 0) {
         return
       }
@@ -227,7 +223,10 @@ export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): 
     async build() {},
     // Use the config() hook to inject electron environments
     async buildConfig(config) {
-      const { environmentOptions, defaultEnvs } = await resolveOptions(config.root)
+      const { environmentOptions, defaultEnvs } = await resolveOptions(
+        true,
+        config.root || process.cwd(),
+      )
       if (environmentOptions.length === 0) {
         return
       }
