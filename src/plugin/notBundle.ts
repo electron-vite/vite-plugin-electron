@@ -27,9 +27,12 @@ export interface NotBundleOptions {
  * - During production, only `dependencies` are externalized.
  * @param pkg package.json 's content
  */
-export function extractExternalDeps(pkg: Record<string, any>): RolldownOrRollupOptions['external'] {
+export function extractExternalDeps(
+  pkg: Record<string, any>,
+  isDev = getIsViteDev(),
+): RolldownOrRollupOptions['external'] {
   return Object.keys(
-    getIsViteDev()
+    isDev
       ? {
           ...pkg.dependencies,
           ...pkg.devDependencies,
@@ -51,6 +54,8 @@ export const bareImportRE: RegExp = /^(?![a-zA-Z]:)[\w@](?!.*:\/\/)/
  * During dev, we exclude the `cjs` npm-pkg from bundle, mush like Vite :)
  */
 export function notBundle(options: NotBundleOptions = {}): Plugin {
+  let missingPackageJsonWarning = false
+
   return {
     name: 'vite-plugin-electron:not-bundle',
     // Run before the builtin plugin 'vite:resolve'
@@ -62,9 +67,7 @@ export function notBundle(options: NotBundleOptions = {}): Plugin {
         if (pkg) {
           external = extractExternalDeps(pkg)
         } else {
-          console.warn(
-            '[vite-plugin-electron:not-bundle] No package.json found in the project root and no filter option provided. All dependencies will be bundled.',
-          )
+          missingPackageJsonWarning = true
           return
         }
       } else {
@@ -76,6 +79,13 @@ export function notBundle(options: NotBundleOptions = {}): Plugin {
             external,
           },
         }),
+      }
+    },
+    configResolved(config) {
+      if (missingPackageJsonWarning) {
+        config.logger.warn(
+          '[vite-plugin-electron:not-bundle] No package.json found in the project root and no filter option provided. All dependencies will be bundled.',
+        )
       }
     },
   }

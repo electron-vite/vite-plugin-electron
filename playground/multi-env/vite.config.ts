@@ -10,7 +10,7 @@ export default defineConfig({
     electronSimple({
       main: {
         input: ['electron/main.ts', 'electron/worker.ts'],
-        notBundle: true,
+        bundleDeps: 'auto',
         options: {
           define: {
             __PLAYGROUND_MULTI_ENV_MAIN_LABEL__: JSON.stringify('main-env-ready'),
