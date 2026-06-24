@@ -15,7 +15,6 @@ import {
   withExternalBuiltins,
 } from './utils'
 import type { RolldownOrRollupOptions } from './utils'
-export type MultiEnvElectronOptionName = 'main' | 'preload' | (string & {})
 
 export interface MultiEnvElectronOptions extends OnStartOptions {
   /**
@@ -49,10 +48,10 @@ export interface MultiEnvElectronOptions extends OnStartOptions {
   notBundle?: boolean | RolldownOrRollupOptions['external']
 }
 
-export type MultiEnvElectronOptionsRecord = Record<
-  MultiEnvElectronOptionName,
-  Omit<MultiEnvElectronOptions, 'name'>
->
+export interface MultiEnvElectronOptionsRecord {
+  main: Omit<MultiEnvElectronOptions, 'name'>
+  preload?: Omit<MultiEnvElectronOptions, 'name'>
+}
 
 /**
  * Helper function to create simple API for {@link electron} like `vite-plugin-electron/simple`.
