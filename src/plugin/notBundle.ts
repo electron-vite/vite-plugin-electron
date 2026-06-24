@@ -29,7 +29,7 @@ export interface NotBundleOptions {
  */
 export function extractExternalDeps(
   pkg: Record<string, any>,
-  isDev = getIsViteDev(),
+  isDev: boolean = getIsViteDev(),
 ): RolldownOrRollupOptions['external'] {
   return Object.keys(
     isDev
