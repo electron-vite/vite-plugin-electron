@@ -147,21 +147,20 @@ interface ResolvedElectronOptions {
 function resolveBundleDepsConfig(
   context: ElectronFactoryContext,
   bundleDeps: BundleDeps,
-): EnvironmentOptions {
+): EnvironmentResolveOptions {
   if (typeof bundleDeps === 'object') {
     const mode = context.isDev ? 'dev' : 'build'
-    return mergeConfig<EnvironmentOptions, EnvironmentOptions>(
+    return mergeConfig<
+      NonNullable<EnvironmentOptions['resolve']>,
+      NonNullable<EnvironmentOptions['resolve']>
+    >(
       {
-        resolve: {
-          external: bundleDeps.both?.exclude,
-          noExternal: bundleDeps.both?.include,
-        },
+        external: bundleDeps.both?.exclude,
+        noExternal: bundleDeps.both?.include,
       },
       {
-        resolve: {
-          external: bundleDeps[mode]?.exclude,
-          noExternal: bundleDeps[mode]?.include,
-        },
+        external: bundleDeps[mode]?.exclude,
+        noExternal: bundleDeps[mode]?.include,
       },
     )
   }
@@ -169,15 +168,13 @@ function resolveBundleDepsConfig(
   switch (bundleDeps) {
     case 'auto':
       return {
-        resolve: {
-          external: extractExternalDeps(context.packageJson!, context.isDev) as BundleDepsExclude,
-          noExternal: true,
-        },
+        external: extractExternalDeps(context.packageJson!, context.isDev) as BundleDepsExclude,
+        noExternal: true,
       }
     case true:
-      return { resolve: { noExternal: true } }
+      return { noExternal: true }
     case false:
-      return { resolve: { external: true } }
+      return { external: true }
     default:
       return {}
   }
@@ -190,15 +187,11 @@ function resolveEnvironmentConfig(
   const defaultConfig = createElectronViteDefaults(context.packageJson!.type === 'module', {
     input: opt.input,
     plugins: opt.plugins,
+    resolve: resolveBundleDepsConfig(context, opt.bundleDeps ?? 'vite'),
   })
 
-  const dependencyConfig = resolveBundleDepsConfig(context, opt.bundleDeps ?? 'vite')
-
   const resolvedConfig: EnvironmentOptions = mergeConfig<EnvironmentOptions, EnvironmentOptions>(
-    mergeConfig<EnvironmentOptions, EnvironmentOptions>(
-      { consumer: 'server', ...defaultConfig },
-      dependencyConfig,
-    ),
+    { consumer: 'server', ...defaultConfig },
     opt.options ?? {},
   )
 

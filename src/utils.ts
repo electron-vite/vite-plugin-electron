@@ -169,11 +169,12 @@ export function createDefaultPreloadConfig(
   }
 }
 
-interface ElectronViteDefaultsOptions {
+export interface ElectronViteDefaultsOptions {
   entry?: ElectronOptions['entry']
   input?: RolldownOrRollupOptions['input']
   plugins?: RolldownOrRollupOptions['plugins']
   external?: RolldownOrRollupOptions['external']
+  resolve?: InlineConfig['resolve']
 }
 
 export function createElectronViteDefaults(
@@ -211,6 +212,7 @@ export function createElectronViteDefaults(
       // Since we're building for electron (which uses Node.js), we don't want to use the "browser" field in the packages.
       // It corrupts bundling packages like `ws` and `isomorphic-ws`, for example.
       mainFields: ['module', 'jsnext:main', 'jsnext'],
+      ...options.resolve,
     },
     define: {
       // @see - https://github.com/vitejs/vite/blob/v5.0.11/packages/vite/src/node/plugins/define.ts#L20
