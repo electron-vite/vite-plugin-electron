@@ -53,27 +53,20 @@ describe('src/simple', () => {
     const preload = options[1]
     expect(preload.onstart).toBe(defaultPreloadOnstart)
     // input is forwarded into the vite build config
-    expect(
-      (preload.vite?.build as any)?.rolldownOptions?.input,
-    ).toBe('electron/preload.ts')
+    expect((preload.vite?.build as any)?.rolldownOptions?.input).toBe('electron/preload.ts')
   })
 
   it('array of preload objects produces one entry per item', async () => {
     await electronSimple({
       main: { entry: 'electron/main.ts' },
-      preload: [
-        { input: 'electron/preload.ts' },
-        { input: 'electron/preload-worker.ts' },
-      ],
+      preload: [{ input: 'electron/preload.ts' }, { input: 'electron/preload-worker.ts' }],
     })
 
     const options = await getPassedOptions()
     expect(options).toHaveLength(3) // main + 2 preloads
 
     expect(options[1].onstart).toBe(defaultPreloadOnstart)
-    expect((options[1].vite?.build as any)?.rolldownOptions?.input).toBe(
-      'electron/preload.ts',
-    )
+    expect((options[1].vite?.build as any)?.rolldownOptions?.input).toBe('electron/preload.ts')
 
     expect(options[2].onstart).toBe(defaultPreloadOnstart)
     expect((options[2].vite?.build as any)?.rolldownOptions?.input).toBe(
@@ -125,8 +118,6 @@ describe('src/simple', () => {
     const preload = options[1]
     expect(preload.vite?.define).toMatchObject({ __PRELOAD__: 'true' })
     // default preload platform is still set
-    expect(
-      (preload.vite?.build as any)?.rolldownOptions?.platform,
-    ).toBe('node')
+    expect((preload.vite?.build as any)?.rolldownOptions?.platform).toBe('node')
   })
 })

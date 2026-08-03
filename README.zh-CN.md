@@ -15,7 +15,9 @@
 - [🔥 热重启 <sub><sup>(主进程)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-restart)
 - [🔄 热重载 <sub><sup>(预加载脚本)</sup></sub>](https://electron-vite.github.io/guide/features.html#hot-reload)
 - [⚡️ HMR <sub><sup>(渲染进程)</sup></sub>](https://electron-vite.github.io/guide/features.html#hmr)
+
 <!-- - [🚀 Not Bundle, It's fast <sub><sup>(Like Vite's Not Bundle)</sup></sub>](https://github.com/electron-vite/vite-plugin-electron#not-bundle) -->
+
 - 🌱 与 Vite 及其生态完全兼容 <sub><sup>(基于 Vite)</sup></sub>
 - 🔮 完整的 [JavaScript API](https://github.com/electron-vite/vite-plugin-electron#javascript-api)，很适合和复杂项目集成。
 - 🐣 API 少，上手简单

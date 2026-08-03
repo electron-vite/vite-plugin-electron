@@ -1,3 +1,5 @@
+import path from 'node:path'
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { startup } from '../src/startup'
@@ -108,8 +110,10 @@ describe('src/startup', () => {
   })
 
   it('resolves Electron from spawn cwd before process cwd', async () => {
+    const appPackageJson = path.join('/app', 'package.json')
+
     createRequire.mockImplementation((filename: string) => {
-      if (filename === '/app/package.json') {
+      if (filename === appPackageJson) {
         return () => '/app/electron'
       }
 
@@ -118,7 +122,7 @@ describe('src/startup', () => {
 
     await startup(['.'], { cwd: '/app' })
 
-    expect(createRequire).toHaveBeenCalledWith('/app/package.json')
+    expect(createRequire).toHaveBeenCalledWith(appPackageJson)
     expect(spawn).toHaveBeenCalledWith(
       '/app/electron',
       ['.'],

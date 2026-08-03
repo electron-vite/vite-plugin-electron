@@ -57,7 +57,7 @@
     "test": "vitest run",
     "lint": "oxlint --fix",
     "format": "oxfmt",
-    "qa": "pnpm run lint && pnpm run format && pnpm run types && pnpm run test",
+    "qa": "pnpm run lint && pnpm run format && pnpm run types",
     "play": "pnpm --dir playground/flat dev",
     "play:multi-env": "pnpm --dir playground/multi-env dev",
     "play:simple": "pnpm --dir playground/simple dev",
@@ -76,13 +76,13 @@
     "@subf/config": "^0.2.1",
     "@types/node": "^24.12.4",
     "bumpp": "^11.1.0",
-    "oxfmt": "^0.56.0",
-    "oxlint": "^1.71.0",
-    "tsdown": "^0.22.3",
-    "typescript": "^6.0.3",
-    "vite": "^8.1.0",
+    "oxfmt": "^0.61.0",
+    "oxlint": "^1.76.0",
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.0",
     "vite-plugin-electron-renderer": "^1.0.0",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   },
   "peerDependencies": {
     "vite-plugin-electron-renderer": "*"

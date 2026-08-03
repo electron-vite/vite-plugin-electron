@@ -338,7 +338,7 @@ export function resolveInput(
         : Array.isArray(libOptions.entry)
           ? libOptions.entry.map(resolve)
           : Object.fromEntries(
-              Object.entries(libOptions.entry).map(([alias, file]) => [alias, resolve(file)]),
+              Object.entries(libOptions.entry || {}).map(([alias, file]) => [alias, resolve(file)]),
             ))
     : normalizeInput(buildOptions?.input)
 
