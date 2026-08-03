@@ -8,16 +8,18 @@ import type { RolldownOrRollupOptions } from './utils'
 import electron, { compatRollupOptions } from './index'
 import type { ElectronOptions } from './index'
 
+export type PreloadSimpleOptions = Omit<ElectronOptions, 'entry'> & {
+  /**
+   * Shortcut of `build.rolldownOptions.input` (`build.rollupOptions.input` on Vite < 8).
+   *
+   * Preload scripts may contain Web assets, so use the build input option instead of `build.lib.entry`.
+   */
+  input: RolldownOrRollupOptions['input']
+}
+
 export interface ElectronSimpleOptions {
   main: ElectronOptions
-  preload?: Omit<ElectronOptions, 'entry'> & {
-    /**
-     * Shortcut of `build.rolldownOptions.input` (`build.rollupOptions.input` on Vite < 8).
-     *
-     * Preload scripts may contain Web assets, so use the build input option instead of `build.lib.entry`.
-     */
-    input: RolldownOrRollupOptions['input']
-  }
+  preload?: PreloadSimpleOptions | PreloadSimpleOptions[]
   /**
    * Support use Node.js API in Electron-Renderer
    * @see https://github.com/electron-vite/vite-plugin-electron-renderer
@@ -45,14 +47,17 @@ export default async function electronSimple(options: ElectronSimpleOptions): Pr
   ]
 
   if (options.preload) {
-    const { input, vite: viteConfig = {}, ...preloadOptions } = options.preload
-    const preloadConfig = createDefaultPreloadConfig(esmodule, input)
-    const preload: ElectronOptions = {
-      onstart: defaultPreloadOnstart,
-      ...preloadOptions,
-      vite: mergeConfig(preloadConfig, viteConfig),
+    const preloadArray = Array.isArray(options.preload) ? options.preload : [options.preload]
+    for (const preloadItem of preloadArray) {
+      const { input, vite: viteConfig = {}, ...preloadOptions } = preloadItem
+      const preloadConfig = createDefaultPreloadConfig(esmodule, input)
+      const preload: ElectronOptions = {
+        onstart: defaultPreloadOnstart,
+        ...preloadOptions,
+        vite: mergeConfig(preloadConfig, viteConfig),
+      }
+      flatApiOptions.push(preload)
     }
-    flatApiOptions.push(preload)
   }
 
   const plugins = electron(flatApiOptions)
