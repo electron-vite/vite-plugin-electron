@@ -357,6 +357,7 @@ export interface MultiEnvElectronOptions {
 export interface ElectronFactoryContext {
   root: string
   packageJson?: PackageJson | null
+  isDev: boolean
 }
 
 export type MultiEnvElectronOptionsFactory = (
