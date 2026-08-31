@@ -85,6 +85,7 @@
     "vitest": "^4.1.10"
   },
   "peerDependencies": {
+    "vite": ">=6",
     "vite-plugin-electron-renderer": "*"
   },
   "peerDependenciesMeta": {

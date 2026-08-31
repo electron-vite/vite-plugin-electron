@@ -1,7 +1,9 @@
 import type { SpawnOptions, StdioOptions } from 'node:child_process'
 import path from 'node:path'
 
-import type { ViteDevServer, MinimalPluginContextWithoutEnvironment } from 'vite'
+import type { ViteDevServer } from 'vite'
+
+import type { ConfigServerContext } from './base'
 
 const startupEnv = {
   REMOTE_DEBUGGING_PORT: '--remote-debugging-port',
@@ -199,7 +201,7 @@ export interface OnStartOptions {
  * @param options The `onstart` options
  */
 export function triggerStartup(
-  context: MinimalPluginContextWithoutEnvironment,
+  context: ConfigServerContext,
   server: ViteDevServer,
   options: OnStartOptions,
 ): void {

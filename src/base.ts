@@ -1,18 +1,14 @@
-import type {
-  Plugin,
-  ConfigEnv,
-  UserConfig,
-  ViteDevServer,
-  MinimalPluginContextWithoutEnvironment,
-} from 'vite'
+import type { Plugin, ConfigEnv, UserConfig, ViteDevServer, ServerHook } from 'vite'
 
 import { startup } from './startup'
 import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule, setIsViteDev } from './utils'
 
+export type ConfigServerContext = ThisParameterType<ServerHook>
+
 interface FactoryOptions {
   prefix: string
   dev: (
-    pluginContext: MinimalPluginContextWithoutEnvironment,
+    pluginContext: ConfigServerContext,
     server: ViteDevServer,
     isESM: boolean,
   ) => Promise<void> | void
