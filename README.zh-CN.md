@@ -201,9 +201,16 @@ export default {
     electronSimple({
       main: {
         input: 'electron/main.ts',
-        // 开发时外部化 npm 依赖（和 Vite 对浏览器的行为一样）
-        // 生产构建时该选项会被忽略，所有依赖都会被打包
-        notBundle: true,
+        bundleDeps: {
+          dev: {
+            // 开发阶段打包这个依赖。
+            include: ['some-cjs-dependency'],
+          },
+          build: {
+            // 生产产物中把这个依赖留在 node_modules 里。
+            exclude: ['electron-updater'],
+          },
+        },
         options: {
           define: {
             __ELECTRON_TARGET__: JSON.stringify('main'),
@@ -295,21 +302,38 @@ export interface MultiEnvElectronOptions {
    */
   options?: import('vite').EnvironmentOptions
   /**
-   * 设为 `true` 时，开发阶段会外部化 npm 依赖，不打包它们，行为和 Vite 对浏览器一样。
+   * 控制依赖如何被打包。
    *
-   * 也可以传入自定义的 `external` 值来覆盖默认从 package.json 生成的外部化集合。
-   *
-   * 生产构建时该选项会被忽略，所有依赖都会被打包。
-   *
-   * @default false
+   * - `'vite'`（默认）保持 Vite server environment 的行为。
+   * - `'auto'` 打包除 package.json dependencies 之外的全部依赖。
+   * - `true` 打包全部依赖。
+   * - `false` 外部化全部依赖。
    */
-  notBundle?: boolean | import('vite').BuildEnvironmentOptions['rolldownOptions']['external']
+  bundleDeps?:
+    | 'vite'
+    | 'auto'
+    | boolean
+    | {
+        both?: {
+          include?: string | RegExp | (string | RegExp)[] | true
+          exclude?: string[] | true
+        }
+        dev?: {
+          include?: string | RegExp | (string | RegExp)[] | true
+          exclude?: string[] | true
+        }
+        build?: {
+          include?: string | RegExp | (string | RegExp)[] | true
+          exclude?: string[] | true
+        }
+      }
   onstart?: ElectronOptions['onstart']
 }
 
 export interface ElectronFactoryContext {
   root: string
   packageJson?: PackageJson | null
+  isDev: boolean
 }
 
 export type MultiEnvElectronOptionsFactory = (
@@ -474,7 +498,7 @@ Await `startup()` 的返回值可以知道是否触发了启动，或者被控�
 
 > [!tip]
 > **正在使用 `vite-plugin-electron/multi-env`？**
-> 可以直接在 `MultiEnvElectronOptions` 上使用内置的 `notBundle: true` 选项，无需单独导入插件：
+> 请改用 `bundleDeps`。它直接映射到 Vite 的 Environment API：
 >
 > ```js
 > import { electronSimple } from 'vite-plugin-electron/multi-env'
@@ -482,13 +506,18 @@ Await `startup()` 的返回值可以知道是否触发了启动，或者被控�
 > electronSimple({
 >   main: {
 >     input: 'electron/main.ts',
->     notBundle: true, // ← 内置快捷方式
+>     bundleDeps: {
+>       dev: { include: ['some-cjs-dependency'] },
+>       build: { exclude: ['electron-updater'] },
+>     },
 >   },
 > })
 > ```
 >
-> 设为 `true` 时，开发阶段会根据 `package.json` 外部化 npm 依赖。
-> 也可以传入自定义 `external` 值（如 `notBundle: ['lodash']`）来覆盖默认集合。
+> `include` 映射到 `resolve.noExternal`，`exclude` 映射到 `resolve.external`。未提供
+> `bundleDeps` 时，采用 Vite server environment 的默认行为。`both` 会与对应的 `dev`
+> 或 `build` 策略合并。使用 `'auto'` 打包除独立 `notBundle()` 插件所选的 package.json
+> 依赖之外的全部依赖，`true` 打包全部依赖，`false` 外部化全部依赖。
 
 > [!important]
 > **`v1.0.0` 行为变更**：
