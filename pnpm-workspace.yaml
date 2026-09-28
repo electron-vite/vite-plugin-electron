@@ -6,4 +6,6 @@ onlyBuiltDependencies:
   - electron
 
 catalog:
+  vite: ^8.3.1
   electron: 42.1.0
+  typescript: ^7.0.2

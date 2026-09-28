@@ -53,7 +53,7 @@
   "scripts": {
     "dev": "tsdown --watch",
     "build": "tsdown",
-    "types": "tsc --noEmit",
+    "types": "tsc --noEmit && pnpm --filter electron-playground-* exec tsc --noEmit",
     "test": "vitest run",
     "lint": "oxlint --fix --max-warnings 0 --report-unused-disable-directives",
     "format": "oxfmt",
@@ -79,8 +79,8 @@
     "oxfmt": "^0.70.0",
     "oxlint": "^1.85.0",
     "tsdown": "^0.23.0",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.1",
+    "typescript": "catalog:",
+    "vite": "catalog:",
     "vite-plugin-electron-renderer": "^1.0.0",
     "vitest": "^5.0.2"
   },
