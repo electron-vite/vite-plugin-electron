@@ -41,6 +41,7 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
     async dev(pluginContext, server, isESM) {
       const entryCount = optionsArray.length
       let closeBundleCount = 0
+      const watchers: { close: () => Promise<void> }[] = []
 
       for (const options of optionsArray) {
         options.vite ??= {}
@@ -67,7 +68,14 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           },
         })
 
-        await buildBase(isESM, options)
+        const result = await buildBase(isESM, options)
+        if ('close' in result) {
+          watchers.push(result)
+        }
+      }
+
+      return async () => {
+        await Promise.all(watchers.map((watcher) => watcher.close()))
       }
     },
     async build(userConfig, configEnv, isESM) {

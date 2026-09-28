@@ -4,6 +4,7 @@ import { startup } from './startup'
 import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule, setIsViteDev } from './utils'
 
 export type ConfigServerContext = ThisParameterType<ServerHook>
+type DevCleanup = () => void | Promise<void>
 
 interface FactoryOptions {
   prefix: string
@@ -11,7 +12,7 @@ interface FactoryOptions {
     pluginContext: ConfigServerContext,
     server: ViteDevServer,
     isESM: boolean,
-  ) => Promise<void> | void
+  ) => DevCleanup | void | Promise<DevCleanup | void>
   build: (userConfig: UserConfig, configEnv: ConfigEnv, isESM: boolean) => Promise<void> | void
   buildConfig?: (config: UserConfig, env: ConfigEnv) => Promise<UserConfig | undefined>
 }
@@ -28,6 +29,7 @@ export function createElectronPlugin({
   let sigintHandler: (() => void) | undefined
   let shutdownSignal: NodeJS.Signals | undefined
   let closing: Promise<void> | undefined
+  let devStarted: Promise<DevCleanup | void> | undefined
 
   let isESM: boolean
 
@@ -61,12 +63,20 @@ export function createElectronPlugin({
             await cleanup()
           }
 
-          await startup.exit(shutdownSignal)
+          try {
+            if (devStarted) {
+              const closeDev = await devStarted
+              await closeDev?.()
+            }
+          } finally {
+            await startup.exit(shutdownSignal)
+          }
         })())
       },
       configureServer(server) {
         shutdownSignal = undefined
         closing = undefined
+        devStarted = undefined
 
         if (sigintHandler) {
           process.removeListener('SIGINT', sigintHandler)
@@ -90,7 +100,8 @@ export function createElectronPlugin({
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
 
-          await dev(this, server, isESM)
+          devStarted = Promise.resolve(dev(this, server, isESM))
+          await devStarted
         })
       },
     },

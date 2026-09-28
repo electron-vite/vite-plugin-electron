@@ -293,6 +293,79 @@ describe('dev process lifecycle', () => {
     expect(process.electronApp).toBeUndefined()
   })
 
+  it('closes dev build watchers when Electron exits naturally', async () => {
+    const electronApp = createElectronProcess()
+    spawn.mockReturnValue(electronApp)
+    const closeWatcher = vi.fn(async () => {})
+    const plugins = createElectronPlugin({
+      prefix: 'vite-plugin-electron-test',
+      dev(context, server) {
+        triggerStartup(context, server, {})
+        return closeWatcher
+      },
+      build: vi.fn(),
+    })
+    const closeBundle = plugins[0].closeBundle as () => Promise<void>
+    const httpServer = Object.assign(new EventEmitter(), { address: () => null })
+    const server = {
+      config: { root: '/app', server: { middlewareMode: false } },
+      httpServer,
+      close: vi.fn(() => closeBundle()),
+    }
+
+    ;(plugins[0].configureServer as any)?.call({}, server)
+    httpServer.emit('listening')
+    await vi.waitFor(() => {
+      expect(spawn).toHaveBeenCalledOnce()
+    })
+
+    electronApp.emit('exit', 0, null)
+    await vi.waitFor(() => {
+      expect(closeWatcher).toHaveBeenCalledOnce()
+    })
+    expect(server.close).toHaveBeenCalledOnce()
+    expect(process.electronApp).toBeUndefined()
+
+    await closeBundle()
+    expect(closeWatcher).toHaveBeenCalledOnce()
+  })
+
+  it('waits for dev setup before closing its watcher', async () => {
+    let finishDev!: (cleanup: () => Promise<void>) => void
+    const dev = vi.fn(
+      () =>
+        new Promise<() => Promise<void>>((resolve) => {
+          finishDev = resolve
+        }),
+    )
+    const closeWatcher = vi.fn(async () => {})
+    const plugins = createElectronPlugin({
+      prefix: 'vite-plugin-electron-test',
+      dev,
+      build: vi.fn(),
+    })
+    const closeBundle = plugins[0].closeBundle as () => Promise<void>
+    const httpServer = Object.assign(new EventEmitter(), { address: () => null })
+    const server = {
+      config: { server: { middlewareMode: false } },
+      httpServer,
+    }
+
+    ;(plugins[0].configureServer as any)?.call({}, server)
+    httpServer.emit('listening')
+    expect(dev).toHaveBeenCalledOnce()
+
+    let settled = false
+    const closing = closeBundle().then(() => {
+      settled = true
+    })
+    expect(settled).toBe(false)
+
+    finishDev(closeWatcher)
+    await closing
+    expect(closeWatcher).toHaveBeenCalledOnce()
+  })
+
   it('keeps Vite closing until Electron has closed', async () => {
     const electronApp = createElectronProcess()
     process.electronApp = electronApp

@@ -242,13 +242,18 @@ export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): 
   const buildElectronEnvironments = async (
     builder: ViteBuilder,
     environmentOptions: ResolvedElectronOptions['environmentOptions'],
-  ): Promise<void> => {
+  ) => {
+    const watchers: { close: () => Promise<void> }[] = []
     for (const { name } of environmentOptions) {
       const env = builder.environments[name]
       if (env && !env.isBuilt) {
-        await builder.build(env)
+        const result = await builder.build(env)
+        if ('close' in result) {
+          watchers.push(result)
+        }
       }
     }
+    return watchers
   }
 
   return createElectronPlugin({
@@ -297,7 +302,10 @@ export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): 
         }),
       )
 
-      await buildElectronEnvironments(builder, environmentOptions)
+      const watchers = await buildElectronEnvironments(builder, environmentOptions)
+      return async () => {
+        await Promise.all(watchers.map((watcher) => watcher.close()))
+      }
     },
     // Build is fully handled by the config() hook, so we can leave this empty.
     async build() {},
