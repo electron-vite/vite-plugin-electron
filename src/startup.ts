@@ -25,15 +25,22 @@ function parseEnvVar(value: string | undefined): boolean | string {
 
 type ElectronExitHandler = (code: number | null, signal: NodeJS.Signals | null) => void
 type KillSignal = NonNullable<SpawnOptions['killSignal']>
+const ELECTRON_SHUTDOWN_TIMEOUT = 5_000
 
-const electronExitHandlers = new WeakMap<ChildProcess, ElectronExitHandler>()
-const electronKillSignals = new WeakMap<ChildProcess, KillSignal>()
-const electronExitPromises = new WeakMap<ChildProcess, Promise<void>>()
+interface ElectronLifecycle {
+  app: ChildProcess
+  exitHandler?: ElectronExitHandler
+  exitPromise?: Promise<void>
+}
+
+let electronLifecycle: ElectronLifecycle | undefined
+let pendingSpawn: Promise<void> = Promise.resolve()
 
 function bindElectronExit(electronApp: ChildProcess, onExit: ElectronExitHandler): void {
   const handler: ElectronExitHandler = (code, signal) => {
-    electronExitHandlers.delete(electronApp)
-    electronKillSignals.delete(electronApp)
+    if (electronLifecycle?.app === electronApp) {
+      electronLifecycle = undefined
+    }
 
     if (process.electronApp === electronApp) {
       process.electronApp = undefined
@@ -42,18 +49,8 @@ function bindElectronExit(electronApp: ChildProcess, onExit: ElectronExitHandler
     onExit(code, signal)
   }
 
-  electronExitHandlers.set(electronApp, handler)
+  electronLifecycle = { app: electronApp, exitHandler: handler }
   electronApp.once('exit', handler)
-}
-
-function unbindElectronExit(electronApp: ChildProcess): void {
-  const handler = electronExitHandlers.get(electronApp)
-  if (!handler) {
-    return
-  }
-
-  electronApp.removeListener('exit', handler)
-  electronExitHandlers.delete(electronApp)
 }
 
 interface StartupFn {
@@ -73,10 +70,13 @@ interface StartupFn {
   hookedProcessExit: boolean
   /**
    * Stop the current Electron app and resolve after its child process closes.
-   * @param signal overrides the spawn killSignal for this shutdown
+   * @param signal shutdown signal (defaults to SIGTERM)
    */
   exit: (signal?: KillSignal) => Promise<void>
 }
+
+export const startup: StartupFn = (argv, options, customElectronPkg) =>
+  startElectron(argv, options, customElectronPkg)
 
 /**
  * Electron App startup function.
@@ -147,43 +147,50 @@ async function startElectron(
 
   const electronPath = electron.default ?? electron
 
-  await startup.exit()
-
-  // Start Electron.app
-  const stdio: StdioOptions =
-    process.platform === 'linux'
-      ? // reserve file descriptor 3 for Chromium; put Node IPC on file descriptor 4
-        ['inherit', 'inherit', 'inherit', 'ignore', 'ipc']
-      : ['inherit', 'inherit', 'inherit', 'ipc']
-
-  const targetArgv = [...argv]
-
-  for (const [envName, flag] of Object.entries(startupEnv)) {
-    const value = parseEnvVar(process.env[envName]?.trim())
-    if (!value) {
-      continue
-    }
-    if (value === true) {
-      targetArgv.push(flag)
-    } else {
-      targetArgv.push(`${flag}=${value}`)
-    }
-  }
-
-  const electronApp = spawn(electronPath, targetArgv, {
-    stdio,
-    ...options,
+  const previousSpawn = pendingSpawn
+  let releaseSpawn!: () => void
+  pendingSpawn = new Promise<void>((resolve) => {
+    releaseSpawn = resolve
   })
+  await previousSpawn
 
-  process.electronApp = electronApp
-  electronKillSignals.set(electronApp, options?.killSignal ?? 'SIGTERM')
-  bindElectronExit(electronApp, onExit)
+  try {
+    await startup.exit()
 
-  return true
+    // Start Electron.app
+    const stdio: StdioOptions =
+      process.platform === 'linux'
+        ? // reserve file descriptor 3 for Chromium; put Node IPC on file descriptor 4
+          ['inherit', 'inherit', 'inherit', 'ignore', 'ipc']
+        : ['inherit', 'inherit', 'inherit', 'ipc']
+
+    const targetArgv = [...argv]
+
+    for (const [envName, flag] of Object.entries(startupEnv)) {
+      const value = parseEnvVar(process.env[envName]?.trim())
+      if (!value) {
+        continue
+      }
+      if (value === true) {
+        targetArgv.push(flag)
+      } else {
+        targetArgv.push(`${flag}=${value}`)
+      }
+    }
+
+    const electronApp = spawn(electronPath, targetArgv, {
+      stdio,
+      ...options,
+    })
+
+    process.electronApp = electronApp
+    bindElectronExit(electronApp, onExit)
+
+    return true
+  } finally {
+    releaseSpawn()
+  }
 }
-
-export const startup: StartupFn = (argv, options, customElectronPkg) =>
-  startElectron(argv, options, customElectronPkg)
 
 startup.send = (message: string) => {
   if (process.electronApp) {
@@ -197,56 +204,71 @@ startup.exit = (signal) => {
   if (!electronApp) {
     return Promise.resolve()
   }
+  const child = electronApp
 
-  const pendingExit = electronExitPromises.get(electronApp)
-  if (pendingExit) {
-    return pendingExit
+  const lifecycle =
+    electronLifecycle?.app === electronApp
+      ? electronLifecycle
+      : (electronLifecycle = { app: electronApp })
+  if (lifecycle.exitPromise) {
+    return lifecycle.exitPromise
   }
 
-  unbindElectronExit(electronApp)
+  if (lifecycle.exitHandler) {
+    electronApp.removeListener('exit', lifecycle.exitHandler)
+  }
 
-  const exitPromise = (async () => {
+  const exitPromise = new Promise<void>((resolve, reject) => {
     if (electronApp.exitCode !== null || electronApp.signalCode !== null) {
+      resolve()
       return
     }
 
-    await new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        electronApp.removeListener('close', onClose)
-        electronApp.removeListener('error', onError)
-      }
-      const onClose = () => {
-        cleanup()
-        resolve()
-      }
-      const onError = (error: Error) => {
-        cleanup()
-        reject(error)
-      }
+    let timeout: NodeJS.Timeout | undefined
+    function onClose() {
+      clearTimeout(timeout)
+      child.removeListener('close', onClose)
+      child.removeListener('error', onError)
+      resolve()
+    }
+    function onError(error: Error) {
+      clearTimeout(timeout)
+      child.removeListener('close', onClose)
+      child.removeListener('error', onError)
+      reject(error)
+    }
 
-      electronApp.once('close', onClose)
-      electronApp.once('error', onError)
-
-      try {
-        const killSignal = signal ?? electronKillSignals.get(electronApp) ?? 'SIGTERM'
-        if (!electronApp.kill(killSignal)) {
-          cleanup()
-          resolve()
+    electronApp.once('close', onClose)
+    electronApp.once('error', onError)
+    timeout = setTimeout(() => {
+      if (electronApp.exitCode === null && electronApp.signalCode === null) {
+        try {
+          if (!electronApp.kill('SIGKILL')) {
+            onClose()
+          }
+        } catch (error) {
+          onError(error as Error)
         }
-      } catch (error) {
-        cleanup()
-        reject(error)
       }
-    })
-  })().finally(() => {
-    electronExitPromises.delete(electronApp)
-    electronKillSignals.delete(electronApp)
+    }, ELECTRON_SHUTDOWN_TIMEOUT)
+
+    try {
+      if (!electronApp.kill(signal ?? 'SIGTERM')) {
+        onClose()
+      }
+    } catch (error) {
+      onError(error as Error)
+    }
+  }).finally(() => {
+    if (electronLifecycle?.app === electronApp) {
+      electronLifecycle = undefined
+    }
     if (process.electronApp === electronApp) {
       process.electronApp = undefined
     }
   })
 
-  electronExitPromises.set(electronApp, exitPromise)
+  lifecycle.exitPromise = exitPromise
   return exitPromise
 }
 

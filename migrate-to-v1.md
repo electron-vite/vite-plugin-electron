@@ -223,7 +223,14 @@ If you use a custom Electron package or fork, pass the package name explicitly.
 
 v0.x used a tree-kill style exit path and waited for the existing Electron process to exit.
 
-v1 waits for the current Electron child process to close before starting the next one. It still does not perform process-tree shutdown, so descendant processes remain the application's responsibility.
+v1 waits for the current direct Electron child process to close before starting the next one. `startup.exit()` is asynchronous and can be awaited:
+
+```ts
+await startup.exit() // Sends SIGTERM and waits for the direct child to close.
+await startup.exit('SIGINT') // Sends an explicit shutdown signal.
+```
+
+`SpawnOptions.killSignal` retains Node's spawn semantics; it does not configure later `startup.exit()` calls. vite-plugin-electron handles Ctrl+C internally in ordinary Vite CLI dev mode. The plugin does not perform process-tree shutdown, so descendant processes remain the application's responsibility.
 
 ## Hot Reload Preload Scripts
 
