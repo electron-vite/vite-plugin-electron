@@ -53,9 +53,9 @@
   "scripts": {
     "dev": "tsdown --watch",
     "build": "tsdown",
-    "types": "tsc",
+    "types": "tsc --noEmit && pnpm --filter electron-playground-* exec tsc --noEmit",
     "test": "vitest run",
-    "lint": "oxlint --fix",
+    "lint": "oxlint --fix --max-warnings 0 --report-unused-disable-directives",
     "format": "oxfmt",
     "qa": "pnpm run lint && pnpm run format && pnpm run types",
     "play": "pnpm --dir playground/flat dev",
@@ -73,16 +73,16 @@
     "local-pkg": "^1.2.1"
   },
   "devDependencies": {
-    "@subf/config": "^0.2.1",
+    "@subf/config": "^0.4.0",
     "@types/node": "^24.12.4",
     "bumpp": "^11.1.0",
-    "oxfmt": "^0.61.0",
-    "oxlint": "^1.76.0",
-    "tsdown": "^0.22.14",
-    "typescript": "^7.0.2",
-    "vite": "^8.2.0",
+    "oxfmt": "^0.70.0",
+    "oxlint": "^1.85.0",
+    "tsdown": "^0.23.0",
+    "typescript": "catalog:",
+    "vite": "catalog:",
     "vite-plugin-electron-renderer": "^1.0.0",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.2"
   },
   "peerDependencies": {
     "vite": ">=6",
@@ -93,5 +93,5 @@
       "optional": true
     }
   },
-  "packageManager": "pnpm@10.33.4"
+  "packageManager": "pnpm@12.6.0"
 }

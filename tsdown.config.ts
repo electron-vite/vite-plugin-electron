@@ -10,7 +10,7 @@ export default defineConfig({
   outputOptions: {
     exports: 'named',
   },
-  dts: { oxc: true },
+  dts: true,
   format: ['cjs', 'esm'],
   deps: {
     neverBundle: ['vite'],
