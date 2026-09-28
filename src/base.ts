@@ -1,3 +1,5 @@
+import { constants } from 'node:os'
+
 import type { Plugin, ConfigEnv, UserConfig, ViteDevServer, ServerHook } from 'vite'
 
 import { startup } from './startup'
@@ -88,7 +90,8 @@ export function createElectronPlugin({
               try {
                 await server.close()
               } finally {
-                process.exit(130)
+                // Shells report signal termination as 128 plus the signal number.
+                process.exit(128 + constants.signals.SIGINT)
               }
             })()
           }
