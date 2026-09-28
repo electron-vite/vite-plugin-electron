@@ -25,6 +25,8 @@ export function createElectronPlugin({
   let userConfig: UserConfig
   let configEnv: ConfigEnv
   let cleanupMock: (() => Promise<void>) | undefined
+  let sigintHandler: (() => void) | undefined
+  let shutdownSignal: NodeJS.Signals | undefined
 
   let isESM: boolean
 
@@ -45,14 +47,40 @@ export function createElectronPlugin({
           cleanupMock = setupMockHtml(config, false, config.logger)
         }
       },
+      async closeBundle() {
+        if (sigintHandler) {
+          process.removeListener('SIGINT', sigintHandler)
+          sigintHandler = undefined
+        }
+
+        const cleanup = cleanupMock
+        cleanupMock = undefined
+        if (cleanup) {
+          await cleanup()
+        }
+
+        await startup.exit(shutdownSignal)
+      },
       configureServer(server) {
-        server.httpServer?.once('close', async () => {
-          if (cleanupMock) {
-            await cleanupMock()
-            cleanupMock = undefined
+        shutdownSignal = undefined
+
+        if (sigintHandler) {
+          process.removeListener('SIGINT', sigintHandler)
+        }
+        if (!server.config.server.middlewareMode) {
+          sigintHandler = () => {
+            shutdownSignal = 'SIGINT'
+            void (async () => {
+              try {
+                await server.close()
+              } finally {
+                process.exitCode ??= 130
+                process.exit()
+              }
+            })()
           }
-          startup.exit()
-        })
+          process.once('SIGINT', sigintHandler)
+        }
 
         server.httpServer?.once('listening', async () => {
           Object.assign(process.env, {

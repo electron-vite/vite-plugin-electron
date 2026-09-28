@@ -22,7 +22,7 @@ Use the main README for current v1 behavior. Use this file only when migrating o
    - Confirm every externalized runtime package exists in the Electron runtime layout.
 5. Review `startup()` usage:
    - Handle the new boolean return value if callers await `startup()`.
-   - Do not assume the old process-tree waiting behavior from `startup.exit()`.
+   - `startup.exit()` waits for the direct Electron child only; do not assume process-tree shutdown.
 6. Build and test:
    - Run the app in dev mode.
    - Run production build.
@@ -223,7 +223,7 @@ If you use a custom Electron package or fork, pass the package name explicitly.
 
 v0.x used a tree-kill style exit path and waited for the existing Electron process to exit.
 
-v1 stops the current Electron child process before starting the next one, but callers should not rely on the old process-tree waiting behavior. If your workflow requires waiting for child processes to exit, implement that in your `onstart` hook or wrapper script.
+v1 waits for the current Electron child process to close before starting the next one. It still does not perform process-tree shutdown, so descendant processes remain the application's responsibility.
 
 ## Hot Reload Preload Scripts
 

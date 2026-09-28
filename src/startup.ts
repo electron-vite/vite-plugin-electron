@@ -1,4 +1,4 @@
-import type { SpawnOptions, StdioOptions } from 'node:child_process'
+import type { ChildProcess, SpawnOptions, StdioOptions } from 'node:child_process'
 import path from 'node:path'
 
 import type { ViteDevServer } from 'vite'
@@ -23,6 +23,39 @@ function parseEnvVar(value: string | undefined): boolean | string {
   return value
 }
 
+type ElectronExitHandler = (code: number | null, signal: NodeJS.Signals | null) => void
+type KillSignal = NonNullable<SpawnOptions['killSignal']>
+
+const electronExitHandlers = new WeakMap<ChildProcess, ElectronExitHandler>()
+const electronKillSignals = new WeakMap<ChildProcess, KillSignal>()
+const electronExitPromises = new WeakMap<ChildProcess, Promise<void>>()
+
+function bindElectronExit(electronApp: ChildProcess, onExit: ElectronExitHandler): void {
+  const handler: ElectronExitHandler = (code, signal) => {
+    electronExitHandlers.delete(electronApp)
+    electronKillSignals.delete(electronApp)
+
+    if (process.electronApp === electronApp) {
+      process.electronApp = undefined
+    }
+
+    onExit(code, signal)
+  }
+
+  electronExitHandlers.set(electronApp, handler)
+  electronApp.once('exit', handler)
+}
+
+function unbindElectronExit(electronApp: ChildProcess): void {
+  const handler = electronExitHandlers.get(electronApp)
+  if (!handler) {
+    return
+  }
+
+  electronApp.removeListener('exit', handler)
+  electronExitHandlers.delete(electronApp)
+}
+
 interface StartupFn {
   (
     argv?: string[],
@@ -38,7 +71,11 @@ interface StartupFn {
    * @deprecated No use
    */
   hookedProcessExit: boolean
-  exit: () => void
+  /**
+   * Stop the current Electron app and resolve after its child process closes.
+   * @param signal overrides the spawn killSignal for this shutdown
+   */
+  exit: (signal?: KillSignal) => Promise<void>
 }
 
 /**
@@ -60,11 +97,12 @@ interface StartupFn {
  * @param customElectronPkg custom electron package name (default: 'electron')
  * @returns `true` if the Electron app is started, or `false` if the startup is prevented by `startup.prevent` or `ELECTRON_STARTUP_PREVENT` env var.
  */
-export const startup: StartupFn = async (
+async function startElectron(
   argv = ['.', '--no-sandbox'],
   options?: SpawnOptions,
   customElectronPkg?: string,
-) => {
+  onExit: ElectronExitHandler = (code) => process.exit(code ?? 0),
+): Promise<boolean> {
   if (startup.prevent || parseEnvVar(process.env.ELECTRON_STARTUP_PREVENT?.trim())) {
     process.electronApp = undefined
     return false
@@ -109,7 +147,7 @@ export const startup: StartupFn = async (
 
   const electronPath = electron.default ?? electron
 
-  startup.exit()
+  await startup.exit()
 
   // Start Electron.app
   const stdio: StdioOptions =
@@ -132,16 +170,21 @@ export const startup: StartupFn = async (
     }
   }
 
-  process.electronApp = spawn(electronPath, targetArgv, {
+  const electronApp = spawn(electronPath, targetArgv, {
     stdio,
     ...options,
   })
 
-  // Exit command after Electron.app exits
-  process.electronApp.on('exit', process.exit)
+  process.electronApp = electronApp
+  electronKillSignals.set(electronApp, options?.killSignal ?? 'SIGTERM')
+  bindElectronExit(electronApp, onExit)
 
   return true
 }
+
+export const startup: StartupFn = (argv, options, customElectronPkg) =>
+  startElectron(argv, options, customElectronPkg)
+
 startup.send = (message: string) => {
   if (process.electronApp) {
     // Based on { stdio: [,,, 'ipc'] }
@@ -149,9 +192,62 @@ startup.send = (message: string) => {
   }
 }
 startup.hookedProcessExit = startup.prevent = false
-startup.exit = () => {
-  process.electronApp?.removeAllListeners()
-  process.electronApp?.kill()
+startup.exit = (signal) => {
+  const electronApp = process.electronApp
+  if (!electronApp) {
+    return Promise.resolve()
+  }
+
+  const pendingExit = electronExitPromises.get(electronApp)
+  if (pendingExit) {
+    return pendingExit
+  }
+
+  unbindElectronExit(electronApp)
+
+  const exitPromise = (async () => {
+    if (electronApp.exitCode !== null || electronApp.signalCode !== null) {
+      return
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        electronApp.removeListener('close', onClose)
+        electronApp.removeListener('error', onError)
+      }
+      const onClose = () => {
+        cleanup()
+        resolve()
+      }
+      const onError = (error: Error) => {
+        cleanup()
+        reject(error)
+      }
+
+      electronApp.once('close', onClose)
+      electronApp.once('error', onError)
+
+      try {
+        const killSignal = signal ?? electronKillSignals.get(electronApp) ?? 'SIGTERM'
+        if (!electronApp.kill(killSignal)) {
+          cleanup()
+          resolve()
+        }
+      } catch (error) {
+        cleanup()
+        reject(error)
+      }
+    })
+  })().finally(() => {
+    electronExitPromises.delete(electronApp)
+    electronKillSignals.delete(electronApp)
+    if (process.electronApp === electronApp) {
+      process.electronApp = undefined
+    }
+  })
+
+  electronExitPromises.set(electronApp, exitPromise)
+  return exitPromise
 }
 
 export interface OnStartOptions {
@@ -210,7 +306,17 @@ export function triggerStartup(
     spawnOptions?: import('node:child_process').SpawnOptions,
     customElectronPkg?: string,
   ) => {
-    return startup(argv, { cwd: server.config.root, ...spawnOptions }, customElectronPkg)
+    return startElectron(
+      argv,
+      { cwd: server.config.root, ...spawnOptions },
+      customElectronPkg,
+      (code) => {
+        if (code !== null) {
+          process.exitCode ??= code
+        }
+        void server.close()
+      },
+    )
   }
   if (options.onstart) {
     options.onstart.call(context, {

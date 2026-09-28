@@ -52,9 +52,12 @@ describe('src/startup', () => {
     createRequire.mockReturnValue(() => '/mock/electron')
     spawn.mockReturnValue({
       on: vi.fn(),
-      removeAllListeners: vi.fn(),
-      kill: vi.fn(),
+      once: vi.fn(),
+      removeListener: vi.fn(),
+      kill: vi.fn(() => true),
       send: vi.fn(),
+      exitCode: null,
+      signalCode: null,
     })
 
     Reflect.deleteProperty(process, 'electronApp')
