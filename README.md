@@ -486,6 +486,8 @@ build({
 
 `startup(argv, options, customElectronPkg)` supports custom Electron forks. The package is resolved from app roots (`process.cwd()`, `options.cwd`, and `INIT_CWD`) before falling back to standard module resolution.
 
+`startup.exit()` signals the Electron process started by vite-plugin-electron (SIGTERM by default, or an explicit signal) and resolves after that direct child exits. It does not recursively terminate processes created by the Electron application; those remain the application's responsibility. `SpawnOptions.killSignal` is spawn configuration, not the signal for later `startup.exit()` calls. Shutdown terminates an OS process, not through Electron's `app.quit()`, and does not promise application-level graceful quit hooks.
+
 If the package cannot be resolved, `startup()` throws an error describing how to install or pass the package explicitly.
 
 ### Startup Env Vars

@@ -21,7 +21,7 @@ vi.mock('vite', async () => {
 
 afterEach(() => {
   capturedBuilderConfig = undefined
-  delete process.env.VITE_DEV_SERVER_URL
+  Reflect.deleteProperty(process.env, 'VITE_DEV_SERVER_URL')
 })
 
 describe('src/multi-env dev', () => {
@@ -57,7 +57,7 @@ describe('src/multi-env dev', () => {
     const [onListening] = httpServer.rawListeners('listening') as Array<{
       listener: () => Promise<void>
     }>
-    await onListening.listener()
+    await onListening!.listener()
 
     expect(capturedBuilderConfig).toBeDefined()
     return capturedBuilderConfig?.environments?.electron_main

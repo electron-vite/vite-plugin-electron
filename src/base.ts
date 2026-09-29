@@ -3,10 +3,19 @@ import { constants } from 'node:os'
 import type { Plugin, ConfigEnv, UserConfig, ViteDevServer, ServerHook } from 'vite'
 
 import { startup } from './startup'
+import type { DevSession } from './startup'
 import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule, setIsViteDev } from './utils'
 
 export type ConfigServerContext = ThisParameterType<ServerHook>
 type DevCleanup = () => void | Promise<void>
+
+export async function closeWatchers(watchers: { close: () => Promise<void> }[]): Promise<void> {
+  const results = await Promise.allSettled(watchers.map(async (watcher) => watcher.close()))
+  const failure = results.find((result) => result.status === 'rejected')
+  if (failure?.status === 'rejected') {
+    throw failure.reason
+  }
+}
 
 interface FactoryOptions {
   prefix: string
@@ -14,6 +23,7 @@ interface FactoryOptions {
     pluginContext: ConfigServerContext,
     server: ViteDevServer,
     isESM: boolean,
+    session: DevSession,
   ) => DevCleanup | void | Promise<DevCleanup | void>
   build: (userConfig: UserConfig, configEnv: ConfigEnv, isESM: boolean) => Promise<void> | void
   buildConfig?: (config: UserConfig, env: ConfigEnv) => Promise<UserConfig | undefined>
@@ -32,6 +42,7 @@ export function createElectronPlugin({
   let shutdownSignal: NodeJS.Signals | undefined
   let closing: Promise<void> | undefined
   let devStarted: Promise<DevCleanup | void> | undefined
+  let session: DevSession | undefined
 
   let isESM: boolean
 
@@ -53,6 +64,9 @@ export function createElectronPlugin({
         }
       },
       closeBundle() {
+        if (session) {
+          session.closed = true
+        }
         return (closing ??= (async () => {
           if (sigintHandler) {
             process.removeListener('SIGINT', sigintHandler)
@@ -61,21 +75,33 @@ export function createElectronPlugin({
 
           const cleanup = cleanupMock
           cleanupMock = undefined
-          if (cleanup) {
-            await cleanup()
+          let firstError: unknown
+          try {
+            await cleanup?.()
+          } catch (error) {
+            firstError = error
           }
-
           try {
             if (devStarted) {
               const closeDev = await devStarted
               await closeDev?.()
             }
-          } finally {
+          } catch (error) {
+            firstError ??= error
+          }
+          try {
             await startup.exit(shutdownSignal)
+          } catch (error) {
+            firstError ??= error
+          }
+          if (firstError) {
+            throw firstError
           }
         })())
       },
       configureServer(server) {
+        session = { closed: false }
+        const currentSession = session
         shutdownSignal = undefined
         closing = undefined
         devStarted = undefined
@@ -99,11 +125,14 @@ export function createElectronPlugin({
         }
 
         server.httpServer?.once('listening', async () => {
+          if (currentSession.closed) {
+            return
+          }
           Object.assign(process.env, {
             VITE_DEV_SERVER_URL: resolveServerUrl(server),
           })
 
-          devStarted = Promise.resolve(dev(this, server, isESM))
+          devStarted = Promise.resolve(dev(this, server, isESM, currentSession))
           await devStarted
         })
       },

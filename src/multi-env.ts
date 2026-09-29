@@ -2,7 +2,7 @@ import { loadPackageJSONSync } from 'local-pkg'
 import { createBuilder, mergeConfig, perEnvironmentPlugin } from 'vite'
 import type { EnvironmentOptions, Plugin, ViteBuilder } from 'vite'
 
-import { createElectronPlugin } from './base'
+import { closeWatchers, createElectronPlugin } from './base'
 import { extractExternalDeps } from './plugin/notBundle'
 import { defaultPreloadOnstart, triggerStartup } from './startup'
 import type { OnStartOptions } from './startup'
@@ -244,21 +244,26 @@ export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): 
     environmentOptions: ResolvedElectronOptions['environmentOptions'],
   ) => {
     const watchers: { close: () => Promise<void> }[] = []
-    for (const { name } of environmentOptions) {
-      const env = builder.environments[name]
-      if (env && !env.isBuilt) {
-        const result = await builder.build(env)
-        if ('close' in result) {
-          watchers.push(result)
+    try {
+      for (const { name } of environmentOptions) {
+        const env = builder.environments[name]
+        if (env && !env.isBuilt) {
+          const result = await builder.build(env)
+          if ('close' in result) {
+            watchers.push(result)
+          }
         }
       }
+    } catch (error) {
+      await closeWatchers(watchers).catch(() => {})
+      throw error
     }
     return watchers
   }
 
   return createElectronPlugin({
     prefix: PLUGIN_PREFIX,
-    async dev(pluginContext, server) {
+    async dev(pluginContext, server, _isESM, session) {
       const { environmentOptions, defaultEnvs } = await resolveOptions(true, server.config.root)
       if (environmentOptions.length === 0) {
         return
@@ -294,7 +299,7 @@ export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): 
                   if (++builtCount < environmentOptions.length) {
                     return
                   }
-                  triggerStartup(pluginContext, server, opt)
+                  triggerStartup(pluginContext, server, opt, session)
                 },
               }
             })
@@ -304,7 +309,7 @@ export function electronPluginFactory(options: MultiEnvElectronOptionsFactory): 
 
       const watchers = await buildElectronEnvironments(builder, environmentOptions)
       return async () => {
-        await Promise.all(watchers.map((watcher) => watcher.close()))
+        await closeWatchers(watchers)
       }
     },
     // Build is fully handled by the config() hook, so we can leave this empty.

@@ -10,6 +10,7 @@ const { spawn, createRequire } = vi.hoisted(() => ({
   spawn: vi.fn(),
   createRequire: vi.fn(),
 }))
+const { setupMockHtml } = vi.hoisted(() => ({ setupMockHtml: vi.fn() }))
 const originalExitCode = process.exitCode
 const originalSigintListeners = new Set(process.listeners('SIGINT'))
 
@@ -20,6 +21,10 @@ vi.mock('node:child_process', () => ({
 vi.mock('node:module', async (importOriginal) => ({
   ...(await importOriginal<typeof import('node:module')>()),
   createRequire,
+}))
+vi.mock('../src/utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/utils')>()),
+  setupMockHtml,
 }))
 
 function createElectronProcess(): ChildProcess {
@@ -36,6 +41,7 @@ describe('dev process lifecycle', () => {
     spawn.mockReset()
     createRequire.mockReset()
     createRequire.mockReturnValue(() => '/mock/electron')
+    setupMockHtml.mockReset()
 
     startup.prevent = false
     Reflect.deleteProperty(process, 'electronApp')
@@ -55,7 +61,7 @@ describe('dev process lifecycle', () => {
     vi.restoreAllMocks()
   })
 
-  it('waits for Electron to close with SIGTERM by default', async () => {
+  it('waits for Electron to exit with SIGTERM by default', async () => {
     const electronApp = createElectronProcess()
     spawn.mockReturnValue(electronApp)
 
@@ -69,7 +75,7 @@ describe('dev process lifecycle', () => {
     expect(electronApp.kill).toHaveBeenCalledWith('SIGTERM')
     expect(settled).toBe(false)
 
-    electronApp.emit('close', 0, 'SIGTERM')
+    electronApp.emit('exit', 0, 'SIGTERM')
     await exiting
 
     expect(settled).toBe(true)
@@ -84,7 +90,7 @@ describe('dev process lifecycle', () => {
     const exiting = startup.exit('SIGINT')
 
     expect(electronApp.kill).toHaveBeenCalledExactlyOnceWith('SIGINT')
-    electronApp.emit('close', null, 'SIGINT')
+    electronApp.emit('exit', null, 'SIGINT')
     await exiting
   })
 
@@ -101,7 +107,7 @@ describe('dev process lifecycle', () => {
 
     const exiting = startup.exit()
     expect(electronApp.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM')
-    electronApp.emit('close', null, 'SIGTERM')
+    electronApp.emit('exit', null, 'SIGTERM')
     await exiting
   })
 
@@ -115,7 +121,7 @@ describe('dev process lifecycle', () => {
 
     expect(second).toBe(first)
     expect(electronApp.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM')
-    electronApp.emit('close', null, 'SIGTERM')
+    electronApp.emit('exit', null, 'SIGTERM')
     await Promise.all([first, second])
     expect(process.electronApp).toBeUndefined()
   })
@@ -138,19 +144,19 @@ describe('dev process lifecycle', () => {
     expect(electronApp.kill).toHaveBeenNthCalledWith(2, 'SIGKILL')
     expect(settled).toBe(false)
 
-    electronApp.emit('close', null, 'SIGKILL')
+    electronApp.emit('exit', null, 'SIGKILL')
     await exiting
     expect(process.electronApp).toBeUndefined()
   })
 
-  it('cancels the force kill after a normal close', async () => {
+  it('cancels the force kill after a normal exit', async () => {
     const electronApp = createElectronProcess()
     spawn.mockReturnValue(electronApp)
 
     await startup(['.'])
     vi.useFakeTimers()
     const exiting = startup.exit()
-    electronApp.emit('close', null, 'SIGTERM')
+    electronApp.emit('exit', null, 'SIGTERM')
     await exiting
     await vi.advanceTimersByTimeAsync(5_001)
 
@@ -166,7 +172,8 @@ describe('dev process lifecycle', () => {
     await startup(['.'])
     expect(electronApp.listenerCount('exit')).toBe(2)
     const exiting = startup.exit()
-    expect(electronApp.listeners('exit')).toEqual([userExitListener])
+    expect(electronApp.listeners('exit')).toContain(userExitListener)
+    expect(electronApp.listenerCount('exit')).toBe(2)
 
     electronApp.emit('exit', null, 'SIGTERM')
     electronApp.emit('close', null, 'SIGTERM')
@@ -185,6 +192,34 @@ describe('dev process lifecycle', () => {
     expect(process.electronApp).toBeUndefined()
   })
 
+  it('does not signal an already-exited child', async () => {
+    const electronApp = createElectronProcess()
+    spawn.mockReturnValue(electronApp)
+    await startup(['.'])
+    Object.defineProperty(electronApp, 'exitCode', { value: 0 })
+    await startup.exit()
+    expect(electronApp.kill).not.toHaveBeenCalled()
+    expect(process.electronApp).toBeUndefined()
+  })
+
+  it('retains a live child after shutdown fails so it can be retried', async () => {
+    const electronApp = createElectronProcess()
+    vi.mocked(electronApp.kill).mockImplementationOnce(() => {
+      throw new Error('signal failed')
+    })
+    spawn.mockReturnValue(electronApp)
+    await startup(['.'])
+
+    await expect(startup.exit()).rejects.toThrow('signal failed')
+    expect(process.electronApp).toBe(electronApp)
+
+    const retry = startup.exit()
+    expect(electronApp.kill).toHaveBeenCalledTimes(2)
+    electronApp.emit('exit', null, 'SIGTERM')
+    await retry
+    expect(process.electronApp).toBeUndefined()
+  })
+
   it('keeps shutdown state tied to the captured child', async () => {
     const firstElectronApp = createElectronProcess()
     const secondElectronApp = createElectronProcess()
@@ -197,11 +232,11 @@ describe('dev process lifecycle', () => {
 
     expect(firstElectronApp.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM')
     expect(secondElectronApp.kill).toHaveBeenCalledExactlyOnceWith('SIGINT')
-    firstElectronApp.emit('close', null, 'SIGTERM')
+    firstElectronApp.emit('exit', null, 'SIGTERM')
     await firstExit
     expect(process.electronApp).toBe(secondElectronApp)
 
-    secondElectronApp.emit('close', null, 'SIGINT')
+    secondElectronApp.emit('exit', null, 'SIGINT')
     await secondExit
     expect(process.electronApp).toBeUndefined()
   })
@@ -232,7 +267,7 @@ describe('dev process lifecycle', () => {
     })
     expect(spawn).toHaveBeenCalledTimes(1)
 
-    firstElectronApp.emit('close', 0, 'SIGTERM')
+    firstElectronApp.emit('exit', 0, 'SIGTERM')
     await restarting
 
     expect(spawn).toHaveBeenCalledTimes(2)
@@ -257,7 +292,7 @@ describe('dev process lifecycle', () => {
     const thirdStart = startup(['.'])
     expect(spawn).toHaveBeenCalledTimes(1)
 
-    firstElectronApp.emit('close', null, 'SIGTERM')
+    firstElectronApp.emit('exit', null, 'SIGTERM')
     await secondStart
     expect(spawn).toHaveBeenCalledTimes(2)
     expect(process.electronApp).toBe(secondElectronApp)
@@ -265,7 +300,7 @@ describe('dev process lifecycle', () => {
     await vi.waitFor(() => {
       expect(secondElectronApp.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM')
     })
-    secondElectronApp.emit('close', null, 'SIGTERM')
+    secondElectronApp.emit('exit', null, 'SIGTERM')
     await thirdStart
     expect(spawn).toHaveBeenCalledTimes(3)
     expect(process.electronApp).toBe(thirdElectronApp)
@@ -305,7 +340,7 @@ describe('dev process lifecycle', () => {
       },
       build: vi.fn(),
     })
-    const closeBundle = plugins[0].closeBundle as () => Promise<void>
+    const closeBundle = plugins[0]!.closeBundle as () => Promise<void>
     const httpServer = Object.assign(new EventEmitter(), { address: () => null })
     const server = {
       config: { root: '/app', server: { middlewareMode: false } },
@@ -313,7 +348,7 @@ describe('dev process lifecycle', () => {
       close: vi.fn(() => closeBundle()),
     }
 
-    ;(plugins[0].configureServer as any)?.call({}, server)
+    ;(plugins[0]!.configureServer as any)?.call({}, server)
     httpServer.emit('listening')
     await vi.waitFor(() => {
       expect(spawn).toHaveBeenCalledOnce()
@@ -344,14 +379,14 @@ describe('dev process lifecycle', () => {
       dev,
       build: vi.fn(),
     })
-    const closeBundle = plugins[0].closeBundle as () => Promise<void>
+    const closeBundle = plugins[0]!.closeBundle as () => Promise<void>
     const httpServer = Object.assign(new EventEmitter(), { address: () => null })
     const server = {
       config: { server: { middlewareMode: false } },
       httpServer,
     }
 
-    ;(plugins[0].configureServer as any)?.call({}, server)
+    ;(plugins[0]!.configureServer as any)?.call({}, server)
     httpServer.emit('listening')
     expect(dev).toHaveBeenCalledOnce()
 
@@ -366,7 +401,131 @@ describe('dev process lifecycle', () => {
     expect(closeWatcher).toHaveBeenCalledOnce()
   })
 
-  it('keeps Vite closing until Electron has closed', async () => {
+  it('does not start from a delayed onstart after the dev session closes', async () => {
+    const electronApp = createElectronProcess()
+    spawn.mockReturnValue(electronApp)
+    let resume!: () => void
+    let finished!: Promise<void>
+    const deferred = new Promise<void>((resolve) => (resume = resolve))
+    const plugins = createElectronPlugin({
+      prefix: 'vite-plugin-electron-test',
+      dev(context, server, _isESM, session) {
+        triggerStartup(
+          context,
+          server,
+          {
+            async onstart({ startup: start }) {
+              finished = (async () => {
+                await deferred
+                await start()
+              })()
+              await finished
+            },
+          },
+          session,
+        )
+      },
+      build: vi.fn(),
+    })
+    const server = {
+      config: { root: '/app', server: { middlewareMode: true } },
+      httpServer: Object.assign(new EventEmitter(), { address: () => null }),
+    }
+    ;(plugins[0]!.configureServer as any)?.call({}, server)
+    server.httpServer.emit('listening')
+    await (plugins[0]!.closeBundle as () => Promise<void>)()
+    resume()
+    await finished
+    expect(spawn).not.toHaveBeenCalled()
+  })
+
+  it('cancels a queued startup while another shutdown is pending', async () => {
+    const old = createElectronProcess()
+    spawn.mockReturnValue(old)
+    await startup(['.'])
+    const server = { config: { root: '/app' } }
+    const session = { closed: false }
+    let start!: () => Promise<boolean>
+    triggerStartup(
+      {} as never,
+      server as never,
+      {
+        onstart({ startup: startWithRoot }) {
+          start = () => startWithRoot()
+        },
+      },
+      session,
+    )
+
+    const first = start()
+    await vi.waitFor(() => expect(old.kill).toHaveBeenCalledOnce())
+    const queued = start()
+    await vi.waitFor(() => expect(createRequire).toHaveBeenCalledTimes(3))
+    await Promise.resolve()
+    session.closed = true
+    old.emit('exit', null, 'SIGTERM')
+    expect(await first).toBe(false)
+    expect(await queued).toBe(false)
+    expect(spawn).toHaveBeenCalledTimes(1)
+  })
+
+  it('gives a new Vite dev session a fresh startup token', async () => {
+    const electronApp = createElectronProcess()
+    spawn.mockReturnValue(electronApp)
+    const starts: Array<() => Promise<boolean>> = []
+    const plugins = createElectronPlugin({
+      prefix: 'vite-plugin-electron-test',
+      dev(context, server, _isESM, session) {
+        triggerStartup(
+          context,
+          server,
+          {
+            onstart({ startup: start }) {
+              starts.push(() => start())
+            },
+          },
+          session,
+        )
+      },
+      build: vi.fn(),
+    })
+    const configure = plugins[0]!.configureServer as any
+    const server = () => ({
+      config: { root: '/app', server: { middlewareMode: true } },
+      httpServer: Object.assign(new EventEmitter(), { address: () => null }),
+    })
+    const first = server()
+    configure.call({}, first)
+    first.httpServer.emit('listening')
+    await (plugins[0]!.closeBundle as () => Promise<void>)()
+
+    const second = server()
+    configure.call({}, second)
+    second.httpServer.emit('listening')
+    expect(await starts[0]!()).toBe(false)
+    expect(await starts[1]!()).toBe(true)
+    expect(spawn).toHaveBeenCalledOnce()
+    const closing = (plugins[0]!.closeBundle as () => Promise<void>)()
+    await vi.waitFor(() => expect(electronApp.kill).toHaveBeenCalledOnce())
+    electronApp.emit('exit', null, 'SIGTERM')
+    await closing
+  })
+
+  it('attempts Electron shutdown even when mock cleanup fails', async () => {
+    const electronApp = createElectronProcess()
+    process.electronApp = electronApp
+    setupMockHtml.mockReturnValue(async () => {
+      throw new Error('mock cleanup failed')
+    })
+    const plugins = createElectronPlugin({ prefix: 'test', dev: vi.fn(), build: vi.fn() })
+    ;(plugins[0]!.configResolved as any)?.({ root: '/app', build: {} })
+    const closing = (plugins[0]!.closeBundle as () => Promise<void>)()
+    await vi.waitFor(() => expect(electronApp.kill).toHaveBeenCalledWith('SIGTERM'))
+    electronApp.emit('exit', null, 'SIGTERM')
+    await expect(closing).rejects.toThrow('mock cleanup failed')
+  })
+
+  it('keeps Vite closing until Electron has exited', async () => {
     const electronApp = createElectronProcess()
     process.electronApp = electronApp
 
@@ -376,7 +535,7 @@ describe('dev process lifecycle', () => {
       build: vi.fn(),
     })
 
-    const closeBundle = plugins[0].closeBundle as () => Promise<void>
+    const closeBundle = plugins[0]!.closeBundle as () => Promise<void>
     let settled = false
     const closing = Promise.all([closeBundle(), closeBundle()]).then(() => {
       settled = true
@@ -388,7 +547,7 @@ describe('dev process lifecycle', () => {
     })
     expect(settled).toBe(false)
 
-    electronApp.emit('close', 0, 'SIGTERM')
+    electronApp.emit('exit', 0, 'SIGTERM')
     await closing
 
     expect(settled).toBe(true)
@@ -403,7 +562,7 @@ describe('dev process lifecycle', () => {
       dev: vi.fn(),
       build: vi.fn(),
     })
-    const closeBundle = plugins[0].closeBundle as () => Promise<void>
+    const closeBundle = plugins[0]!.closeBundle as () => Promise<void>
     const close = vi.fn(async () => {
       await closeBundle()
     })
@@ -419,7 +578,7 @@ describe('dev process lifecycle', () => {
     const existingListeners = new Set(process.listeners('SIGINT'))
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
 
-    ;(plugins[0].configureServer as any)?.call({}, server)
+    ;(plugins[0]!.configureServer as any)?.call({}, server)
 
     const handler = process.listeners('SIGINT').find((listener) => !existingListeners.has(listener))
     expect(handler).toBeDefined()
@@ -432,7 +591,7 @@ describe('dev process lifecycle', () => {
     })
     expect(exit).not.toHaveBeenCalled()
 
-    electronApp.emit('close', null, 'SIGINT')
+    electronApp.emit('exit', null, 'SIGINT')
 
     await vi.waitFor(() => {
       expect(exit).toHaveBeenCalledOnce()
@@ -449,7 +608,7 @@ describe('dev process lifecycle', () => {
       dev: vi.fn(),
       build: vi.fn(),
     })
-    const closeBundle = plugins[0].closeBundle as () => Promise<void>
+    const closeBundle = plugins[0]!.closeBundle as () => Promise<void>
     const close = vi.fn(() => closeBundle())
     const server = {
       config: { server: { middlewareMode: true } },
@@ -458,17 +617,17 @@ describe('dev process lifecycle', () => {
     }
     const existingListeners = process.listeners('SIGINT')
 
-    ;(plugins[0].configureServer as any)?.call({}, server)
+    ;(plugins[0]!.configureServer as any)?.call({}, server)
     expect(process.listeners('SIGINT')).toEqual(existingListeners)
 
     let settled = false
     const closing = close().then(() => {
       settled = true
     })
-    expect(electronApp.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM')
+    await vi.waitFor(() => expect(electronApp.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM'))
     expect(settled).toBe(false)
 
-    electronApp.emit('close', null, 'SIGTERM')
+    electronApp.emit('exit', null, 'SIGTERM')
     await closing
     expect(process.electronApp).toBeUndefined()
   })

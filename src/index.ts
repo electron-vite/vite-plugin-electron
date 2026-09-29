@@ -1,7 +1,7 @@
 import { build as viteBuild } from 'vite'
 import type { Plugin, LibraryOptions, InlineConfig } from 'vite'
 
-import { createElectronPlugin } from './base'
+import { closeWatchers, createElectronPlugin } from './base'
 import { triggerStartup } from './startup'
 import type { OnStartOptions } from './startup'
 import { checkESModule, resolveViteConfigBase, withExternalBuiltins } from './utils'
@@ -38,44 +38,49 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
 
   return createElectronPlugin({
     prefix: 'vite-plugin-electron',
-    async dev(pluginContext, server, isESM) {
+    async dev(pluginContext, server, isESM, session) {
       const entryCount = optionsArray.length
       let closeBundleCount = 0
       const watchers: { close: () => Promise<void> }[] = []
 
-      for (const options of optionsArray) {
-        options.vite ??= {}
-        options.vite.mode ??= server.config.mode
-        options.vite.root ??= server.config.root
-        options.vite.envDir ??= server.config.envDir
-        options.vite.envPrefix ??= server.config.envPrefix
+      try {
+        for (const options of optionsArray) {
+          options.vite ??= {}
+          options.vite.mode ??= server.config.mode
+          options.vite.root ??= server.config.root
+          options.vite.envDir ??= server.config.envDir
+          options.vite.envPrefix ??= server.config.envPrefix
 
-        options.vite.build ??= {}
-        if (!('watch' in options.vite.build)) {
-          // #252
-          options.vite.build.watch = {}
+          options.vite.build ??= {}
+          if (!('watch' in options.vite.build)) {
+            // #252
+            options.vite.build.watch = {}
+          }
+          options.vite.build.minify ??= false
+
+          options.vite.plugins ??= []
+          options.vite.plugins.push({
+            name: ':startup',
+            closeBundle() {
+              if (++closeBundleCount < entryCount) {
+                return
+              }
+              triggerStartup(pluginContext, server, options, session)
+            },
+          })
+
+          const result = await buildBase(isESM, options)
+          if ('close' in result) {
+            watchers.push(result)
+          }
         }
-        options.vite.build.minify ??= false
-
-        options.vite.plugins ??= []
-        options.vite.plugins.push({
-          name: ':startup',
-          closeBundle() {
-            if (++closeBundleCount < entryCount) {
-              return
-            }
-            triggerStartup(pluginContext, server, options)
-          },
-        })
-
-        const result = await buildBase(isESM, options)
-        if ('close' in result) {
-          watchers.push(result)
-        }
+      } catch (error) {
+        await closeWatchers(watchers).catch(() => {})
+        throw error
       }
 
       return async () => {
-        await Promise.all(watchers.map((watcher) => watcher.close()))
+        await closeWatchers(watchers)
       }
     },
     async build(userConfig, configEnv, isESM) {

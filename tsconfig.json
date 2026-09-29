@@ -18,8 +18,9 @@
     "lib": ["ES2023"],
     "noUncheckedIndexedAccess": true,
     "declaration": true,
-    "isolatedDeclarations": true
+    "isolatedDeclarations": true,
+    "types": ["node"]
   },
-  "include": ["src", "*.d.ts"],
+  "include": ["src", "*.d.ts", "test"],
   "exclude": ["**/fixtures"]
 }
