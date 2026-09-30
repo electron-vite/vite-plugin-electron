@@ -28,32 +28,43 @@ type KillSignal = NonNullable<SpawnOptions['killSignal']>
 const ELECTRON_SHUTDOWN_TIMEOUT = 5_000
 export interface DevSession {
   closed: boolean
+  electronApp?: ChildProcess
 }
 
 interface ElectronLifecycle {
-  app: ChildProcess
+  session?: DevSession
   exitHandler?: ElectronExitHandler
   exitPromise?: Promise<void>
 }
 
-let electronLifecycle: ElectronLifecycle | undefined
+const electronLifecycles = new WeakMap<ChildProcess, ElectronLifecycle>()
+const exitedChildren = new WeakSet<ChildProcess>()
 let pendingSpawn: Promise<void> = Promise.resolve()
 
-function bindElectronExit(electronApp: ChildProcess, onExit: ElectronExitHandler): void {
+function clearElectron(child: ChildProcess, lifecycle: ElectronLifecycle): void {
+  exitedChildren.add(child)
+  electronLifecycles.delete(child)
+  if (lifecycle.session?.electronApp === child) {
+    lifecycle.session.electronApp = undefined
+  }
+  if (process.electronApp === child) {
+    process.electronApp = undefined
+  }
+}
+
+function bindElectronExit(
+  child: ChildProcess,
+  onExit: ElectronExitHandler,
+  session?: DevSession,
+): void {
+  const lifecycle: ElectronLifecycle = { session }
   const handler: ElectronExitHandler = (code, signal) => {
-    if (electronLifecycle?.app === electronApp) {
-      electronLifecycle = undefined
-    }
-
-    if (process.electronApp === electronApp) {
-      process.electronApp = undefined
-    }
-
+    clearElectron(child, lifecycle)
     onExit(code, signal)
   }
-
-  electronLifecycle = { app: electronApp, exitHandler: handler }
-  electronApp.once('exit', handler)
+  lifecycle.exitHandler = handler
+  electronLifecycles.set(child, lifecycle)
+  child.once('exit', handler)
 }
 
 interface StartupFn {
@@ -145,7 +156,6 @@ async function startElectron(
   }
 
   if (!electron) {
-    process.electronApp = undefined
     throw new Error(
       `Unable to resolve "${electronPackage}". Install it in the app project or pass startup(..., ..., customElectronPkg).`,
       { cause: resolutionError as Error },
@@ -197,7 +207,10 @@ async function startElectron(
     })
 
     process.electronApp = electronApp
-    bindElectronExit(electronApp, onExit)
+    if (session) {
+      session.electronApp = electronApp
+    }
+    bindElectronExit(electronApp, onExit, session)
 
     return true
   } finally {
@@ -213,96 +226,91 @@ startup.send = (message: string) => {
 }
 startup.hookedProcessExit = startup.prevent = false
 startup.exit = (signal) => {
-  const electronApp = process.electronApp
-  if (!electronApp) {
-    return Promise.resolve()
-  }
-  const child = electronApp
+  const child = process.electronApp
+  return child ? exitElectron(child, signal) : Promise.resolve()
+}
 
-  const lifecycle =
-    electronLifecycle?.app === electronApp
-      ? electronLifecycle
-      : (electronLifecycle = { app: electronApp })
-  if (lifecycle.exitPromise) {
-    return lifecycle.exitPromise
+/** Internal shutdown primitive: never reads the current global child. */
+export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<void> {
+  let lifecycle = electronLifecycles.get(child)
+  if (!lifecycle) {
+    lifecycle = {}
+    electronLifecycles.set(child, lifecycle)
+  }
+  const state = lifecycle
+  if (state.exitPromise) {
+    return state.exitPromise
   }
 
-  const exitHandler = lifecycle.exitHandler
+  const exitHandler = state.exitHandler
   if (exitHandler) {
-    electronApp.removeListener('exit', exitHandler)
-    lifecycle.exitHandler = undefined
+    child.removeListener('exit', exitHandler)
+    state.exitHandler = undefined
   }
+
+  const hasExited = () =>
+    exitedChildren.has(child) || child.exitCode !== null || child.signalCode !== null
 
   const exitPromise = new Promise<void>((resolve, reject) => {
-    if (electronApp.exitCode !== null || electronApp.signalCode !== null) {
+    if (hasExited()) {
       resolve()
       return
     }
 
     let timeout: NodeJS.Timeout | undefined
-    function onExit() {
+    function cleanup() {
       clearTimeout(timeout)
       child.removeListener('exit', onExit)
       child.removeListener('error', onError)
+    }
+    function onExit() {
+      cleanup()
+      exitedChildren.add(child)
       resolve()
     }
     function onError(error: Error) {
-      clearTimeout(timeout)
-      child.removeListener('exit', onExit)
-      child.removeListener('error', onError)
+      cleanup()
       reject(error)
     }
-
-    electronApp.once('exit', onExit)
-    electronApp.once('error', onError)
-    timeout = setTimeout(() => {
-      if (electronApp.exitCode === null && electronApp.signalCode === null) {
-        try {
-          if (!electronApp.kill('SIGKILL')) {
+    function kill(requestedSignal: KillSignal) {
+      try {
+        if (!child.kill(requestedSignal)) {
+          if (hasExited()) {
             onExit()
+          } else {
+            onError(new Error(`Failed to send ${requestedSignal} to Electron child`))
           }
-        } catch (error) {
-          onError(error as Error)
         }
+      } catch (error) {
+        onError(error as Error)
+      }
+    }
+
+    child.once('exit', onExit)
+    child.once('error', onError)
+    timeout = setTimeout(() => {
+      if (!hasExited()) {
+        kill('SIGKILL')
       }
     }, ELECTRON_SHUTDOWN_TIMEOUT)
-
-    try {
-      if (!electronApp.kill(signal ?? 'SIGTERM')) {
-        onExit()
-      }
-    } catch (error) {
-      onError(error as Error)
-    }
+    kill(signal ?? 'SIGTERM')
   }).then(
-    () => {
-      if (electronLifecycle?.app === electronApp) {
-        electronLifecycle = undefined
-      }
-      if (process.electronApp === electronApp) {
-        process.electronApp = undefined
-      }
-    },
+    () => clearElectron(child, state),
     (error: unknown) => {
-      if (electronApp.exitCode !== null || electronApp.signalCode !== null) {
-        if (electronLifecycle?.app === electronApp) {
-          electronLifecycle = undefined
-        }
-        if (process.electronApp === electronApp) {
-          process.electronApp = undefined
-        }
-      } else if (electronLifecycle?.app === electronApp) {
-        lifecycle.exitPromise = undefined
+      if (hasExited()) {
+        clearElectron(child, state)
+      } else {
+        state.exitPromise = undefined
         if (exitHandler) {
-          lifecycle.exitHandler = exitHandler
-          electronApp.once('exit', exitHandler)
+          state.exitHandler = exitHandler
+          child.once('exit', exitHandler)
         }
       }
       throw error
     },
   )
 
-  lifecycle.exitPromise = exitPromise
+  state.exitPromise = exitPromise
   return exitPromise
 }
 
@@ -368,6 +376,9 @@ export function triggerStartup(
       { cwd: server.config.root, ...spawnOptions },
       customElectronPkg,
       (code) => {
+        if (session?.closed) {
+          return
+        }
         if (code !== null) {
           process.exitCode ??= code
         }
@@ -383,6 +394,9 @@ export function triggerStartup(
       // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
       // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
       reload() {
+        if (session?.closed) {
+          return
+        }
         if (process.electronApp) {
           ;(server.hot || server.ws).send({ type: 'full-reload' })
 

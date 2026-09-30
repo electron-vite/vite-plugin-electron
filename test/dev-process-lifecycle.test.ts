@@ -4,7 +4,9 @@ import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createElectronPlugin } from '../src/base'
-import { startup, triggerStartup } from '../src/startup'
+import { exitElectron, startup, triggerStartup } from '../src/startup'
+
+import { closeDev, configureDev } from './helpers/dev-session'
 
 const { spawn, createRequire } = vi.hoisted(() => ({
   spawn: vi.fn(),
@@ -183,7 +185,10 @@ describe('dev process lifecycle', () => {
 
   it('finishes when the child has already terminated before it can be signalled', async () => {
     const electronApp = createElectronProcess()
-    vi.mocked(electronApp.kill).mockReturnValue(false)
+    vi.mocked(electronApp.kill).mockImplementation(() => {
+      Object.defineProperty(electronApp, 'exitCode', { value: 0 })
+      return false
+    })
     spawn.mockReturnValue(electronApp)
 
     await startup(['.'])
@@ -239,6 +244,54 @@ describe('dev process lifecycle', () => {
     secondElectronApp.emit('exit', null, 'SIGINT')
     await secondExit
     expect(process.electronApp).toBeUndefined()
+  })
+
+  it('retries a failed old-child shutdown without losing the new child lifecycle', async () => {
+    const old = createElectronProcess()
+    const current = createElectronProcess()
+    spawn.mockReturnValue(old)
+    await startup()
+    vi.mocked(old.kill).mockImplementationOnce(() => {
+      throw new Error('old signal failed')
+    })
+    const failed = exitElectron(old)
+    process.electronApp = current
+    const currentExit = startup.exit('SIGINT')
+    await expect(failed).rejects.toThrow('old signal failed')
+    const retry = exitElectron(old)
+    expect(old.kill).toHaveBeenCalledTimes(2)
+    expect(startup.exit()).toBe(currentExit)
+    old.emit('exit', null, 'SIGTERM')
+    await retry
+    expect(process.electronApp).toBe(current)
+    current.emit('exit', null, 'SIGINT')
+    await currentExit
+  })
+
+  it('retains a live child and session ownership when kill returns false', async () => {
+    const child = createElectronProcess()
+    spawn.mockReturnValue(child)
+    const session = { closed: false, electronApp: undefined as ChildProcess | undefined }
+    let start!: () => Promise<boolean>
+    triggerStartup(
+      {} as never,
+      { config: { root: '/app' } } as never,
+      {
+        onstart({ startup }) {
+          start = () => startup()
+        },
+      },
+      session,
+    )
+    await start()
+    vi.mocked(child.kill).mockReturnValueOnce(false)
+    await expect(exitElectron(child)).rejects.toThrow('Failed to send SIGTERM')
+    expect(process.electronApp).toBe(child)
+    expect(session.electronApp).toBe(child)
+    const retry = exitElectron(child)
+    child.emit('exit', null, 'SIGTERM')
+    await retry
+    expect(session.electronApp).toBeUndefined()
   })
 
   it('exits the parent for a natural exit from exported startup', async () => {
@@ -334,13 +387,13 @@ describe('dev process lifecycle', () => {
     const closeWatcher = vi.fn(async () => {})
     const plugins = createElectronPlugin({
       prefix: 'vite-plugin-electron-test',
-      dev(context, server) {
-        triggerStartup(context, server, {})
+      dev(context, server, _isESM, session) {
+        triggerStartup(context, server, {}, session)
         return closeWatcher
       },
       build: vi.fn(),
     })
-    const closeBundle = plugins[0]!.closeBundle as () => Promise<void>
+    const closeBundle = () => closeDev(plugins[0]!)
     const httpServer = Object.assign(new EventEmitter(), { address: () => null })
     const server = {
       config: { root: '/app', server: { middlewareMode: false } },
@@ -348,7 +401,7 @@ describe('dev process lifecycle', () => {
       close: vi.fn(() => closeBundle()),
     }
 
-    ;(plugins[0]!.configureServer as any)?.call({}, server)
+    configureDev(plugins[0]!, server)
     httpServer.emit('listening')
     await vi.waitFor(() => {
       expect(spawn).toHaveBeenCalledOnce()
@@ -379,14 +432,14 @@ describe('dev process lifecycle', () => {
       dev,
       build: vi.fn(),
     })
-    const closeBundle = plugins[0]!.closeBundle as () => Promise<void>
+    const closeBundle = () => closeDev(plugins[0]!)
     const httpServer = Object.assign(new EventEmitter(), { address: () => null })
     const server = {
       config: { server: { middlewareMode: false } },
       httpServer,
     }
 
-    ;(plugins[0]!.configureServer as any)?.call({}, server)
+    configureDev(plugins[0]!, server)
     httpServer.emit('listening')
     expect(dev).toHaveBeenCalledOnce()
 
@@ -431,9 +484,9 @@ describe('dev process lifecycle', () => {
       config: { root: '/app', server: { middlewareMode: true } },
       httpServer: Object.assign(new EventEmitter(), { address: () => null }),
     }
-    ;(plugins[0]!.configureServer as any)?.call({}, server)
+    configureDev(plugins[0]!, server)
     server.httpServer.emit('listening')
-    await (plugins[0]!.closeBundle as () => Promise<void>)()
+    await closeDev(plugins[0]!)
     resume()
     await finished
     expect(spawn).not.toHaveBeenCalled()
@@ -489,37 +542,164 @@ describe('dev process lifecycle', () => {
       },
       build: vi.fn(),
     })
-    const configure = plugins[0]!.configureServer as any
+    const configure = (server: any) => configureDev(plugins[0]!, server)
     const server = () => ({
       config: { root: '/app', server: { middlewareMode: true } },
       httpServer: Object.assign(new EventEmitter(), { address: () => null }),
     })
     const first = server()
-    configure.call({}, first)
+    configure(first)
     first.httpServer.emit('listening')
-    await (plugins[0]!.closeBundle as () => Promise<void>)()
+    await closeDev(plugins[0]!)
 
     const second = server()
-    configure.call({}, second)
+    configure(second)
     second.httpServer.emit('listening')
     expect(await starts[0]!()).toBe(false)
     expect(await starts[1]!()).toBe(true)
     expect(spawn).toHaveBeenCalledOnce()
-    const closing = (plugins[0]!.closeBundle as () => Promise<void>)()
+    const closing = closeDev(plugins[0]!)
     await vi.waitFor(() => expect(electronApp.kill).toHaveBeenCalledOnce())
     electronApp.emit('exit', null, 'SIGTERM')
     await closing
   })
 
+  it('keeps B alive and supervised when A closes after B has spawned', async () => {
+    const childA = createElectronProcess()
+    const childB = createElectronProcess()
+    spawn.mockReturnValueOnce(childA).mockReturnValueOnce(childB)
+    const cleanupA = vi.fn(async () => {})
+    const cleanupB = vi.fn(async () => {})
+    const mockA = vi.fn(async () => {})
+    const mockB = vi.fn(async () => {})
+    setupMockHtml.mockReturnValueOnce(mockA).mockReturnValueOnce(mockB)
+    const starts: Array<() => Promise<boolean>> = []
+    const sessions: Array<{ closed: boolean; electronApp?: ChildProcess }> = []
+    const plugins = createElectronPlugin({
+      prefix: 'overlap-test',
+      dev(context, server, _isESM, session) {
+        sessions.push(session)
+        triggerStartup(
+          context,
+          server,
+          {
+            onstart({ startup }) {
+              starts.push(() => startup())
+            },
+          },
+          session,
+        )
+        return sessions.length === 1 ? cleanupA : cleanupB
+      },
+      build() {},
+    })
+    const plugin = plugins[0]!
+    const makeServer = (root: string) => ({
+      config: { root, build: {}, server: { middlewareMode: false } },
+      httpServer: Object.assign(new EventEmitter(), { address: () => null }),
+      close: vi.fn(async () => {}),
+    })
+    const a = makeServer('/session-a')
+    ;(plugin.configResolved as any)(a.config)
+    const envA = configureDev(plugin, a)
+    a.httpServer.emit('listening')
+    await starts[0]!()
+    expect(sessions[0]?.electronApp).toBe(childA)
+
+    const b = makeServer('/session-b')
+    ;(plugin.configResolved as any)(b.config)
+    const envB = configureDev(plugin, b)
+    b.close.mockImplementation(() => closeDev(plugin, envB))
+    b.httpServer.emit('listening')
+    const startingB = starts[1]!()
+    await vi.waitFor(() => expect(childA.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM'))
+    expect(spawn).toHaveBeenCalledTimes(1)
+    childA.emit('exit', null, 'SIGTERM')
+    expect(await startingB).toBe(true)
+    expect(sessions[0]?.electronApp).toBeUndefined()
+    expect(sessions[1]?.electronApp).toBe(childB)
+
+    const listeners = process.listeners('SIGINT')
+    const closingA = closeDev(plugin, envA)
+    expect(closeDev(plugin, envA)).toBe(closingA)
+    await closingA
+    expect(sessions[0]?.closed).toBe(true)
+    expect(sessions[1]?.closed).toBe(false)
+    expect(cleanupA).toHaveBeenCalledOnce()
+    expect(mockA).toHaveBeenCalledOnce()
+    expect(cleanupB).not.toHaveBeenCalled()
+    expect(mockB).not.toHaveBeenCalled()
+    expect(childB.kill).not.toHaveBeenCalled()
+    expect(process.electronApp).toBe(childB)
+    expect(process.listeners('SIGINT')).toEqual(listeners)
+
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    const handler = listeners.find((listener) => !originalSigintListeners.has(listener))
+    handler!('SIGINT')
+    await vi.waitFor(() => expect(childB.kill).toHaveBeenCalledExactlyOnceWith('SIGINT'))
+    expect(b.close).toHaveBeenCalledOnce()
+    expect(a.close).not.toHaveBeenCalled()
+    childB.emit('exit', null, 'SIGINT')
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledExactlyOnceWith(130))
+    expect(cleanupB).toHaveBeenCalledOnce()
+    expect(mockB).toHaveBeenCalledOnce()
+    expect(process.electronApp).toBeUndefined()
+  })
+
+  it('reloads preload without restarting main, and ignores closed-session reloads', async () => {
+    const child = createElectronProcess()
+    spawn.mockReturnValue(child)
+    await startup()
+    const session = { closed: false }
+    const send = vi.fn()
+    const server = { config: { root: '/app' }, hot: { send } }
+    let reload!: () => void
+    triggerStartup(
+      {} as never,
+      server as never,
+      {
+        onstart(args) {
+          reload = args.reload
+        },
+      },
+      session,
+    )
+    reload()
+    expect(send).toHaveBeenCalledExactlyOnceWith({ type: 'full-reload' })
+    expect(child.send).toHaveBeenCalledExactlyOnceWith('electron-vite&type=hot-reload')
+    expect(spawn).toHaveBeenCalledOnce()
+    session.closed = true
+    reload()
+    expect(send).toHaveBeenCalledOnce()
+    expect(child.send).toHaveBeenCalledOnce()
+    const closing = startup.exit()
+    child.emit('exit', null, 'SIGTERM')
+    await closing
+  })
+
   it('attempts Electron shutdown even when mock cleanup fails', async () => {
     const electronApp = createElectronProcess()
-    process.electronApp = electronApp
+    spawn.mockReturnValue(electronApp)
     setupMockHtml.mockReturnValue(async () => {
       throw new Error('mock cleanup failed')
     })
-    const plugins = createElectronPlugin({ prefix: 'test', dev: vi.fn(), build: vi.fn() })
-    ;(plugins[0]!.configResolved as any)?.({ root: '/app', build: {} })
-    const closing = (plugins[0]!.closeBundle as () => Promise<void>)()
+    const plugins = createElectronPlugin({
+      prefix: 'test',
+      dev(context, server, _isESM, session) {
+        triggerStartup(context, server, {}, session)
+      },
+      build: vi.fn(),
+    })
+    const config = { root: '/app', build: {}, server: { middlewareMode: true } }
+    ;(plugins[0]!.configResolved as any)?.(config)
+    const server = {
+      config,
+      httpServer: Object.assign(new EventEmitter(), { address: () => null }),
+    }
+    configureDev(plugins[0]!, server)
+    server.httpServer.emit('listening')
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce())
+    const closing = closeDev(plugins[0]!)
     await vi.waitFor(() => expect(electronApp.kill).toHaveBeenCalledWith('SIGTERM'))
     electronApp.emit('exit', null, 'SIGTERM')
     await expect(closing).rejects.toThrow('mock cleanup failed')
@@ -527,15 +707,24 @@ describe('dev process lifecycle', () => {
 
   it('keeps Vite closing until Electron has exited', async () => {
     const electronApp = createElectronProcess()
-    process.electronApp = electronApp
+    spawn.mockReturnValue(electronApp)
 
     const plugins = createElectronPlugin({
       prefix: 'vite-plugin-electron-test',
-      dev: vi.fn(),
+      dev(context, server, _isESM, session) {
+        triggerStartup(context, server, {}, session)
+      },
       build: vi.fn(),
     })
 
-    const closeBundle = plugins[0]!.closeBundle as () => Promise<void>
+    const closeBundle = () => closeDev(plugins[0]!)
+    const server = {
+      config: { root: '/app', server: { middlewareMode: true } },
+      httpServer: Object.assign(new EventEmitter(), { address: () => null }),
+    }
+    configureDev(plugins[0]!, server)
+    server.httpServer.emit('listening')
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce())
     let settled = false
     const closing = Promise.all([closeBundle(), closeBundle()]).then(() => {
       settled = true
@@ -555,30 +744,35 @@ describe('dev process lifecycle', () => {
 
   it('closes Vite and forwards SIGINT before exiting the parent process', async () => {
     const electronApp = createElectronProcess()
-    process.electronApp = electronApp
+    spawn.mockReturnValue(electronApp)
 
     const plugins = createElectronPlugin({
       prefix: 'vite-plugin-electron-test',
-      dev: vi.fn(),
+      dev(context, server, _isESM, session) {
+        triggerStartup(context, server, {}, session)
+      },
       build: vi.fn(),
     })
-    const closeBundle = plugins[0]!.closeBundle as () => Promise<void>
+    const closeBundle = () => closeDev(plugins[0]!)
     const close = vi.fn(async () => {
       await closeBundle()
     })
     const server = {
       config: {
+        root: '/app',
         server: {
           middlewareMode: false,
         },
       },
-      httpServer: new EventEmitter(),
+      httpServer: Object.assign(new EventEmitter(), { address: () => null }),
       close,
     }
     const existingListeners = new Set(process.listeners('SIGINT'))
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
 
-    ;(plugins[0]!.configureServer as any)?.call({}, server)
+    configureDev(plugins[0]!, server)
+    server.httpServer.emit('listening')
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce())
 
     const handler = process.listeners('SIGINT').find((listener) => !existingListeners.has(listener))
     expect(handler).toBeDefined()
@@ -601,24 +795,28 @@ describe('dev process lifecycle', () => {
 
   it('leaves SIGINT ownership to a middleware host while closing Electron on request', async () => {
     const electronApp = createElectronProcess()
-    process.electronApp = electronApp
+    spawn.mockReturnValue(electronApp)
 
     const plugins = createElectronPlugin({
       prefix: 'vite-plugin-electron-test',
-      dev: vi.fn(),
+      dev(context, server, _isESM, session) {
+        triggerStartup(context, server, {}, session)
+      },
       build: vi.fn(),
     })
-    const closeBundle = plugins[0]!.closeBundle as () => Promise<void>
+    const closeBundle = () => closeDev(plugins[0]!)
     const close = vi.fn(() => closeBundle())
     const server = {
-      config: { server: { middlewareMode: true } },
-      httpServer: new EventEmitter(),
+      config: { root: '/app', server: { middlewareMode: true } },
+      httpServer: Object.assign(new EventEmitter(), { address: () => null }),
       close,
     }
     const existingListeners = process.listeners('SIGINT')
 
-    ;(plugins[0]!.configureServer as any)?.call({}, server)
+    configureDev(plugins[0]!, server)
     expect(process.listeners('SIGINT')).toEqual(existingListeners)
+    server.httpServer.emit('listening')
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce())
 
     let settled = false
     const closing = close().then(() => {

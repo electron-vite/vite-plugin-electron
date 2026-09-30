@@ -1,4 +1,4 @@
-import { build as viteBuild } from 'vite'
+import { build as viteBuild, mergeConfig } from 'vite'
 import type { Plugin, LibraryOptions, InlineConfig } from 'vite'
 
 import { closeWatchers, createElectronPlugin } from './base'
@@ -44,8 +44,8 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
       const watchers: { close: () => Promise<void> }[] = []
 
       try {
-        for (const options of optionsArray) {
-          options.vite ??= {}
+        for (const originalOptions of optionsArray) {
+          const options = { ...originalOptions, vite: mergeConfig({}, originalOptions.vite ?? {}) }
           options.vite.mode ??= server.config.mode
           options.vite.root ??= server.config.root
           options.vite.envDir ??= server.config.envDir
@@ -58,16 +58,18 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
           }
           options.vite.build.minify ??= false
 
-          options.vite.plugins ??= []
-          options.vite.plugins.push({
-            name: ':startup',
-            closeBundle() {
-              if (++closeBundleCount < entryCount) {
-                return
-              }
-              triggerStartup(pluginContext, server, options, session)
+          options.vite.plugins = [
+            ...(options.vite.plugins ?? []),
+            {
+              name: ':startup',
+              closeBundle() {
+                if (++closeBundleCount < entryCount) {
+                  return
+                }
+                triggerStartup(pluginContext, server, options, session)
+              },
             },
-          })
+          ]
 
           const result = await buildBase(isESM, options)
           if ('close' in result) {

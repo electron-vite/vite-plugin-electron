@@ -488,6 +488,8 @@ build({
 
 `startup.exit()` signals the Electron process started by vite-plugin-electron (SIGTERM by default, or an explicit signal) and resolves after that direct child exits. It does not recursively terminate processes created by the Electron application; those remain the application's responsibility. `SpawnOptions.killSignal` is spawn configuration, not the signal for later `startup.exit()` calls. Shutdown terminates an OS process, not through Electron's `app.quit()`, and does not promise application-level graceful quit hooks.
 
+During development, Ctrl+C forwards `SIGINT` to Electron and waits for shutdown before exiting with code 130. Programmatic `server.close()` uses `SIGTERM`. If the direct child has not exited after 5 seconds, shutdown escalates to `SIGKILL`. Vite restarts isolate each server generation's watchers, mock files, and Electron child; cleanup from an earlier generation cannot shut down the new session.
+
 If the package cannot be resolved, `startup()` throws an error describing how to install or pass the package explicitly.
 
 ### Startup Env Vars

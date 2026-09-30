@@ -8,6 +8,8 @@ import { closeWatchers } from '../src/base'
 import electron from '../src/index'
 import multiEnvElectron from '../src/multi-env'
 
+import { closeDev, configureDev } from './helpers/dev-session'
+
 vi.mock('vite', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vite')>()),
   build: vi.fn(),
@@ -32,15 +34,13 @@ async function startDev(plugins: ReturnType<typeof electron>) {
     },
     httpServer,
   }
-  ;(devPlugin.configureServer as any)?.call({}, server)
+  configureDev(devPlugin, server)
   const [listener] = httpServer.rawListeners('listening') as unknown as Array<{
     listener: () => Promise<void>
   }>
   const started = listener!.listener()
   await expect(started).rejects.toThrow('second build failed')
-  await expect((devPlugin.closeBundle as () => Promise<void>)()).rejects.toThrow(
-    'second build failed',
-  )
+  await expect(closeDev(devPlugin)).rejects.toThrow('second build failed')
 }
 
 it('closes previously initialized normal watchers when a later build fails', async () => {
