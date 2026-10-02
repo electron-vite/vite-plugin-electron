@@ -2,6 +2,7 @@ const { spawn } = require('node:child_process')
 const path = require('node:path')
 
 process.on('message', (message) => {
+  if (message === 'exit') process.exit(0)
   if (message !== 'start') return
 
   const descendant = spawn(process.execPath, [path.join(__dirname, 'descendant.cjs')], {

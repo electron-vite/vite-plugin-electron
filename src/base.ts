@@ -54,6 +54,7 @@ export function createElectronPlugin({
   const configs = new WeakMap<ResolvedConfig, ConfigState>()
   const sessions = new WeakMap<object, Session>()
   const mocks = new Map<string, { references: number; cleanup: () => Promise<void> }>()
+  const pendingSessions = new Set<Session>()
   let activeSession: Session | undefined
   let sigintHandler: (() => void) | undefined
 
@@ -86,8 +87,11 @@ export function createElectronPlugin({
       } catch (error) {
         errors.push(error)
       } finally {
-        // Closing an earlier generation must leave the active supervisor intact.
-        if (activeSession === session) {
+        if (!session.electronApp) {
+          pendingSessions.delete(session)
+        }
+        // Keep supervising earlier generations until all owned children exit.
+        if (pendingSessions.size === 0) {
           removeSigintHandler()
         }
       }
@@ -145,6 +149,7 @@ export function createElectronPlugin({
           ...(configs.get(server.config) ?? { isESM: false }),
         }
         activeSession = session
+        pendingSessions.add(session)
         for (const environment of Object.values(server.environments ?? {})) {
           sessions.set(environment, session)
         }
@@ -154,17 +159,20 @@ export function createElectronPlugin({
         } else if (!sigintHandler) {
           sigintHandler = () => {
             const current = activeSession
-            if (!current || current.closed) {
-              return
+            const pending = [...pendingSessions]
+            for (const owned of pending) {
+              owned.closed = true
+              owned.shutdownSignal = 'SIGINT'
             }
-            current.shutdownSignal = 'SIGINT'
             void (async () => {
-              try {
-                await current.server.close()
-              } finally {
-                // Shells report signal termination as 128 plus the signal number.
-                process.exit(128 + constants.signals.SIGINT)
-              }
+              // A restart can publish B while A is still waiting for its child.
+              // Wait for every generation, even if closing Vite rejects.
+              await Promise.allSettled([
+                ...pending.map(closeSession),
+                Promise.resolve().then(() => current?.server.close()),
+              ])
+              // Shells report signal termination as 128 plus the signal number.
+              process.exit(128 + constants.signals.SIGINT)
             })()
           }
           process.once('SIGINT', sigintHandler)

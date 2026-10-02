@@ -43,6 +43,13 @@ let pendingSpawn: Promise<void> = Promise.resolve()
 
 function clearElectron(child: ChildProcess, lifecycle: ElectronLifecycle): void {
   exitedChildren.add(child)
+  // Descendants may keep inherited pipes open after the direct child exits.
+  // Preserve stream consumers, but do not let those pipes keep the host alive.
+  for (const stream of child.stdio ?? []) {
+    if (stream && 'unref' in stream && typeof stream.unref === 'function') {
+      stream.unref()
+    }
+  }
   electronLifecycles.delete(child)
   if (lifecycle.session?.electronApp === child) {
     lifecycle.session.electronApp = undefined

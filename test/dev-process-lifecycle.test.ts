@@ -793,6 +793,49 @@ describe('dev process lifecycle', () => {
     expect(exit).toHaveBeenCalledWith(130)
   })
 
+  it('waits for an earlier child after the active session closes and Vite close rejects', async () => {
+    const child = createElectronProcess()
+    let generation = 0
+    const plugins = createElectronPlugin({
+      prefix: 'shutdown-test',
+      dev(_context, _server, _isESM, session) {
+        if (++generation === 1) {
+          session.electronApp = child
+        }
+      },
+      build() {},
+    })
+    const plugin = plugins[0]!
+    const makeServer = () => ({
+      config: { server: { middlewareMode: false } },
+      httpServer: Object.assign(new EventEmitter(), { address: () => null }),
+      close: vi.fn(async () => {
+        throw new Error('Vite close failed')
+      }),
+    })
+    const a = makeServer()
+    const envA = configureDev(plugin, a)
+    a.httpServer.emit('listening')
+    const b = makeServer()
+    const envB = configureDev(plugin, b)
+    b.httpServer.emit('listening')
+    const closingA = closeDev(plugin, envA)
+    await vi.waitFor(() => expect(child.kill).toHaveBeenCalledOnce())
+    await closeDev(plugin, envB)
+
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    const handler = process
+      .listeners('SIGINT')
+      .find((listener) => !originalSigintListeners.has(listener))
+    expect(handler).toBeDefined()
+    handler!('SIGINT')
+    await vi.waitFor(() => expect(b.close).toHaveBeenCalledOnce())
+    expect(exit).not.toHaveBeenCalled()
+    child.emit('exit', null, 'SIGTERM')
+    await closingA
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledExactlyOnceWith(130))
+  })
+
   it('leaves SIGINT ownership to a middleware host while closing Electron on request', async () => {
     const electronApp = createElectronProcess()
     spawn.mockReturnValue(electronApp)
