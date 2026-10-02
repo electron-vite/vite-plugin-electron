@@ -133,10 +133,10 @@ describe('src/multi-env', () => {
       },
     })
 
-    expect(composed[0].onstart).toBeUndefined()
+    expect(composed[0]!.onstart).toBeUndefined()
 
     const reload = vi.fn()
-    composed[1].onstart?.({
+    composed[1]!.onstart?.({
       reload,
       startup: async () => {},
     } as never)
@@ -149,12 +149,12 @@ describe('src/multi-env', () => {
       preload: { input: 'electron/preload.ts' },
     })
 
-    const firstMainBuild = (first[0].options as { build: Record<string, unknown> }).build
+    const firstMainBuild = (first[0]!.options as { build: Record<string, unknown> }).build
     firstMainBuild.minify = 'first-mutated'
     ;(firstMainBuild.rolldownOptions as Record<string, unknown>).platform = 'mutated'
 
     const firstPreloadOutput = (
-      first[1].options as { build: { rolldownOptions: { output: Record<string, unknown> } } }
+      first[1]!.options as { build: { rolldownOptions: { output: Record<string, unknown> } } }
     ).build.rolldownOptions.output
     firstPreloadOutput.entryFileNames = 'mutated.[name].mjs'
 
@@ -173,7 +173,7 @@ describe('src/multi-env', () => {
         },
       },
     })
-    expect((second[0].options as { build: Record<string, unknown> }).build.minify).toBeUndefined()
+    expect((second[0]!.options as { build: Record<string, unknown> }).build.minify).toBeUndefined()
 
     expect(second[1]).toMatchObject({
       name: 'preload',
