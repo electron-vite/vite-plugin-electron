@@ -1,6 +1,6 @@
 # Playground
 
-This folder holds four separate demo packages that import the plugin source from the repo root.
+This folder holds five separate demo packages that import the plugin source from the repo root.
 
 ## Install
 
@@ -17,6 +17,7 @@ pnpm --dir playground/flat install
 pnpm --dir playground/multi-env install
 pnpm --dir playground/simple install
 pnpm --dir playground/worker install
+pnpm --dir playground/shutdown install
 ```
 
 ## Run Flat Demo
@@ -91,9 +92,37 @@ pnpm dev
 pnpm build
 ```
 
+## Run Shutdown Repro
+
+The shutdown playground lives in `playground/shutdown/` and uses `playground/shutdown/vite.config.ts` to import [src/index.ts](../src/index.ts). It is a demo of the remaining process-lifetime gaps around `startup.exit()`: leftover descendants, SIGKILL of the direct child only, a second Ctrl+C dropping the plugin handler, Electron's natural exit skipping `process.exit()`, a failed close that cannot be retried, watcher cleanup running before the kill signal, and two plugin instances sharing `process.electronApp`.
+
+From the repo root:
+
+```sh
+pnpm play:shutdown
+pnpm play:shutdown:reproduce
+```
+
+Or from inside `playground/shutdown/`:
+
+```sh
+pnpm dev
+pnpm reproduce
+```
+
+Interactive env vars:
+
+- `SHUTDOWN_SCENARIO=descendants|natural-exit|ignore-signals|two-plugins`
+- `SHUTDOWN_WATCHER_DELAY_MS=2000` delays the Electron watcher close so the late kill is visible in logs
+- `SHUTDOWN_TWO_PLUGINS=1` mounts a second `electron()` plugin
+- `SHUTDOWN_HEADLESS=1` skips the BrowserWindow
+
+`pnpm reproduce` drives those cases against the plugin source and prints `[reproduced]` (or `[skipped]` for Windows-only SIGINT semantics on non-Windows hosts).
+
 ## What Each Demo Covers
 
 - `flat/` exercises the flat API with `onstart`, full app restart behavior, and array-based Electron entries.
 - `multi-env/` exercises `vite-plugin-electron/multi-env` with named Vite environments, per-environment `define` values, preload reload behavior, and a worker thread entry.
 - `simple/` exercises the simple API with preload rebuild hot reload behavior.
 - `worker/` exercises multiple entries.
+- `shutdown/` reproduces Ctrl+C / child-process lifetime gaps that remain after synchronizing Electron and Vite shutdown.
