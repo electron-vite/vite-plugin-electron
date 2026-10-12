@@ -52,13 +52,11 @@ if (scenario === 'ignore-signals') {
 
 function spawnHelper(): void {
   const helper = spawn(process.execPath, [join(process.cwd(), 'electron/helper.cjs')], {
-    stdio: ['ignore', 'inherit', 'inherit'],
-    detached: process.platform === 'win32',
+    stdio: ['ignore', 'ignore', 'ignore'],
+    detached: true,
   })
+  helper.unref()
   helperPid = helper.pid ?? null
-  if (process.platform === 'win32') {
-    helper.unref()
-  }
   logEvent(`spawned helper pid=${helperPid}`)
 }
 

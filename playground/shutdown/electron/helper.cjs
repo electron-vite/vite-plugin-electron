@@ -1,9 +1,14 @@
 process.on('SIGINT', () => {})
 process.on('SIGTERM', () => {})
 process.on('SIGHUP', () => {})
+process.on('SIGPIPE', () => {})
 
 const beat = () => {
-  process.stdout.write(`[shutdown-helper] still alive pid=${process.pid} ppid=${process.ppid}\n`)
+  try {
+    process.stdout.write(`[shutdown-helper] still alive pid=${process.pid} ppid=${process.ppid}\n`)
+  } catch {
+    // Parent pipes may already be gone (e.g. host SIGKILL).
+  }
 }
 
 beat()

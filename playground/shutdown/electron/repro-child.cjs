@@ -14,12 +14,10 @@ function stayAlive() {
 
 function spawnHelper() {
   const helper = spawn(process.execPath, [helperPath], {
-    stdio: ['ignore', 'inherit', 'inherit'],
-    detached: process.platform === 'win32',
+    stdio: ['ignore', 'ignore', 'ignore'],
+    detached: true,
   })
-  if (process.platform === 'win32') {
-    helper.unref()
-  }
+  helper.unref()
   return helper.pid
 }
 

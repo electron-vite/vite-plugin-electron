@@ -94,7 +94,7 @@ pnpm build
 
 ## Run Shutdown Repro
 
-The shutdown playground lives in `playground/shutdown/` and uses `playground/shutdown/vite.config.ts` to import [src/index.ts](../src/index.ts). It is a demo of the remaining process-lifetime gaps around `startup.exit()`: leftover descendants, SIGKILL of the direct child only, a second Ctrl+C dropping the plugin handler, Electron's natural exit skipping `process.exit()`, a failed close that cannot be retried, watcher cleanup running before the kill signal, and two plugin instances sharing `process.electronApp`.
+The shutdown playground lives in `playground/shutdown/` and uses `playground/shutdown/vite.config.ts` to import [src/index.ts](../src/index.ts). It is a demo of the remaining process-lifetime gaps around `startup.exit()`: leftover descendants, SIGKILL of the direct child only, a second Ctrl+C dropping the plugin handler, Electron's natural exit skipping `process.exit()`, a failed close that cannot be retried, watcher cleanup running before the kill signal, two plugin instances sharing `process.electronApp`, host SIGKILL leaving Electron/helper orphans, `startup.exit()` after the child is already gone, concurrent `startup.exit()` sharing one promise, natural Electron exit leaving the Vite host event loop alive, and helpers surviving `exitElectron(SIGTERM)`.
 
 From the repo root:
 
