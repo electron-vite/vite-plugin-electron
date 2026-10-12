@@ -57,17 +57,22 @@ export function createElectronPlugin({
   const pendingSessions = new Set<Session>()
   let activeSession: Session | undefined
   let sigintHandler: (() => void) | undefined
+  let sigintShutdownStarted = false
 
   function removeSigintHandler() {
     if (sigintHandler) {
       process.removeListener('SIGINT', sigintHandler)
       sigintHandler = undefined
     }
+    sigintShutdownStarted = false
   }
 
   function closeSession(session: Session): Promise<void> {
     session.closed = true
-    return (session.closing ??= (async () => {
+    if (session.closing) {
+      return session.closing
+    }
+    const closing = (async () => {
       const errors: unknown[] = []
       try {
         await session.cleanupMock?.()
@@ -93,12 +98,21 @@ export function createElectronPlugin({
         // Keep supervising earlier generations until all owned children exit.
         if (pendingSessions.size === 0) {
           removeSigintHandler()
+          sigintShutdownStarted = false
         }
       }
       if (errors.length) {
         throw errors[0]
       }
-    })())
+    })()
+    session.closing = closing
+    // A failed close must be retryable: clear the cached rejection so close() can run again.
+    void closing.catch(() => {
+      if (session.closing === closing) {
+        session.closing = undefined
+      }
+    })
+    return closing
   }
 
   return [
@@ -156,8 +170,20 @@ export function createElectronPlugin({
 
         if (server.config.server.middlewareMode) {
           removeSigintHandler()
+          sigintShutdownStarted = false
         } else if (!sigintHandler) {
           sigintHandler = () => {
+            if (sigintShutdownStarted) {
+              // Second Ctrl+C: keep supervising and escalate in-flight Electron shutdowns.
+              for (const owned of pendingSessions) {
+                owned.shutdownSignal = 'SIGKILL'
+                if (owned.electronApp) {
+                  void exitElectron(owned.electronApp, 'SIGKILL')
+                }
+              }
+              return
+            }
+            sigintShutdownStarted = true
             const current = activeSession
             const pending = [...pendingSessions]
             for (const owned of pending) {
@@ -175,7 +201,8 @@ export function createElectronPlugin({
               process.exit(128 + constants.signals.SIGINT)
             })()
           }
-          process.once('SIGINT', sigintHandler)
+          // Use `on`, not `once`: a second SIGINT must escalate rather than default-kill the host.
+          process.on('SIGINT', sigintHandler)
         }
 
         server.httpServer?.once('listening', async () => {

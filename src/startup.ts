@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { ViteDevServer } from 'vite'
 
 import type { ConfigServerContext } from './base'
+import { killPidsSync, listDescendantPids, treeKillSync } from './utils'
 
 const startupEnv = {
   REMOTE_DEBUGGING_PORT: '--remote-debugging-port',
@@ -91,6 +92,7 @@ interface StartupFn {
   hookedProcessExit: boolean
   /**
    * Stop the current Electron app and resolve after the direct Electron child process exits.
+   * Leftover descendants discovered before the signal are cleaned up afterward.
    * @param signal shutdown signal (defaults to SIGTERM)
    */
   exit: (signal?: KillSignal) => Promise<void>
@@ -182,7 +184,20 @@ async function startElectron(
     if (session?.closed) {
       return false
     }
-    await startup.exit()
+    if (session) {
+      if (session.electronApp) {
+        await exitElectron(session.electronApp)
+      } else if (process.electronApp) {
+        // Replace an unowned global child (manual startup() before a session start).
+        // Do not kill a child owned by a different live session.
+        const life = electronLifecycles.get(process.electronApp)
+        if (!life?.session || life.session === session) {
+          await exitElectron(process.electronApp)
+        }
+      }
+    } else {
+      await startup.exit()
+    }
     if (session?.closed) {
       return false
     }
@@ -246,6 +261,14 @@ export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<
   }
   const state = lifecycle
   if (state.exitPromise) {
+    // Allow a later SIGKILL (e.g. second Ctrl+C) to escalate an in-flight graceful exit.
+    if (signal === 'SIGKILL' && child.pid) {
+      const alreadyGone =
+        exitedChildren.has(child) || child.exitCode !== null || child.signalCode !== null
+      if (!alreadyGone) {
+        treeKillSync(child.pid, 'SIGKILL')
+      }
+    }
     return state.exitPromise
   }
 
@@ -257,6 +280,9 @@ export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<
 
   const hasExited = () =>
     exitedChildren.has(child) || child.exitCode !== null || child.signalCode !== null
+
+  // Snapshot while the direct child is still alive so detached helpers can be reaped.
+  const knownDescendants = !hasExited() && child.pid ? listDescendantPids(child.pid) : []
 
   const exitPromise = new Promise<void>((resolve, reject) => {
     if (hasExited()) {
@@ -281,6 +307,16 @@ export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<
     }
     function kill(requestedSignal: KillSignal) {
       try {
+        const pid = child.pid
+        if (requestedSignal === 'SIGKILL' && pid) {
+          treeKillSync(pid, 'SIGKILL')
+          if (hasExited()) {
+            onExit()
+          }
+          return
+        }
+        // Windows child.kill(SIGINT|SIGTERM) is TerminateProcess on one pid; leftovers
+        // are reaped after exit via knownDescendants. POSIX gets a real signal first.
         if (!child.kill(requestedSignal)) {
           if (hasExited()) {
             onExit()
@@ -302,10 +338,18 @@ export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<
     }, ELECTRON_SHUTDOWN_TIMEOUT)
     kill(signal ?? 'SIGTERM')
   }).then(
-    () => clearElectron(child, state),
+    () => {
+      clearElectron(child, state)
+      if (knownDescendants.length) {
+        killPidsSync(knownDescendants)
+      }
+    },
     (error: unknown) => {
       if (hasExited()) {
         clearElectron(child, state)
+        if (knownDescendants.length) {
+          killPidsSync(knownDescendants)
+        }
       } else {
         state.exitPromise = undefined
         if (exitHandler) {
@@ -404,11 +448,12 @@ export function triggerStartup(
         if (session?.closed) {
           return
         }
-        if (process.electronApp) {
+        const live = session?.electronApp ?? process.electronApp
+        if (live) {
           ;(server.hot || server.ws).send({ type: 'full-reload' })
 
           // For Electron apps that don't need to use the renderer process.
-          startup.send('electron-vite&type=hot-reload')
+          live.send?.('electron-vite&type=hot-reload')
         } else {
           startupWithRoot()
         }

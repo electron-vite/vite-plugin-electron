@@ -92,10 +92,6 @@ it('resolves on direct exit even while a descendant holds its pipe open', async 
     descendantPid = await ready
     expect(isAlive(descendantPid)).toBe(true)
 
-    let closed = false
-    directChild.once('close', () => {
-      closed = true
-    })
     const exiting = startup.exit()
     const finished = await Promise.race([
       exiting.then(() => true),
@@ -103,8 +99,10 @@ it('resolves on direct exit even while a descendant holds its pipe open', async 
     ])
     expect(finished, 'shutdown should not wait for the descendant-held pipe').toBe(true)
     expect(await waitForExit(directChild.pid)).toBe(true)
-    expect(isAlive(descendantPid)).toBe(true)
-    expect(closed).toBe(false)
+    expect(
+      await waitForExit(descendantPid),
+      'plugin-initiated shutdown should reap leftover descendants',
+    ).toBe(true)
 
     await startup(
       [path.resolve('test/fixtures/process-tree/parent.cjs')],
@@ -112,7 +110,7 @@ it('resolves on direct exit even while a descendant holds its pipe open', async 
       'e2e-electron',
     )
     expect(process.electronApp?.pid).not.toBe(directChild.pid)
-    expect(isAlive(descendantPid)).toBe(true)
+    expect(isAlive(descendantPid)).toBe(false)
   } finally {
     if (process.electronApp && process.electronApp !== directChild) {
       await startup.exit()

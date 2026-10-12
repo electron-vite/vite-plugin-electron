@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import { builtinModules } from 'node:module'
 import type { AddressInfo } from 'node:net'
@@ -401,4 +402,158 @@ export function setIsViteDev(): void {
 
 export function getIsViteDev(): boolean {
   return ['1', 'true'].includes((process.env[VITE_IS_DEV] ?? '').trim().toLowerCase())
+}
+
+/**
+ * List descendant PIDs of `pid` (not including `pid` itself).
+ * Best-effort: process listings can race with exits.
+ */
+export function listDescendantPids(pid: number): number[] {
+  if (!pid || pid <= 0) {
+    return []
+  }
+  if (process.platform === 'win32') {
+    return listWindowsDescendantPids(pid)
+  }
+  const result: number[] = []
+  const stack = [pid]
+  const seen = new Set<number>([pid])
+  while (stack.length) {
+    const current = stack.pop()!
+    let children: number[]
+    try {
+      if (process.platform === 'darwin') {
+        const out = execFileSync('pgrep', ['-P', String(current)], { encoding: 'utf8' })
+        children = out.match(/\d+/g)?.map(Number) ?? []
+      } else {
+        const out = execFileSync('ps', ['-o', 'pid=', '--ppid', String(current)], {
+          encoding: 'utf8',
+        })
+        children = out.match(/\d+/g)?.map(Number) ?? []
+      }
+    } catch {
+      children = []
+    }
+    for (const child of children) {
+      if (!seen.has(child)) {
+        seen.add(child)
+        result.push(child)
+        stack.push(child)
+      }
+    }
+  }
+  return result
+}
+
+function listWindowsDescendantPids(rootPid: number): number[] {
+  try {
+    const out = execFileSync(
+      'wmic',
+      ['process', 'get', 'ProcessId,ParentProcessId', '/FORMAT:CSV'],
+      { encoding: 'utf8' },
+    )
+    const childrenByParent = new Map<number, number[]>()
+    for (const line of out.split(/\r?\n/)) {
+      const parts = line.trim().split(',')
+      if (parts.length < 3) {
+        continue
+      }
+      const ppid = Number(parts[parts.length - 2])
+      const pid = Number(parts[parts.length - 1])
+      if (!Number.isFinite(pid) || !Number.isFinite(ppid)) {
+        continue
+      }
+      const list = childrenByParent.get(ppid)
+      if (list) {
+        list.push(pid)
+      } else {
+        childrenByParent.set(ppid, [pid])
+      }
+    }
+    const result: number[] = []
+    const stack = [rootPid]
+    const seen = new Set<number>([rootPid])
+    while (stack.length) {
+      const current = stack.pop()!
+      for (const child of childrenByParent.get(current) ?? []) {
+        if (!seen.has(child)) {
+          seen.add(child)
+          result.push(child)
+          stack.push(child)
+        }
+      }
+    }
+    return result
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Terminate `pid` and its descendants. On Windows uses `taskkill /T /F`.
+ * On POSIX walks the process tree and signals leaves before parents.
+ */
+export function treeKillSync(pid: number, signal: NodeJS.Signals = 'SIGKILL'): void {
+  if (!pid || pid <= 0) {
+    return
+  }
+  if (process.platform === 'win32') {
+    try {
+      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+        stdio: 'ignore',
+      })
+    } catch {
+      // Process may already be gone (taskkill exit 128).
+    }
+    return
+  }
+  const descendants = listDescendantPids(pid)
+  for (const child of descendants.reverse()) {
+    try {
+      process.kill(child, signal)
+    } catch {
+      // Already gone.
+    }
+  }
+  try {
+    process.kill(pid, signal)
+  } catch {
+    // Already gone.
+  }
+}
+
+/** Best-effort SIGKILL of leftover PIDs after the direct child has exited. */
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== 'ESRCH'
+  }
+}
+
+/**
+ * Best-effort SIGKILL of leftover PIDs after the direct child has exited.
+ * Waits briefly so callers observing liveness do not race kernel reaping.
+ */
+export function killPidsSync(pids: number[]): void {
+  const targets = pids.filter((pid) => pid > 0)
+  for (const pid of targets) {
+    try {
+      if (process.platform === 'win32') {
+        execFileSync('taskkill', ['/PID', String(pid), '/F'], {
+          stdio: 'ignore',
+        })
+      } else {
+        process.kill(pid, 'SIGKILL')
+      }
+    } catch {
+      // Already gone.
+    }
+  }
+  const deadline = Date.now() + 500
+  const park = new Int32Array(new SharedArrayBuffer(4))
+  while (Date.now() < deadline && targets.some(isPidAlive)) {
+    Atomics.wait(park, 0, 0, 10)
+  }
 }

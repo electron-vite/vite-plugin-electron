@@ -612,18 +612,22 @@ describe('dev process lifecycle', () => {
     b.close.mockImplementation(() => closeDev(plugin, envB))
     b.httpServer.emit('listening')
     const startingB = starts[1]!()
-    await vi.waitFor(() => expect(childA.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM'))
-    expect(spawn).toHaveBeenCalledTimes(1)
-    childA.emit('exit', null, 'SIGTERM')
+    // Session-scoped ownership: starting B must not kill A's child through the global alias.
     expect(await startingB).toBe(true)
-    expect(sessions[0]?.electronApp).toBeUndefined()
+    expect(spawn).toHaveBeenCalledTimes(2)
+    expect(childA.kill).not.toHaveBeenCalled()
+    expect(sessions[0]?.electronApp).toBe(childA)
     expect(sessions[1]?.electronApp).toBe(childB)
+    expect(process.electronApp).toBe(childB)
 
     const listeners = process.listeners('SIGINT')
     const closingA = closeDev(plugin, envA)
     expect(closeDev(plugin, envA)).toBe(closingA)
+    await vi.waitFor(() => expect(childA.kill).toHaveBeenCalledExactlyOnceWith('SIGTERM'))
+    childA.emit('exit', null, 'SIGTERM')
     await closingA
     expect(sessions[0]?.closed).toBe(true)
+    expect(sessions[0]?.electronApp).toBeUndefined()
     expect(sessions[1]?.closed).toBe(false)
     expect(cleanupA).toHaveBeenCalledOnce()
     expect(mockA).toHaveBeenCalledOnce()
@@ -834,6 +838,79 @@ describe('dev process lifecycle', () => {
     child.emit('exit', null, 'SIGTERM')
     await closingA
     await vi.waitFor(() => expect(exit).toHaveBeenCalledExactlyOnceWith(130))
+  })
+
+  it('retries closeSession after a failed Electron kill', async () => {
+    const electronApp = createElectronProcess()
+    spawn.mockReturnValue(electronApp)
+    vi.mocked(electronApp.kill).mockImplementationOnce(() => {
+      throw new Error('signal failed')
+    })
+    const plugins = createElectronPlugin({
+      prefix: 'failed-close-retry',
+      dev(context, server, _isESM, session) {
+        triggerStartup(context, server, {}, session)
+      },
+      build: vi.fn(),
+    })
+    const server = {
+      config: { root: '/app', server: { middlewareMode: true } },
+      httpServer: Object.assign(new EventEmitter(), { address: () => null }),
+    }
+    configureDev(plugins[0]!, server)
+    server.httpServer.emit('listening')
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce())
+
+    await expect(closeDev(plugins[0]!)).rejects.toThrow('signal failed')
+    expect(process.electronApp).toBe(electronApp)
+
+    const retry = closeDev(plugins[0]!)
+    await vi.waitFor(() => expect(electronApp.kill).toHaveBeenCalledTimes(2))
+    electronApp.emit('exit', null, 'SIGTERM')
+    await retry
+    expect(process.electronApp).toBeUndefined()
+  })
+
+  it('escalates a second SIGINT to SIGKILL without dropping the handler', async () => {
+    const electronApp = Object.assign(createElectronProcess(), { pid: 4242 })
+    spawn.mockReturnValue(electronApp)
+    const plugins = createElectronPlugin({
+      prefix: 'second-sigint',
+      dev(context, server, _isESM, session) {
+        triggerStartup(context, server, {}, session)
+      },
+      build: vi.fn(),
+    })
+    const closeBundle = () => closeDev(plugins[0]!)
+    const close = vi.fn(async () => {
+      await closeBundle()
+    })
+    const server = {
+      config: { root: '/app', server: { middlewareMode: false } },
+      httpServer: Object.assign(new EventEmitter(), { address: () => null }),
+      close,
+    }
+    const existingListeners = new Set(process.listeners('SIGINT'))
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
+
+    configureDev(plugins[0]!, server)
+    server.httpServer.emit('listening')
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce())
+
+    const handler = process.listeners('SIGINT').find((listener) => !existingListeners.has(listener))
+    expect(handler).toBeDefined()
+    handler?.('SIGINT')
+    await vi.waitFor(() => expect(electronApp.kill).toHaveBeenCalledWith('SIGINT'))
+    expect(exit).not.toHaveBeenCalled()
+
+    handler?.('SIGINT')
+    await vi.waitFor(() => expect(killSpy).toHaveBeenCalledWith(4242, 'SIGKILL'))
+    expect(process.listeners('SIGINT')).toContain(handler)
+
+    electronApp.emit('exit', null, 'SIGKILL')
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledExactlyOnceWith(130))
+    killSpy.mockRestore()
   })
 
   it('leaves SIGINT ownership to a middleware host while closing Electron on request', async () => {

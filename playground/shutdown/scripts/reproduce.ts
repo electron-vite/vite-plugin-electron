@@ -120,10 +120,7 @@ async function waitForMessage(
   })
 }
 
-async function waitForReproReady(
-  child: ChildProcess,
-  timeout = 10_000,
-): Promise<any> {
+async function waitForReproReady(child: ChildProcess, timeout = 10_000): Promise<any> {
   const started = Date.now()
   while (Date.now() - started < timeout) {
     const ready = (child as ChildProcess & { reproReady?: any }).reproReady
@@ -233,7 +230,7 @@ afterEach(() => {
   process.exitCode = originalExitCode
 })
 
-it('reproduces leftover descendants after the direct child exits', async () => {
+it('reaps leftover descendants after the direct child exits on SIGINT', async () => {
   const host = await startHost('descendants')
   const ready = await waitForMessage(host, (message) => message?.helperPid)
   const childPid = ready.pid as number
@@ -252,16 +249,13 @@ it('reproduces leftover descendants after the direct child exits', async () => {
 
   expect(result.code, 'host should wait for the direct child then exit 130').toBe(130)
   expect(isAlive(childPid)).toBe(false)
-  expect(
-    isAlive(helperPid),
-    'helper spawned by Electron should survive SIGINT of the direct child',
-  ).toBe(true)
+  expect(isAlive(helperPid), 'plugin-initiated shutdown should reap helper descendants').toBe(false)
   console.log(
-    `[reproduced] leftover-descendants hostExit=${result.code} childAlive=${isAlive(childPid)} helperAlive=${isAlive(helperPid)}`,
+    `[ok] leftover-descendants-reaped hostExit=${result.code} childAlive=${isAlive(childPid)} helperAlive=${isAlive(helperPid)}`,
   )
 }, 20_000)
 
-it('reproduces SIGKILL of an unresponsive direct child leaving the helper running', async () => {
+it('tree-kills helpers when escalating an unresponsive child to SIGKILL', async () => {
   const host = await startHost('ignore-signals')
   const ready = await waitForMessage(host, (message) => message?.helperPid)
   const childPid = ready.pid as number
@@ -279,19 +273,20 @@ it('reproduces SIGKILL of an unresponsive direct child leaving the helper runnin
   expect(result.code).toBe(130)
   expect(elapsed).toBeGreaterThanOrEqual(4_500)
   expect(isAlive(childPid)).toBe(false)
-  expect(isAlive(helperPid), 'SIGKILL only targets the direct child pid').toBe(true)
+  expect(isAlive(helperPid), 'SIGKILL escalation should tree-kill helpers').toBe(false)
   console.log(
-    `[reproduced] sigkill-direct-child-only elapsedMs=${elapsed} helperAlive=${isAlive(helperPid)}`,
+    `[ok] sigkill-tree-kills-helpers elapsedMs=${elapsed} helperAlive=${isAlive(helperPid)}`,
   )
 }, 20_000)
 
-it('reproduces a second SIGINT dropping the plugin handler while Electron is still shutting down', async () => {
+it('escalates a second SIGINT instead of dropping Electron supervision', async () => {
   const host = await startHost('ignore-signals')
   const ready = await waitForMessage(host, (message) => message?.pid)
   const childPid = ready.pid as number
   extraPids.add(childPid)
-  if (typeof ready.helperPid === 'number') {
-    extraPids.add(ready.helperPid)
+  const helperPid = typeof ready.helperPid === 'number' ? ready.helperPid : undefined
+  if (helperPid) {
+    extraPids.add(helperPid)
   }
 
   const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) => {
@@ -300,20 +295,20 @@ it('reproduces a second SIGINT dropping the plugin handler while Electron is sti
   host.kill('SIGINT')
   await sleep(200)
   host.kill('SIGINT')
-  const result = await Promise.race([exited, sleep(2_000).then(() => null)])
+  const result = await Promise.race([exited, sleep(8_000).then(() => null)])
 
-  expect(result, 'second SIGINT should default-kill the Vite host before the 5s SIGKILL').not.toBe(
-    null,
-  )
-  expect(result?.code).not.toBe(130)
-  expect(result?.signal).toBe('SIGINT')
-  expect(isAlive(childPid), 'unresponsive Electron child should still be alive').toBe(true)
+  expect(result, 'host should stay supervised and exit 130 after escalated kill').not.toBe(null)
+  expect(result?.code).toBe(130)
+  expect(isAlive(childPid), 'second SIGINT should escalate to SIGKILL of the child').toBe(false)
+  if (helperPid) {
+    expect(isAlive(helperPid), 'escalated tree kill should reap helpers').toBe(false)
+  }
   console.log(
-    `[reproduced] second-sigint-drops-handler hostSignal=${result?.signal} childAlive=${isAlive(childPid)}`,
+    `[ok] second-sigint-escalates hostCode=${result?.code} childAlive=${isAlive(childPid)}`,
   )
 }, 15_000)
 
-it('reproduces Electron natural exit closing Vite without process.exit', async () => {
+it('documents Electron natural exit closing Vite without process.exit', async () => {
   const httpServer = Object.assign(new EventEmitter(), { address: () => null })
   let closed = false
   let exitCalls = 0
@@ -345,7 +340,7 @@ it('reproduces Electron natural exit closing Vite without process.exit', async (
     expect(closed, 'plugin should close the Vite server when Electron exits').toBe(true)
     expect(exitCalls, 'plugin should not call process.exit on a natural Electron exit').toBe(0)
     console.log(
-      `[reproduced] natural-exit-skips-process-exit serverClosed=${closed} exitCalls=${exitCalls} exitCode=${String(process.exitCode)}`,
+      `[ok] natural-exit-skips-process-exit serverClosed=${closed} exitCalls=${exitCalls} exitCode=${String(process.exitCode)}`,
     )
     await closeDev(plugin, environment).catch(() => {})
   } finally {
@@ -353,7 +348,7 @@ it('reproduces Electron natural exit closing Vite without process.exit', async (
   }
 }, 15_000)
 
-it('reproduces a failed startup.exit being cached so close() cannot retry', async () => {
+it('retries close() after a failed startup.exit instead of caching the rejection', async () => {
   const httpServer = Object.assign(new EventEmitter(), { address: () => null })
   const plugins = createElectronPlugin({
     prefix: 'shutdown-failed-close',
@@ -386,19 +381,13 @@ it('reproduces a failed startup.exit being cached so close() cannot retry', asyn
     return originalKill(signal)
   }) as typeof child.kill
 
-  await expect(
-    closeDev(plugin, environment),
-    'second closeSession should reuse the rejected promise and not kill again',
-  ).rejects.toThrow('signal failed')
-  expect(retried).toBe(false)
-  expect(isAlive(child.pid!)).toBe(true)
-  child.kill = originalKill
-  console.log(
-    `[reproduced] failed-close-is-cached retried=${retried} childAlive=${isAlive(child.pid!)}`,
-  )
+  await closeDev(plugin, environment)
+  expect(retried, 'second closeSession should kill again after a failed close').toBe(true)
+  expect(isAlive(child.pid!)).toBe(false)
+  console.log(`[ok] failed-close-is-retryable retried=${retried} childAlive=${isAlive(child.pid!)}`)
 }, 15_000)
 
-it('reproduces SIGINT being sent only after mock/watcher cleanup', async () => {
+it('documents SIGINT being sent only after mock/watcher cleanup', async () => {
   const httpServer = Object.assign(new EventEmitter(), { address: () => null })
   let killedAt = 0
   const plugins = createElectronPlugin({
@@ -426,10 +415,10 @@ it('reproduces SIGINT being sent only after mock/watcher cleanup', async () => {
   await closeDev(plugin, environment)
   expect(killedAt).toBeGreaterThan(0)
   expect(killedAt - started).toBeGreaterThanOrEqual(350)
-  console.log(`[reproduced] shutdown-waits-on-cleanup-before-kill delayMs=${killedAt - started}`)
+  console.log(`[ok] shutdown-waits-on-cleanup-before-kill delayMs=${killedAt - started}`)
 }, 15_000)
 
-it('reproduces two plugin instances sharing process.electronApp', async () => {
+it('keeps two plugin instances on separate session-owned children', async () => {
   const firstHttp = Object.assign(new EventEmitter(), { address: () => null })
   const secondHttp = Object.assign(new EventEmitter(), { address: () => null })
   let firstStarted!: Promise<ChildProcess>
@@ -470,20 +459,19 @@ it('reproduces two plugin instances sharing process.electronApp', async () => {
   const secondChild = await secondStarted
   expect(secondChild).toBeDefined()
   expect(secondChild?.pid).not.toBe(firstPid)
-  expect(
-    firstChild.exitCode !== null || firstChild.signalCode !== null || !isAlive(firstPid),
-    'starting the second plugin kills the first child through process.electronApp',
-  ).toBe(true)
+  expect(isAlive(firstPid), 'starting B must not kill A through the global alias').toBe(true)
   expect(isAlive(secondChild!.pid!)).toBe(true)
+  expect(process.electronApp).toBe(secondChild)
   console.log(
-    `[reproduced] two-plugins-share-global-child firstPid=${firstPid} secondPid=${secondChild?.pid} firstDead=${!isAlive(firstPid)}`,
+    `[ok] two-plugins-session-scoped firstPid=${firstPid} secondPid=${secondChild?.pid} firstAlive=${isAlive(firstPid)}`,
   )
   await closeDev(second, secondEnv).catch(() => {})
   await closeDev(first, firstEnv).catch(() => {})
+  expect(isAlive(firstPid)).toBe(false)
+  expect(isAlive(secondChild!.pid!)).toBe(false)
 }, 15_000)
 
-
-it('reproduces host SIGKILL leaving Electron and helper orphans', async () => {
+it('documents host SIGKILL leaving Electron and helper orphans', async () => {
   const host = await startHost('descendants')
   const ready = await waitForMessage(host, (message) => message?.helperPid)
   const childPid = ready.pid as number
@@ -498,11 +486,11 @@ it('reproduces host SIGKILL leaving Electron and helper orphans', async () => {
   expect(isAlive(childPid), 'Electron direct child should outlive a SIGKILL host').toBe(true)
   expect(isAlive(helperPid), 'detached helper should outlive a SIGKILL host').toBe(true)
   console.log(
-    `[reproduced] host-sigkill-leaves-orphans childAlive=${isAlive(childPid)} helperAlive=${isAlive(helperPid)}`,
+    `[ok] host-sigkill-leaves-orphans (OS limitation) childAlive=${isAlive(childPid)} helperAlive=${isAlive(helperPid)}`,
   )
 }, 15_000)
 
-it('reproduces startup.exit resolving immediately when the child already exited', async () => {
+it('resolves startup.exit immediately when the child already exited', async () => {
   const httpServer = Object.assign(new EventEmitter(), { address: () => null })
   const plugins = createElectronPlugin({
     prefix: 'shutdown-already-exited',
@@ -526,11 +514,11 @@ it('reproduces startup.exit resolving immediately when the child already exited'
   const started = Date.now()
   await startup.exit()
   expect(Date.now() - started).toBeLessThan(500)
-  console.log('[reproduced] startup-exit-after-child-gone resolves-immediately')
+  console.log('[ok] startup-exit-after-child-gone resolves-immediately')
   await closeDev(plugin, environment).catch(() => {})
 }, 15_000)
 
-it('reproduces concurrent startup.exit calls sharing one in-flight promise', async () => {
+it('shares one in-flight promise across concurrent startup.exit calls', async () => {
   const httpServer = Object.assign(new EventEmitter(), { address: () => null })
   const plugins = createElectronPlugin({
     prefix: 'shutdown-shared-exit-promise',
@@ -570,12 +558,12 @@ it('reproduces concurrent startup.exit calls sharing one in-flight promise', asy
   // SIGTERM is ignored by the fixture, so the 5s escalator may send SIGKILL too.
   expect(killCount).toBeGreaterThanOrEqual(1)
   expect(killCount).toBeLessThanOrEqual(2)
-  console.log(`[reproduced] concurrent-startup-exit-shares-promise killCount=${killCount}`)
+  console.log(`[ok] concurrent-startup-exit-shares-promise killCount=${killCount}`)
   child.kill = originalKill
   await closeDev(plugin, environment).catch(() => {})
 }, 20_000)
 
-it('reproduces Electron natural exit leaving the Vite host event loop alive', async () => {
+it('documents Electron natural exit leaving the Vite host event loop alive', async () => {
   const host = await startHost('natural-exit')
   const ready = await waitForMessage(host, (message) => message?.ready || message?.pid)
   const childPid = ready.pid as number
@@ -588,12 +576,12 @@ it('reproduces Electron natural exit leaving the Vite host event loop alive', as
   expect(isAlive(childPid), 'natural-exit child should have exited').toBe(false)
   expect(isAlive(host.pid!), 'Vite host keeps a leftover timer after server.close()').toBe(true)
   console.log(
-    `[reproduced] natural-exit-leaves-vite-host-alive hostAlive=${isAlive(host.pid!)} childAlive=${isAlive(childPid)}`,
+    `[ok] natural-exit-leaves-vite-host-alive hostAlive=${isAlive(host.pid!)} childAlive=${isAlive(childPid)}`,
   )
   host.kill('SIGKILL')
 }, 15_000)
 
-it('reproduces helper surviving exitElectron(SIGTERM) of the direct child', async () => {
+it('reaps helpers after exitElectron(SIGTERM) of the direct child', async () => {
   const httpServer = Object.assign(new EventEmitter(), { address: () => null })
   const plugins = createElectronPlugin({
     prefix: 'shutdown-helper-survives-sigterm',
@@ -619,14 +607,12 @@ it('reproduces helper surviving exitElectron(SIGTERM) of the direct child', asyn
 
   await startup.exit('SIGTERM')
   expect(isAlive(childPid)).toBe(false)
-  expect(isAlive(helperPid), 'exitElectron only signals the direct child').toBe(true)
-  console.log(
-    `[reproduced] helper-survives-exitElectron-sigterm helperAlive=${isAlive(helperPid)}`,
-  )
+  expect(isAlive(helperPid), 'exitElectron should reap snapshotted helper descendants').toBe(false)
+  console.log(`[ok] helper-reaped-after-exitElectron-sigterm helperAlive=${isAlive(helperPid)}`)
   await closeDev(plugin, environment).catch(() => {})
 }, 15_000)
 
-it('reproduces Windows SIGINT as TerminateProcess, or documents the Unix difference', async () => {
+it('documents Windows SIGINT as TerminateProcess, or skips on Unix', async () => {
   if (process.platform !== 'win32') {
     console.log(
       '[skipped] windows-sigint-is-terminateprocess (this host is not Windows; child.kill("SIGINT") is a real POSIX signal here)',
@@ -648,5 +634,5 @@ it('reproduces Windows SIGINT as TerminateProcess, or documents the Unix differe
     isAlive(pid),
     'Windows kill(SIGINT) should terminate the process without a catchable Ctrl+C',
   ).toBe(false)
-  console.log(`[reproduced] windows-sigint-is-terminateprocess pid=${pid}`)
+  console.log(`[ok] windows-sigint-is-terminateprocess pid=${pid}`)
 })

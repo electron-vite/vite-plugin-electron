@@ -92,9 +92,26 @@ pnpm dev
 pnpm build
 ```
 
-## Run Shutdown Repro
+## Run Shutdown Regression
 
-The shutdown playground lives in `playground/shutdown/` and uses `playground/shutdown/vite.config.ts` to import [src/index.ts](../src/index.ts). It is a demo of the remaining process-lifetime gaps around `startup.exit()`: leftover descendants, SIGKILL of the direct child only, a second Ctrl+C dropping the plugin handler, Electron's natural exit skipping `process.exit()`, a failed close that cannot be retried, watcher cleanup running before the kill signal, two plugin instances sharing `process.electronApp`, host SIGKILL leaving Electron/helper orphans, `startup.exit()` after the child is already gone, concurrent `startup.exit()` sharing one promise, natural Electron exit leaving the Vite host event loop alive, and helpers surviving `exitElectron(SIGTERM)`.
+The shutdown playground lives in `playground/shutdown/` and uses `playground/shutdown/vite.config.ts` to import [src/index.ts](../src/index.ts). It is a regression suite for process-lifetime behavior around `startup.exit()`:
+
+**Fixed / asserted healthy**
+
+- Leftover helpers are reaped after plugin-initiated shutdown (including SIGKILL escalation and `exitElectron(SIGTERM)`)
+- A second Ctrl+C escalates in-flight Electron shutdown instead of dropping the handler
+- A failed `close()` / `startup.exit()` can be retried
+- Two plugin sessions keep separate Electron children (`process.electronApp` is the latest alias)
+- `startup.exit()` after the child is already gone resolves immediately
+- Concurrent `startup.exit()` calls share one in-flight promise
+
+**Documented intentional / platform notes**
+
+- Natural Electron exit closes Vite without `process.exit()` (middleware / Vite API hosts own process lifetime)
+- Watcher/mock cleanup runs before the kill signal
+- Host `SIGKILL` can leave Electron/helper orphans (OS limitation)
+- Natural Electron exit may leave Vite CLI leftover timers keeping the host alive
+- Windows `child.kill('SIGINT')` is `TerminateProcess` (skipped on non-Windows)
 
 From the repo root:
 
@@ -117,7 +134,7 @@ Interactive env vars:
 - `SHUTDOWN_TWO_PLUGINS=1` mounts a second `electron()` plugin
 - `SHUTDOWN_HEADLESS=1` skips the BrowserWindow
 
-`pnpm reproduce` drives those cases against the plugin source and prints `[reproduced]` (or `[skipped]` for Windows-only SIGINT semantics on non-Windows hosts).
+`pnpm reproduce` drives those cases against the plugin source and prints `[ok]` (or `[skipped]` for Windows-only SIGINT semantics on non-Windows hosts).
 
 ## What Each Demo Covers
 
@@ -125,4 +142,4 @@ Interactive env vars:
 - `multi-env/` exercises `vite-plugin-electron/multi-env` with named Vite environments, per-environment `define` values, preload reload behavior, and a worker thread entry.
 - `simple/` exercises the simple API with preload rebuild hot reload behavior.
 - `worker/` exercises multiple entries.
-- `shutdown/` reproduces Ctrl+C / child-process lifetime gaps that remain after synchronizing Electron and Vite shutdown.
+- `shutdown/` regression-tests Ctrl+C / child-process lifetime behavior after synchronizing Electron and Vite shutdown.
