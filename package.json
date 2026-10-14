@@ -62,6 +62,8 @@
     "play:multi-env": "pnpm --dir playground/multi-env dev",
     "play:simple": "pnpm --dir playground/simple dev",
     "play:worker": "pnpm --dir playground/worker dev",
+    "play:shutdown": "pnpm --dir playground/shutdown dev",
+    "play:shutdown:reproduce": "pnpm --dir playground/shutdown reproduce",
     "play:build": "pnpm --dir playground/flat build",
     "play:build:multi-env": "pnpm --dir playground/multi-env build",
     "play:build:simple": "pnpm --dir playground/simple build",

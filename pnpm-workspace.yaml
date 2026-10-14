@@ -5,6 +5,9 @@ packages:
 onlyBuiltDependencies:
   - electron
 
+publicHoistPattern:
+  - '*oxlint*'
+
 catalog:
   vite: ^8.3.1
   electron: 42.1.0

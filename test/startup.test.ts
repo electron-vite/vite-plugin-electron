@@ -4,14 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { startup } from '../src/startup'
 
-const spawn = vi.fn()
-const createRequire = vi.fn()
+const { spawn, createRequire } = vi.hoisted(() => ({
+  spawn: vi.fn(),
+  createRequire: vi.fn(),
+}))
 
-vi.mock('node:child_process', () => ({
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:child_process')>()),
   spawn,
 }))
 
-vi.mock('node:module', () => ({
+vi.mock('node:module', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:module')>()),
   createRequire,
 }))
 
@@ -26,6 +30,7 @@ const envKeys = [
   'ELECTRON_DISABLE_WEB_SECURITY',
   'ELECTRON_INSPECT',
   'ELECTRON_INSPECT_BRK',
+  'ELECTRON_STARTUP_PREVENT',
 ] as const
 
 const originalEnvValues = new Map(envKeys.map((key) => [key, process.env[key]] as const))
@@ -45,6 +50,7 @@ function restoreEnv() {
 describe('src/startup', () => {
   beforeEach(() => {
     restoreEnv()
+    startup.prevent = false
 
     spawn.mockReset()
     createRequire.mockReset()
@@ -52,9 +58,12 @@ describe('src/startup', () => {
     createRequire.mockReturnValue(() => '/mock/electron')
     spawn.mockReturnValue({
       on: vi.fn(),
-      removeAllListeners: vi.fn(),
-      kill: vi.fn(),
+      once: vi.fn(),
+      removeListener: vi.fn(),
+      kill: vi.fn(() => true),
       send: vi.fn(),
+      exitCode: null,
+      signalCode: null,
     })
 
     Reflect.deleteProperty(process, 'electronApp')
@@ -62,6 +71,7 @@ describe('src/startup', () => {
 
   afterEach(() => {
     restoreEnv()
+    startup.prevent = false
     Reflect.deleteProperty(process, 'electronApp')
   })
 
@@ -131,5 +141,30 @@ describe('src/startup', () => {
         stdio: defaultStdio,
       }),
     )
+  })
+
+  it('resolves a custom Electron package', async () => {
+    const resolve = vi.fn(() => '/mock/custom-electron')
+    createRequire.mockReturnValue(resolve)
+
+    await startup(['.'], undefined, 'custom-electron')
+
+    expect(resolve).toHaveBeenCalledWith('custom-electron')
+    expect(spawn).toHaveBeenCalledWith(
+      '/mock/custom-electron',
+      ['.'],
+      expect.objectContaining({ stdio: defaultStdio }),
+    )
+  })
+
+  it('does not spawn when startup is prevented', async () => {
+    startup.prevent = true
+    expect(await startup()).toBe(false)
+    expect(spawn).not.toHaveBeenCalled()
+
+    startup.prevent = false
+    process.env.ELECTRON_STARTUP_PREVENT = '1'
+    expect(await startup()).toBe(false)
+    expect(spawn).not.toHaveBeenCalled()
   })
 })

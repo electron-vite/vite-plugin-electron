@@ -22,7 +22,7 @@ Use the main README for current v1 behavior. Use this file only when migrating o
    - Confirm every externalized runtime package exists in the Electron runtime layout.
 5. Review `startup()` usage:
    - Handle the new boolean return value if callers await `startup()`.
-   - Do not assume the old process-tree waiting behavior from `startup.exit()`.
+   - `startup.exit()` waits for the direct Electron child only; do not assume process-tree shutdown.
 6. Build and test:
    - Run the app in dev mode.
    - Run production build.
@@ -223,7 +223,14 @@ If you use a custom Electron package or fork, pass the package name explicitly.
 
 v0.x used a tree-kill style exit path and waited for the existing Electron process to exit.
 
-v1 stops the current Electron child process before starting the next one, but callers should not rely on the old process-tree waiting behavior. If your workflow requires waiting for child processes to exit, implement that in your `onstart` hook or wrapper script.
+v1 waits for the direct Electron child process started by vite-plugin-electron to exit before starting the next one. `startup.exit()` is asynchronous and can be awaited:
+
+```ts
+await startup.exit() // Sends SIGTERM and waits for the direct Electron child to exit.
+await startup.exit('SIGINT') // Sends an explicit shutdown signal.
+```
+
+`SpawnOptions.killSignal` configures spawning; it does not configure later `startup.exit()` calls. `startup.exit()` terminates the OS process, not via Electron's `app.quit()`, and does not promise application-level graceful quit hooks. vite-plugin-electron handles Ctrl+C internally in ordinary Vite CLI dev mode. The plugin does not recursively terminate processes created by the Electron application; those descendants remain the application's responsibility.
 
 ## Hot Reload Preload Scripts
 

@@ -25,7 +25,7 @@ async function getPassedOptions(): Promise<ElectronOptions[]> {
   const mock = vi.mocked(electron)
   const calls = mock.mock.calls
   expect(calls).toHaveLength(1)
-  return calls[0][0] as ElectronOptions[]
+  return calls[0]![0] as ElectronOptions[]
 }
 
 describe('src/simple', () => {
@@ -50,7 +50,7 @@ describe('src/simple', () => {
     const options = await getPassedOptions()
     expect(options).toHaveLength(2)
 
-    const preload = options[1]
+    const preload = options[1]!
     expect(preload.onstart).toBe(defaultPreloadOnstart)
     // input is forwarded into the vite build config
     expect((preload.vite?.build as any)?.rolldownOptions?.input).toBe('electron/preload.ts')
@@ -65,11 +65,11 @@ describe('src/simple', () => {
     const options = await getPassedOptions()
     expect(options).toHaveLength(3) // main + 2 preloads
 
-    expect(options[1].onstart).toBe(defaultPreloadOnstart)
-    expect((options[1].vite?.build as any)?.rolldownOptions?.input).toBe('electron/preload.ts')
+    expect(options[1]!.onstart).toBe(defaultPreloadOnstart)
+    expect((options[1]!.vite?.build as any)?.rolldownOptions?.input).toBe('electron/preload.ts')
 
-    expect(options[2].onstart).toBe(defaultPreloadOnstart)
-    expect((options[2].vite?.build as any)?.rolldownOptions?.input).toBe(
+    expect(options[2]!.onstart).toBe(defaultPreloadOnstart)
+    expect((options[2]!.vite?.build as any)?.rolldownOptions?.input).toBe(
       'electron/preload-worker.ts',
     )
   })
@@ -83,8 +83,8 @@ describe('src/simple', () => {
     })
 
     const options = await getPassedOptions()
-    expect(options[1].onstart).toBe(customOnstart)
-    expect(options[1].onstart).not.toBe(defaultPreloadOnstart)
+    expect(options[1]!.onstart).toBe(customOnstart)
+    expect(options[1]!.onstart).not.toBe(defaultPreloadOnstart)
   })
 
   it('custom onstart in each preload array item overrides defaultPreloadOnstart', async () => {
@@ -101,8 +101,8 @@ describe('src/simple', () => {
 
     const options = await getPassedOptions()
     expect(options).toHaveLength(3)
-    expect(options[1].onstart).toBe(customOnstart1)
-    expect(options[2].onstart).toBe(customOnstart2)
+    expect(options[1]!.onstart).toBe(customOnstart1)
+    expect(options[2]!.onstart).toBe(customOnstart2)
   })
 
   it('vite config in preload is merged with the default preload config', async () => {
@@ -115,7 +115,7 @@ describe('src/simple', () => {
     })
 
     const options = await getPassedOptions()
-    const preload = options[1]
+    const preload = options[1]!
     expect(preload.vite?.define).toMatchObject({ __PRELOAD__: 'true' })
     // default preload platform is still set
     expect((preload.vite?.build as any)?.rolldownOptions?.platform).toBe('node')

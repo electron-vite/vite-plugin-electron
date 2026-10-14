@@ -132,7 +132,7 @@ describe('src/plugin', () => {
     }
 
     expect(config.build?.rolldownOptions?.external).toEqual(expect.arrayContaining(['electron']))
-    expect(config.environments?.electron.build?.rolldownOptions?.external).toEqual(
+    expect(config.environments?.electron?.build?.rolldownOptions?.external).toEqual(
       expect.arrayContaining(['electron']),
     )
   })
@@ -151,7 +151,7 @@ describe('src/plugin', () => {
       buildConfig,
     })
 
-    const config = await (plugins[1].config as any)?.(
+    const config = await (plugins[1]!.config as any)?.(
       { root: __dirname } as never,
       { command: 'build', mode: 'production' } as never,
     )
