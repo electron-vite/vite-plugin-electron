@@ -8,6 +8,18 @@ const childPath = process.env.SHUTDOWN_CHILD
 const electronRoot = process.env.SHUTDOWN_ELECTRON_ROOT
 const delayMs = Number(process.env.SHUTDOWN_WATCHER_DELAY_MS ?? 0)
 
+// Windows has no catchable SIGINT for child.kill(): it is TerminateProcess. The repro
+// drives Ctrl+C over IPC instead so the plugin's real SIGINT handler still runs.
+// SHUTDOWN_SIGINT_VIA_IPC=1 forces this path on Unix for verification.
+const sigintViaIpc = process.platform === 'win32' || process.env.SHUTDOWN_SIGINT_VIA_IPC === '1'
+if (sigintViaIpc) {
+  process.on('message', (message: { type?: string } | null) => {
+    if (message?.type === 'sigint') {
+      process.emit('SIGINT', 'SIGINT')
+    }
+  })
+}
+
 if (!childPath || !electronRoot) {
   throw new Error('SHUTDOWN_CHILD and SHUTDOWN_ELECTRON_ROOT are required')
 }

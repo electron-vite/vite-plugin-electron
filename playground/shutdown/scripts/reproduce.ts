@@ -48,6 +48,27 @@ function killPid(pid: number | undefined): void {
   }
 }
 
+const isWindows = process.platform === 'win32'
+// Must match host.ts: on Windows child.kill('SIGINT') is TerminateProcess, so the host
+// would die before the plugin's SIGINT handler runs.
+const sigintViaIpc = isWindows || process.env.SHUTDOWN_SIGINT_VIA_IPC === '1'
+
+/** Deliver Ctrl+C to the host: a real POSIX signal on Unix, an IPC-emitted SIGINT on Windows. */
+function sendSigint(host: ChildProcess): void {
+  if (!sigintViaIpc) {
+    host.kill('SIGINT')
+    return
+  }
+  // The host may already be exiting (e.g. a second Ctrl+C after the child died).
+  if (host.connected) {
+    try {
+      host.send({ type: 'sigint' })
+    } catch {
+      // Channel closed between the check and send.
+    }
+  }
+}
+
 function track(child: ChildProcess | undefined): ChildProcess | undefined {
   if (child) {
     startedChildren.add(child)
@@ -241,7 +262,7 @@ it('reaps leftover descendants after the direct child exits on SIGINT', async ()
   const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) => {
     host.once('exit', (code, signal) => resolve({ code, signal }))
   })
-  host.kill('SIGINT')
+  sendSigint(host)
   const result = await Promise.race([
     exited,
     sleep(8_000).then(() => ({ code: null, signal: null })),
@@ -266,12 +287,16 @@ it('tree-kills helpers when escalating an unresponsive child to SIGKILL', async 
     host.once('exit', (code, signal) => resolve({ code, signal }))
   })
   const started = Date.now()
-  host.kill('SIGINT')
+  sendSigint(host)
   const result = await exited
   const elapsed = Date.now() - started
 
   expect(result.code).toBe(130)
-  expect(elapsed).toBeGreaterThanOrEqual(4_500)
+  if (!isWindows) {
+    // POSIX: the child ignores SIGINT, so only the 5s SIGKILL escalation ends it.
+    // Windows: child.kill('SIGINT') is TerminateProcess, so there is no escalation to wait for.
+    expect(elapsed).toBeGreaterThanOrEqual(4_500)
+  }
   expect(isAlive(childPid)).toBe(false)
   expect(isAlive(helperPid), 'SIGKILL escalation should tree-kill helpers').toBe(false)
   console.log(
@@ -292,9 +317,9 @@ it('escalates a second SIGINT instead of dropping Electron supervision', async (
   const exited = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) => {
     host.once('exit', (code, signal) => resolve({ code, signal }))
   })
-  host.kill('SIGINT')
+  sendSigint(host)
   await sleep(200)
-  host.kill('SIGINT')
+  sendSigint(host)
   const result = await Promise.race([exited, sleep(8_000).then(() => null)])
 
   expect(result, 'host should stay supervised and exit 130 after escalated kill').not.toBe(null)
@@ -483,10 +508,14 @@ it('documents host SIGKILL leaving Electron and helper orphans', async () => {
   await sleep(500)
 
   expect(isAlive(host.pid!), 'host should be gone after SIGKILL').toBe(false)
-  expect(isAlive(childPid), 'Electron direct child should outlive a SIGKILL host').toBe(true)
-  expect(isAlive(helperPid), 'detached helper should outlive a SIGKILL host').toBe(true)
+  if (!isWindows) {
+    expect(isAlive(childPid), 'Electron direct child should outlive a SIGKILL host').toBe(true)
+    expect(isAlive(helperPid), 'detached helper should outlive a SIGKILL host').toBe(true)
+  }
+  // Windows: TerminateProcess on the host; the direct child has been observed to go away
+  // with it (pipe/IPC teardown) and helper survival may vary, so only log the outcome.
   console.log(
-    `[ok] host-sigkill-leaves-orphans (OS limitation) childAlive=${isAlive(childPid)} helperAlive=${isAlive(helperPid)}`,
+    `[ok] host-sigkill-leaves-orphans (OS limitation, platform=${process.platform}) childAlive=${isAlive(childPid)} helperAlive=${isAlive(helperPid)}`,
   )
 }, 15_000)
 
