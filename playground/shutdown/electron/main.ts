@@ -54,6 +54,9 @@ function spawnHelper(): void {
   const helper = spawn(process.execPath, [join(process.cwd(), 'electron/helper.cjs')], {
     stdio: ['ignore', 'ignore', 'ignore'],
     detached: true,
+    // process.execPath is electron(.exe); run the helper as plain Node so it is one process
+    // instead of a second Electron app with its own GPU/utility children.
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
   })
   helper.unref()
   helperPid = helper.pid ?? null

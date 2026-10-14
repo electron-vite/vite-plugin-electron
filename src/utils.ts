@@ -445,48 +445,95 @@ export function listDescendantPids(pid: number): number[] {
   return result
 }
 
-function listWindowsDescendantPids(rootPid: number): number[] {
+/** Parse `wmic process get ProcessId,ParentProcessId /FORMAT:CSV` into ppid -> pids. */
+export function parseWindowsProcessTable(out: string): Map<number, number[]> {
+  const childrenByParent = new Map<number, number[]>()
+  for (const line of out.split(/\r?\n/)) {
+    const parts = line.trim().split(',')
+    if (parts.length < 3) {
+      continue
+    }
+    const ppid = Number(parts[parts.length - 2])
+    const pid = Number(parts[parts.length - 1])
+    // Skip the CSV header and malformed rows; wmic lists the System Idle Process as pid 0.
+    if (!Number.isFinite(pid) || !Number.isFinite(ppid) || pid <= 0) {
+      continue
+    }
+    const list = childrenByParent.get(ppid)
+    if (list) {
+      list.push(pid)
+    } else {
+      childrenByParent.set(ppid, [pid])
+    }
+  }
+  return childrenByParent
+}
+
+function readWindowsProcessTable(): Map<number, number[]> | undefined {
   try {
     const out = execFileSync(
       'wmic',
       ['process', 'get', 'ProcessId,ParentProcessId', '/FORMAT:CSV'],
-      { encoding: 'utf8' },
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
     )
-    const childrenByParent = new Map<number, number[]>()
-    for (const line of out.split(/\r?\n/)) {
-      const parts = line.trim().split(',')
-      if (parts.length < 3) {
-        continue
-      }
-      const ppid = Number(parts[parts.length - 2])
-      const pid = Number(parts[parts.length - 1])
-      if (!Number.isFinite(pid) || !Number.isFinite(ppid)) {
-        continue
-      }
-      const list = childrenByParent.get(ppid)
-      if (list) {
-        list.push(pid)
-      } else {
-        childrenByParent.set(ppid, [pid])
-      }
-    }
-    const result: number[] = []
-    const stack = [rootPid]
-    const seen = new Set<number>([rootPid])
-    while (stack.length) {
-      const current = stack.pop()!
-      for (const child of childrenByParent.get(current) ?? []) {
-        if (!seen.has(child)) {
-          seen.add(child)
-          result.push(child)
-          stack.push(child)
-        }
-      }
-    }
-    return result
+    return parseWindowsProcessTable(out)
   } catch {
+    return undefined
+  }
+}
+
+function listWindowsDescendantPids(rootPid: number): number[] {
+  const childrenByParent = readWindowsProcessTable()
+  if (!childrenByParent) {
     return []
   }
+  const result: number[] = []
+  const stack = [rootPid]
+  const seen = new Set<number>([rootPid])
+  while (stack.length) {
+    const current = stack.pop()!
+    for (const child of childrenByParent.get(current) ?? []) {
+      if (!seen.has(child)) {
+        seen.add(child)
+        result.push(child)
+        stack.push(child)
+      }
+    }
+  }
+  return result
+}
+
+/**
+ * Best-effort cleanup of processes orphaned by a direct child that already exited on its own
+ * (e.g. Electron `app.quit()` / `process.exit()`), when no pre-exit snapshot exists.
+ *
+ * Windows keeps the dead parent's id in `ParentProcessId`, so the orphans are still findable;
+ * each is tree-killed with `taskkill /T /F`. Trade-off: PIDs are reused on Windows, but this
+ * runs synchronously within milliseconds of the parent's exit, so a reused `deadPid` that has
+ * already spawned children of its own is very unlikely.
+ *
+ * POSIX re-parents orphans to init/subreaper, so they cannot be found by the dead pid; this is a
+ * no-op there (plugin-initiated shutdown still reaps them via its pre-kill snapshot).
+ * @returns the orphan PIDs that were targeted
+ */
+export function killOrphanedChildrenSync(deadPid: number): number[] {
+  if (process.platform !== 'win32' || !deadPid || deadPid <= 0) {
+    return []
+  }
+  const orphans = (readWindowsProcessTable()?.get(deadPid) ?? []).filter(
+    (pid) => pid !== deadPid && pid !== process.pid,
+  )
+  for (const pid of orphans) {
+    try {
+      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      })
+    } catch {
+      // Already gone (taskkill exit 128).
+    }
+  }
+  return orphans
 }
 
 /**

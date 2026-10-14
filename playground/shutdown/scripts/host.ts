@@ -12,6 +12,13 @@ const delayMs = Number(process.env.SHUTDOWN_WATCHER_DELAY_MS ?? 0)
 // drives Ctrl+C over IPC instead so the plugin's real SIGINT handler still runs.
 // SHUTDOWN_SIGINT_VIA_IPC=1 forces this path on Unix for verification.
 const sigintViaIpc = process.platform === 'win32' || process.env.SHUTDOWN_SIGINT_VIA_IPC === '1'
+// Host leaves via process.exit() while Electron is alive (not Ctrl+C / server.close()).
+process.on('message', (message: { type?: string; code?: number } | null) => {
+  if (message?.type === 'host-exit') {
+    process.exit(message.code ?? 0)
+  }
+})
+
 if (sigintViaIpc) {
   process.on('message', (message: { type?: string } | null) => {
     if (message?.type === 'sigint') {

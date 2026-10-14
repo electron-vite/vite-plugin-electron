@@ -27,6 +27,12 @@ function start() {
     setTimeout(() => process.exit(0), 200)
     return
   }
+  if (mode === 'natural-exit-descendants') {
+    // Like Electron app.quit()/process.exit(0) with a detached helper still running.
+    send({ ready: true, pid: process.pid, helperPid: spawnHelper() })
+    setTimeout(() => process.exit(0), 200)
+    return
+  }
   if (mode === 'stay') {
     process.on('SIGINT', () => process.exit(0))
     process.on('SIGTERM', () => process.exit(0))

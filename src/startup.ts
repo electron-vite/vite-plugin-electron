@@ -4,7 +4,7 @@ import path from 'node:path'
 import type { ViteDevServer } from 'vite'
 
 import type { ConfigServerContext } from './base'
-import { killPidsSync, listDescendantPids, treeKillSync } from './utils'
+import { killOrphanedChildrenSync, killPidsSync, listDescendantPids, treeKillSync } from './utils'
 
 const startupEnv = {
   REMOTE_DEBUGGING_PORT: '--remote-debugging-port',
@@ -42,8 +42,44 @@ const electronLifecycles = new WeakMap<ChildProcess, ElectronLifecycle>()
 const exitedChildren = new WeakSet<ChildProcess>()
 let pendingSpawn: Promise<void> = Promise.resolve()
 
+// Children still alive, for the synchronous host-exit safety net below.
+const liveChildren = new Set<ChildProcess>()
+let hostExitHookInstalled = false
+
+/**
+ * If the host exits by any path (process.exit, uncaught error, ...) while an Electron child is
+ * still alive, tree-kill it synchronously. Normal shutdown paths clear children first, so this
+ * is a no-op for them and never changes the exit code.
+ */
+function onHostExit(): void {
+  for (const child of liveChildren) {
+    const gone = exitedChildren.has(child) || child.exitCode !== null || child.signalCode !== null
+    if (!gone && child.pid) {
+      treeKillSync(child.pid, 'SIGKILL')
+    }
+  }
+  liveChildren.clear()
+}
+
+function trackLiveChild(child: ChildProcess): void {
+  liveChildren.add(child)
+  if (!hostExitHookInstalled) {
+    hostExitHookInstalled = true
+    process.on('exit', onHostExit)
+  }
+}
+
+function untrackLiveChild(child: ChildProcess): void {
+  liveChildren.delete(child)
+  if (liveChildren.size === 0 && hostExitHookInstalled) {
+    hostExitHookInstalled = false
+    process.removeListener('exit', onHostExit)
+  }
+}
+
 function clearElectron(child: ChildProcess, lifecycle: ElectronLifecycle): void {
   exitedChildren.add(child)
+  untrackLiveChild(child)
   // Descendants may keep inherited pipes open after the direct child exits.
   // Preserve stream consumers, but do not let those pipes keep the host alive.
   for (const stream of child.stdio ?? []) {
@@ -66,7 +102,13 @@ function bindElectronExit(
   session?: DevSession,
 ): void {
   const lifecycle: ElectronLifecycle = { session }
+  // Only runs when Electron exits by itself: exitElectron() detaches this handler first and
+  // reaps descendants from its own pre-kill snapshot.
   const handler: ElectronExitHandler = (code, signal) => {
+    if (child.pid) {
+      // Windows: detached helpers keep the stale parent id; reap them before the host exits.
+      killOrphanedChildrenSync(child.pid)
+    }
     clearElectron(child, lifecycle)
     onExit(code, signal)
   }
@@ -229,6 +271,7 @@ async function startElectron(
     })
 
     process.electronApp = electronApp
+    trackLiveChild(electronApp)
     if (session) {
       session.electronApp = electronApp
     }

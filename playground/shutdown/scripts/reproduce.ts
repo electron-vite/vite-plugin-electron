@@ -610,6 +610,71 @@ it('documents Electron natural exit leaving the Vite host event loop alive', asy
   host.kill('SIGKILL')
 }, 15_000)
 
+it('reaps orphaned helpers when Electron exits by itself (win32), documents POSIX', async () => {
+  const httpServer = Object.assign(new EventEmitter(), { address: () => null })
+  let closed = false
+  const plugins = createElectronPlugin({
+    prefix: 'shutdown-natural-exit-descendants',
+    async dev(context, server, _isESM, session) {
+      await startTrackedChild(context, server, session, 'natural-exit-descendants')
+    },
+    build() {},
+  })
+  const plugin = plugins[0]!
+  const server = {
+    config: { root: electronRoot, server: { middlewareMode: true } },
+    httpServer,
+    close: async () => {
+      closed = true
+    },
+  }
+  const environment = configureDev(plugin, server)
+  httpServer.emit('listening')
+  const child = await waitForElectronApp()
+  const childPid = child.pid!
+  const ready = await waitForReproReady(child)
+  const helperPid = ready.helperPid as number
+  expect(helperPid).toBeGreaterThan(0)
+  extraPids.add(helperPid)
+
+  const settled = () => !isAlive(childPid) && closed
+  const deadline = Date.now() + 5_000
+  while (Date.now() < deadline && !settled()) {
+    await sleep(50)
+  }
+  expect(isAlive(childPid), 'child should exit on its own').toBe(false)
+  expect(closed, 'natural exit should close the Vite server').toBe(true)
+  if (isWindows) {
+    // Windows keeps the stale ParentProcessId, so the exit handler finds and tree-kills it.
+    await sleep(300)
+    expect(isAlive(helperPid), 'natural exit should reap orphaned helpers on Windows').toBe(false)
+  }
+  // POSIX: the orphan is re-parented to init and cannot be found by the dead pid (by design,
+  // no polling). Plugin-initiated shutdown and the host-exit hook still reap descendants.
+  console.log(
+    `[ok] natural-exit-orphans platform=${process.platform} helperAlive=${isAlive(helperPid)}`,
+  )
+  await closeDev(plugin, environment).catch(() => {})
+}, 15_000)
+
+it('tree-kills a live Electron child when the host exits via process.exit', async () => {
+  const host = await startHost('descendants')
+  const ready = await waitForMessage(host, (message) => message?.helperPid)
+  const childPid = ready.pid as number
+  const helperPid = ready.helperPid as number
+  extraPids.add(helperPid)
+  expect(isAlive(childPid)).toBe(true)
+
+  const exited = new Promise<number | null>((resolve) => host.once('exit', (code) => resolve(code)))
+  host.send({ type: 'host-exit', code: 3 })
+  const code = await exited
+  await sleep(300)
+  expect(code, 'exit hook must not change the host exit code').toBe(3)
+  expect(isAlive(childPid), 'host exit hook should kill the Electron child').toBe(false)
+  expect(isAlive(helperPid), 'host exit hook should tree-kill helpers').toBe(false)
+  console.log(`[ok] host-process-exit-tree-kills code=${code}`)
+}, 15_000)
+
 it('reaps helpers after exitElectron(SIGTERM) of the direct child', async () => {
   const httpServer = Object.assign(new EventEmitter(), { address: () => null })
   const plugins = createElectronPlugin({
