@@ -63,13 +63,28 @@ it('taskkills each direct orphan of the dead pid with /T /F on win32', () => {
   ])
 })
 
-it('is a no-op when wmic fails on win32', () => {
+it('falls back to PowerShell when wmic is unavailable on win32', () => {
+  setPlatform('win32')
+  mockedExec.mockImplementation(((file: string) => {
+    if (file === 'wmic') {
+      throw new Error('wmic not found')
+    }
+    if (file === 'powershell.exe') {
+      return 'P,100,200\r\nP,100,201\r\n'
+    }
+    return ''
+  }) as typeof execFileSync)
+
+  expect(killOrphanedChildrenSync(100)).toEqual([200, 201])
+})
+
+it('is a no-op when wmic and PowerShell both fail on win32', () => {
   setPlatform('win32')
   mockedExec.mockImplementation(() => {
-    throw new Error('wmic not found')
+    throw new Error('not found')
   })
   expect(killOrphanedChildrenSync(100)).toEqual([])
-  expect(mockedExec).toHaveBeenCalledTimes(1)
+  expect(mockedExec).toHaveBeenCalledTimes(2)
 })
 
 it('is a no-op on POSIX', () => {

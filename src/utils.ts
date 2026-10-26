@@ -445,7 +445,7 @@ export function listDescendantPids(pid: number): number[] {
   return result
 }
 
-/** Parse `wmic process get ProcessId,ParentProcessId /FORMAT:CSV` into ppid -> pids. */
+/** Parse `wmic process get ProcessId,ParentProcessId /FORMAT:CSV` (or equivalent) into ppid -> pids. */
 export function parseWindowsProcessTable(out: string): Map<number, number[]> {
   const childrenByParent = new Map<number, number[]>()
   for (const line of out.split(/\r?\n/)) {
@@ -470,13 +470,31 @@ export function parseWindowsProcessTable(out: string): Map<number, number[]> {
 }
 
 function readWindowsProcessTable(): Map<number, number[]> | undefined {
+  const options = {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    windowsHide: true,
+  } as const
   try {
-    const out = execFileSync(
-      'wmic',
-      ['process', 'get', 'ProcessId,ParentProcessId', '/FORMAT:CSV'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
+    return parseWindowsProcessTable(
+      execFileSync('wmic', ['process', 'get', 'ProcessId,ParentProcessId', '/FORMAT:CSV'], options),
     )
-    return parseWindowsProcessTable(out)
+  } catch {
+    // wmic is removed from recent Windows 10/11 builds; fall back to PowerShell (same CSV shape).
+  }
+  try {
+    return parseWindowsProcessTable(
+      execFileSync(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          "Get-CimInstance Win32_Process | ForEach-Object { 'P,' + $_.ParentProcessId + ',' + $_.ProcessId }",
+        ],
+        options,
+      ),
+    )
   } catch {
     return undefined
   }
