@@ -98,8 +98,9 @@ The shutdown playground lives in `playground/shutdown/` and uses `playground/shu
 
 **Fixed / asserted healthy**
 
-- Leftover helpers are reaped after plugin-initiated shutdown (including SIGKILL escalation and `exitElectron(SIGTERM)`)
-- A second Ctrl+C escalates in-flight Electron shutdown instead of dropping the handler
+- With `startup.treeKill`, leftover helpers are reaped after plugin-initiated shutdown (including SIGKILL escalation and `exitElectron(SIGTERM)`); without it, only the direct Electron child is signaled and helpers are left to the app
+- A second Ctrl+C kills Electron and exits immediately (like the OS default for SIGINT)
+- A programmatic `createServer()` host keeps its own SIGINT listener and still waits for Electron
 - A failed `close()` / `startup.exit()` can be retried
 - Two plugin sessions keep separate Electron children (`process.electronApp` is the latest alias)
 - `startup.exit()` after the child is already gone resolves immediately
