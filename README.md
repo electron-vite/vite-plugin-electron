@@ -490,9 +490,29 @@ build({
 
 During development, Ctrl+C forwards `SIGINT` to Electron and waits for all pending dev sessions and their children to shut down before exiting with code 130, including earlier sessions still closing during a restart. A second Ctrl+C escalates in-flight Electron shutdowns to `SIGKILL` instead of dropping the plugin handler. Programmatic `server.close()` uses `SIGTERM`. If the direct child has not exited after 5 seconds, shutdown escalates to `SIGKILL` (tree kill). Each plugin session owns its Electron child; `process.electronApp` remains a compatibility alias for the latest/active child. Vite restarts isolate each server generation's watchers, mock files, and Electron child; cleanup from an earlier generation cannot shut down the new session.
 
-Natural Electron exit closes the Vite server without calling `process.exit()` so middleware and Vite API hosts retain control of process lifetime. Piped stdio is unreferenced after the direct child exits, so pipes inherited by descendants do not keep the development process alive. When Electron exits by itself (`app.quit()`, `process.exit()`), Windows orphans whose parent was the Electron process (e.g. detached helpers) are tree-killed via `wmic` (or PowerShell when `wmic` is unavailable) and `taskkill`; POSIX re-parents orphans, so they are not tracked after a self-exit. If the host process exits by another path while Electron is still running, a synchronous `exit` hook tree-kills the Electron child. Host `SIGKILL` cannot run plugin cleanup and may leave orphans (OS limitation). On Windows, `child.kill('SIGINT')` is `TerminateProcess` rather than a catchable Ctrl+C.
+Natural Electron exit closes the Vite server and then exits the development process with Electron's exit code, so leftover Vite CLI handles (such as the stdin shortcut reader) cannot keep it alive. In `server.middlewareMode`, the plugin only closes the Vite server and does not call `process.exit()`, so middleware hosts retain control of process lifetime. Piped stdio is unreferenced after the direct child exits, so pipes inherited by descendants do not keep the development process alive. When Electron exits by itself (`app.quit()`, `process.exit()`), Windows orphans whose parent was the Electron process (e.g. detached helpers) are tree-killed via `wmic` (or PowerShell when `wmic` is unavailable) and `taskkill`; POSIX re-parents orphans, so they are not tracked after a self-exit. If the host process exits by another path while Electron is still running, a synchronous `exit` hook tree-kills the Electron child. Host `SIGKILL` cannot run plugin cleanup and may leave orphans (OS limitation). On Windows, `child.kill('SIGINT')` is `TerminateProcess` rather than a catchable Ctrl+C.
 
 If the package cannot be resolved, `startup()` throws an error describing how to install or pass the package explicitly.
+
+### Killing the App's Child Processes on Exit
+
+If the Electron main process starts child processes (a local server, a worker binary, ...), those processes keep running after Electron quits. On Windows, Electron itself also stays alive after `app.quit()`, `app.exit()` or `process.exit()` while a process it started before its first window is still running, so the dev process never ends.
+
+By default the plugin does not touch these processes, and the app must stop its own children before quitting (for example in `app.on('will-quit')`). Set `startup.treeKill = true` to let the plugin handle it during development:
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite'
+import electron, { startup } from 'vite-plugin-electron'
+
+startup.treeKill = true
+
+export default defineConfig({
+  plugins: [electron({ entry: 'electron/main.ts' })],
+})
+```
+
+When enabled, each Electron app the plugin starts gets a small script preloaded into its main process via `NODE_OPTIONS=--require` (the user's own `NODE_OPTIONS` are kept). When the Electron main process exits, the script synchronously kills every process the app started, including their descendants and detached processes, but not Chromium's own helper processes. It reads the process table with PowerShell on Windows and `ps` on macOS/Linux, which adds a short delay to exit (about 1 second on Windows). Processes the app starts see the original `NODE_OPTIONS`, so the script does not spread to them. It is not part of production builds, and does not run if Electron crashes or is killed from outside.
 
 ### Startup Env Vars
 

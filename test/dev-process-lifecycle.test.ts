@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createElectronPlugin } from '../src/base'
 import { exitElectron, startup, triggerStartup } from '../src/startup'
+import { TREE_KILL_NODE_OPTIONS_KEY } from '../src/tree-kill-hook'
+import { treeKillSync } from '../src/utils'
 
 import { closeDev, configureDev } from './helpers/dev-session'
 
@@ -24,10 +26,15 @@ vi.mock('node:module', async (importOriginal) => ({
   ...(await importOriginal<typeof import('node:module')>()),
   createRequire,
 }))
-vi.mock('../src/utils', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../src/utils')>()),
-  setupMockHtml,
-}))
+vi.mock('../src/utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/utils')>()
+  return {
+    ...actual,
+    setupMockHtml,
+    // Pass-through spy: Windows tree-kills via taskkill rather than process.kill.
+    treeKillSync: vi.fn(actual.treeKillSync),
+  }
+})
 
 function createElectronProcess(): ChildProcess {
   return Object.assign(new EventEmitter(), {
@@ -38,12 +45,24 @@ function createElectronProcess(): ChildProcess {
   }) as unknown as ChildProcess
 }
 
+/** A mock Electron child that exits as soon as it is signalled. */
+function exitingOnKill(): ChildProcess {
+  const child = createElectronProcess()
+  vi.mocked(child.kill).mockImplementation((signal) => {
+    queueMicrotask(() => child.emit('exit', null, signal ?? 'SIGTERM'))
+    return true
+  })
+  return child
+}
+
 describe('dev process lifecycle', () => {
   beforeEach(() => {
     spawn.mockReset()
     createRequire.mockReset()
     createRequire.mockReturnValue(() => '/mock/electron')
     setupMockHtml.mockReset()
+    // Restores the pass-through implementation.
+    vi.mocked(treeKillSync).mockReset()
 
     startup.prevent = false
     Reflect.deleteProperty(process, 'electronApp')
@@ -294,6 +313,37 @@ describe('dev process lifecycle', () => {
     expect(session.electronApp).toBeUndefined()
   })
 
+  it('does not touch the Electron env unless treeKill is enabled', async () => {
+    spawn.mockImplementation(() => exitingOnKill())
+    await startup(['.'], { env: { FOO: '1' } as unknown as NodeJS.ProcessEnv })
+    expect(spawn.mock.calls[0]![2].env).toEqual({ FOO: '1' })
+    await startup(['.'])
+    expect(spawn.mock.calls[1]![2]).not.toHaveProperty('env')
+    await startup.exit()
+  })
+
+  it('preloads the tree-kill hook into Electron when treeKill is enabled', async () => {
+    spawn.mockImplementation(() => exitingOnKill())
+    startup.treeKill = true
+    try {
+      await startup(['.'], {
+        env: { FOO: '1', NODE_OPTIONS: '--no-deprecation' } as unknown as NodeJS.ProcessEnv,
+      })
+      const env = spawn.mock.calls[0]![2].env
+      expect(env.FOO).toBe('1')
+      expect(env.NODE_OPTIONS).toMatch(/^--no-deprecation --require ".+tree-kill-hook-\w+\.cjs"$/)
+      expect(env[TREE_KILL_NODE_OPTIONS_KEY]).toBe('--no-deprecation')
+
+      await startup(['.'])
+      const inherited = spawn.mock.calls[1]![2].env
+      expect(inherited.PATH ?? inherited.Path).toBe(process.env.PATH ?? process.env.Path)
+      expect(inherited.NODE_OPTIONS).toContain('--require')
+      await startup.exit()
+    } finally {
+      startup.treeKill = false
+    }
+  })
+
   it('exits the parent for a natural exit from exported startup', async () => {
     const electronApp = createElectronProcess()
     spawn.mockReturnValue(electronApp)
@@ -359,13 +409,20 @@ describe('dev process lifecycle', () => {
     expect(process.electronApp).toBe(thirdElectronApp)
   })
 
-  it('closes the Vite dev server when Electron exits on its own', async () => {
+  it('closes the Vite dev server and exits the CLI host when Electron exits on its own', async () => {
     const electronApp = createElectronProcess()
     spawn.mockReturnValue(electronApp)
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
 
-    const close = vi.fn(async () => {})
+    let finishClose!: () => void
+    const close = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishClose = resolve
+        }),
+    )
     const server = {
-      config: { root: '/app' },
+      config: { root: '/app', server: { middlewareMode: false } },
       close,
     }
 
@@ -379,11 +436,55 @@ describe('dev process lifecycle', () => {
 
     expect(close).toHaveBeenCalledOnce()
     expect(process.electronApp).toBeUndefined()
+    await Promise.resolve()
+    expect(exit, 'host must wait for Vite to close before exiting').not.toHaveBeenCalled()
+    finishClose()
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledOnce())
+    expect(process.exitCode).toBe(0)
+  })
+
+  it('exits the CLI host even when Vite close rejects after a natural Electron exit', async () => {
+    const electronApp = createElectronProcess()
+    spawn.mockReturnValue(electronApp)
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    const server = {
+      config: { root: '/app', server: { middlewareMode: false } },
+      close: vi.fn(async () => {
+        throw new Error('Vite close failed')
+      }),
+    }
+
+    triggerStartup({} as never, server as never, {})
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce())
+    electronApp.emit('exit', 3, null)
+
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledOnce())
+    expect(process.exitCode).toBe(3)
+  })
+
+  it('does not exit a middleware-mode host when Electron exits on its own', async () => {
+    const electronApp = createElectronProcess()
+    spawn.mockReturnValue(electronApp)
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    const close = vi.fn(async () => {})
+    const server = {
+      config: { root: '/app', server: { middlewareMode: true } },
+      close,
+    }
+
+    triggerStartup({} as never, server as never, {})
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce())
+    electronApp.emit('exit', 0, null)
+
+    expect(close).toHaveBeenCalledOnce()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(exit).not.toHaveBeenCalled()
   })
 
   it('closes dev build watchers when Electron exits naturally', async () => {
     const electronApp = createElectronProcess()
     spawn.mockReturnValue(electronApp)
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
     const closeWatcher = vi.fn(async () => {})
     const plugins = createElectronPlugin({
       prefix: 'vite-plugin-electron-test',
@@ -413,6 +514,7 @@ describe('dev process lifecycle', () => {
     })
     expect(server.close).toHaveBeenCalledOnce()
     expect(process.electronApp).toBeUndefined()
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledOnce())
 
     await closeBundle()
     expect(closeWatcher).toHaveBeenCalledOnce()
@@ -892,7 +994,8 @@ describe('dev process lifecycle', () => {
     }
     const existingListeners = new Set(process.listeners('SIGINT'))
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
+    // pid 4242 is fake: assert the tree kill without signalling a real process on any platform.
+    const treeKill = vi.mocked(treeKillSync).mockImplementation(() => {})
 
     configureDev(plugins[0]!, server)
     server.httpServer.emit('listening')
@@ -903,14 +1006,14 @@ describe('dev process lifecycle', () => {
     handler?.('SIGINT')
     await vi.waitFor(() => expect(electronApp.kill).toHaveBeenCalledWith('SIGINT'))
     expect(exit).not.toHaveBeenCalled()
+    expect(treeKill).not.toHaveBeenCalled()
 
     handler?.('SIGINT')
-    await vi.waitFor(() => expect(killSpy).toHaveBeenCalledWith(4242, 'SIGKILL'))
+    await vi.waitFor(() => expect(treeKill).toHaveBeenCalledWith(4242, 'SIGKILL'))
     expect(process.listeners('SIGINT')).toContain(handler)
 
     electronApp.emit('exit', null, 'SIGKILL')
     await vi.waitFor(() => expect(exit).toHaveBeenCalledExactlyOnceWith(130))
-    killSpy.mockRestore()
   })
 
   it('leaves SIGINT ownership to a middleware host while closing Electron on request', async () => {

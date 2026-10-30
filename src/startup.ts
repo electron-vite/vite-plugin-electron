@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { ViteDevServer } from 'vite'
 
 import type { ConfigServerContext } from './base'
+import { withTreeKillHook } from './tree-kill-hook'
 import { killOrphanedChildrenSync, killPidsSync, listDescendantPids, treeKillSync } from './utils'
 
 const startupEnv = {
@@ -132,6 +133,20 @@ interface StartupFn {
    * @deprecated No use
    */
   hookedProcessExit: boolean
+  /**
+   * Kill the processes the Electron app started when Electron exits by itself
+   * (`app.quit()`, `app.exit()`, `process.exit()`). Defaults to `false`, in which case the app
+   * must stop its own child processes before quitting.
+   *
+   * Without this, Electron on Windows stays alive after quitting while a process it started
+   * before its first window is still running. When enabled, a script is preloaded into the
+   * Electron main process via `NODE_OPTIONS=--require` that kills the app's descendant processes
+   * on exit (Chromium's own helpers excluded).
+   *
+   * Applies to Electron apps started after it is set. Set it on the imported `startup`,
+   * e.g. `startup.treeKill = true` in `vite.config.ts`.
+   */
+  treeKill: boolean
   /**
    * Stop the current Electron app and resolve after the direct Electron child process exits.
    * Leftover descendants discovered before the signal are cleaned up afterward.
@@ -268,6 +283,7 @@ async function startElectron(
     const electronApp = spawn(electronPath, targetArgv, {
       stdio,
       ...options,
+      ...(startup.treeKill ? { env: withTreeKillHook(options?.env ?? process.env) } : {}),
     })
 
     process.electronApp = electronApp
@@ -289,7 +305,7 @@ startup.send = (message: string) => {
     process.electronApp.send?.(message)
   }
 }
-startup.hookedProcessExit = startup.prevent = false
+startup.hookedProcessExit = startup.prevent = startup.treeKill = false
 startup.exit = (signal) => {
   const child = process.electronApp
   return child ? exitElectron(child, signal) : Promise.resolve()
@@ -476,7 +492,13 @@ export function triggerStartup(
         if (code !== null) {
           process.exitCode ??= code
         }
-        void server.close()
+        // `async` turns a synchronous throw from close() into a rejection.
+        const closing = (async () => server.close())().catch(() => {})
+        // Middleware hosts own the process lifetime. The Vite CLI does not exit by itself after
+        // close() (its stdin shortcut reader stays open), so end it like the Ctrl+C path does.
+        if (!server.config.server?.middlewareMode) {
+          void closing.then(() => process.exit())
+        }
       },
       session,
     )

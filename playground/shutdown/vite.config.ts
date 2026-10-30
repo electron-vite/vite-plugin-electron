@@ -1,7 +1,11 @@
 import { defineConfig } from 'vite'
 import type { Plugin } from 'vite'
 
-import electron from '../../src/index'
+import electron, { startup } from '../../src/index'
+
+// Kill the helper (and anything else the app started) when Electron exits by itself.
+// SHUTDOWN_TREE_KILL=0 shows the unhandled behavior: on Windows, Electron hangs after quitting.
+startup.treeKill = process.env.SHUTDOWN_TREE_KILL !== '0'
 
 function delayWatcherClose(): Plugin {
   return {

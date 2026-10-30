@@ -3,7 +3,12 @@ import { join } from 'node:path'
 
 import { app, BrowserWindow, ipcMain } from 'electron'
 
-type ShutdownScenario = 'descendants' | 'natural-exit' | 'ignore-signals' | 'two-plugins'
+type ShutdownScenario =
+  | 'descendants'
+  | 'natural-exit'
+  | 'natural-process-exit'
+  | 'ignore-signals'
+  | 'two-plugins'
 
 type ShutdownState = {
   scenario: ShutdownScenario
@@ -105,11 +110,17 @@ app.whenReady().then(() => {
   if (process.env.SHUTDOWN_HEADLESS !== '1') {
     createWindow()
   }
-  logEvent(`ready scenario=${scenario}`)
+  logEvent(`ready scenario=${scenario} pid=${process.pid}`)
   if (scenario === 'natural-exit') {
     setTimeout(() => {
       logEvent('natural-exit timer calling app.quit()')
       app.quit()
+    }, 1500)
+  }
+  if (scenario === 'natural-process-exit') {
+    setTimeout(() => {
+      logEvent('natural-process-exit timer calling process.exit(0)')
+      process.exit(0)
     }, 1500)
   }
 })
