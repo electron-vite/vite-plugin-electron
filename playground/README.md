@@ -94,7 +94,7 @@ pnpm build
 
 ## Run Shutdown Regression
 
-The shutdown playground lives in `playground/shutdown/` and uses `playground/shutdown/vite.config.ts` to import [src/index.ts](../src/index.ts). It is a regression suite for process-lifetime behavior around `startup.exit()`:
+The shutdown playground lives in `playground/shutdown/` and uses `playground/shutdown/vite.config.ts` to import [src/index.ts](../src/index.ts). Its regression suite is [test/shutdown.test.ts](../test/shutdown.test.ts) (fixtures in `test/fixtures/shutdown/`), which covers process-lifetime behavior around `startup.exit()`:
 
 **Fixed / asserted healthy**
 
@@ -104,37 +104,35 @@ The shutdown playground lives in `playground/shutdown/` and uses `playground/shu
 - Two plugin sessions keep separate Electron children (`process.electronApp` is the latest alias)
 - `startup.exit()` after the child is already gone resolves immediately
 - Concurrent `startup.exit()` calls share one in-flight promise
+- Natural Electron exit (`app.quit()` / `process.exit()`) closes Vite and exits the Vite CLI host
+- With `startup.treeKill = true` (enabled in this playground's `vite.config.ts`), quitting kills the helper, so Electron, the helper and Vite all exit (real Electron test; skipped on Linux without `DISPLAY`)
 
 **Documented intentional / platform notes**
 
-- Natural Electron exit closes Vite without `process.exit()` (middleware / Vite API hosts own process lifetime)
+- Natural Electron exit in `server.middlewareMode` closes Vite without `process.exit()` (the middleware host owns process lifetime)
+- Without `startup.treeKill`, Windows Electron hangs after quitting while the helper runs (`SHUTDOWN_TREE_KILL=0` reproduces it)
 - Watcher/mock cleanup runs before the kill signal
 - Host `SIGKILL` can leave Electron/helper orphans (OS limitation)
-- Natural Electron exit may leave Vite CLI leftover timers keeping the host alive
 - Windows `child.kill('SIGINT')` is `TerminateProcess` (skipped on non-Windows)
 
 From the repo root:
 
 ```sh
 pnpm play:shutdown
-pnpm play:shutdown:reproduce
+pnpm test test/shutdown.test.ts
 ```
 
-Or from inside `playground/shutdown/`:
-
-```sh
-pnpm dev
-pnpm reproduce
-```
+Or run the playground from inside `playground/shutdown/` with `pnpm dev`.
 
 Interactive env vars:
 
-- `SHUTDOWN_SCENARIO=descendants|natural-exit|ignore-signals|two-plugins`
+- `SHUTDOWN_SCENARIO=descendants|natural-exit|natural-process-exit|ignore-signals|two-plugins`
+- `SHUTDOWN_TREE_KILL=0` disables `startup.treeKill` to show the unhandled hang
 - `SHUTDOWN_WATCHER_DELAY_MS=2000` delays the Electron watcher close so the late kill is visible in logs
 - `SHUTDOWN_TWO_PLUGINS=1` mounts a second `electron()` plugin
 - `SHUTDOWN_HEADLESS=1` skips the BrowserWindow
 
-`pnpm reproduce` drives those cases against the plugin source and prints `[ok]` (or `[skipped]` for Windows-only SIGINT semantics on non-Windows hosts).
+`test/shutdown.test.ts` drives those cases against the plugin source and prints `[ok]` (or `[skipped]` for Windows-only SIGINT semantics on non-Windows hosts).
 
 ## What Each Demo Covers
 

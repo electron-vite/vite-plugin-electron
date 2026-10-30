@@ -4,8 +4,7 @@
   "main": "./dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "reproduce": "pnpm --dir ../.. exec vitest run --config playground/shutdown/vitest.config.mts"
+    "build": "vite build"
   },
   "devDependencies": {
     "electron": "catalog:",

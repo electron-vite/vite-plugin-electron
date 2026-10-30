@@ -1,21 +1,26 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
-import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { build } from 'vite'
 import type { Plugin, ViteDevServer } from 'vite'
-import { afterEach, beforeAll, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 
-import { createElectronPlugin } from '../../../src/base'
-import { startup, triggerStartup } from '../../../src/startup'
+import { createElectronPlugin } from '../src/base'
+import { startup, triggerStartup } from '../src/startup'
 
-const playgroundDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const childFixture = path.join(playgroundDir, 'electron/repro-child.cjs')
-const helperFixture = path.join(playgroundDir, 'electron/helper.cjs')
+const testDir = path.dirname(fileURLToPath(import.meta.url))
+const shutdownFixtures = path.join(testDir, 'fixtures/shutdown')
+// The real-Electron cases run the interactive shutdown playground.
+const playgroundDir = path.resolve(testDir, '../playground/shutdown')
+const childFixture = path.join(shutdownFixtures, 'child.cjs')
+const helperFixture = path.join(shutdownFixtures, 'helper.cjs')
 const originalSigintListeners = new Set(process.listeners('SIGINT'))
 const originalExitCode = process.exitCode
 const startedChildren = new Set<ChildProcess>()
@@ -78,6 +83,18 @@ function track(child: ChildProcess | undefined): ChildProcess | undefined {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** Poll instead of fixed sleeps so slow CI runners don't flake. Resolves false on timeout. */
+async function waitUntil(condition: () => boolean, timeout = 5_000): Promise<boolean> {
+  const deadline = Date.now() + timeout
+  while (!condition()) {
+    if (Date.now() >= deadline) {
+      return false
+    }
+    await sleep(25)
+  }
+  return true
 }
 
 function configureDev(plugin: Plugin, server: object): object {
@@ -211,7 +228,11 @@ beforeAll(async () => {
   electronRoot = path.join(workspace, 'app')
   const fixtureDir = path.join(electronRoot, 'node_modules/node-electron-fixture')
   await mkdir(fixtureDir, { recursive: true })
-  await symlink(path.resolve('node_modules'), path.join(workspace, 'node_modules'), 'junction')
+  await symlink(
+    path.resolve(testDir, '../node_modules'),
+    path.join(workspace, 'node_modules'),
+    'junction',
+  )
   await writeFile(path.join(electronRoot, 'package.json'), '{"type":"module"}')
   await writeFile(path.join(electronRoot, 'index.html'), '<!doctype html><title>shutdown</title>')
   await writeFile(path.join(fixtureDir, 'package.json'), '{"main":"index.cjs"}')
@@ -223,13 +244,20 @@ beforeAll(async () => {
     configFile: false,
     logLevel: 'silent',
     build: {
-      ssr: path.resolve(playgroundDir, 'scripts/host.ts'),
+      ssr: path.join(shutdownFixtures, 'host.ts'),
       outDir: path.join(workspace, 'dist'),
       rollupOptions: { output: { entryFileNames: 'host.mjs' } },
     },
   })
   hostPath = path.join(workspace, 'dist/host.mjs')
 }, 30_000)
+
+afterAll(async () => {
+  if (workspace) {
+    // Tests kill every tracked process in afterEach, so nothing holds files open here.
+    await rm(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+  }
+})
 
 afterEach(() => {
   for (const listener of process.listeners('SIGINT')) {
@@ -361,7 +389,7 @@ it('documents Electron natural exit closing Vite without process.exit', async ()
     const environment = configureDev(plugin, server)
     httpServer.emit('listening')
     await waitForElectronApp()
-    await sleep(800)
+    await waitUntil(() => closed)
     expect(closed, 'plugin should close the Vite server when Electron exits').toBe(true)
     expect(exitCalls, 'plugin should not call process.exit on a natural Electron exit').toBe(0)
     console.log(
@@ -505,7 +533,7 @@ it('documents host SIGKILL leaving Electron and helper orphans', async () => {
   extraPids.add(helperPid)
 
   host.kill('SIGKILL')
-  await sleep(500)
+  await waitUntil(() => !isAlive(host.pid!))
 
   expect(isAlive(host.pid!), 'host should be gone after SIGKILL').toBe(false)
   if (!isWindows) {
@@ -537,12 +565,13 @@ it('resolves startup.exit immediately when the child already exited', async () =
   const environment = configureDev(plugin, server)
   httpServer.emit('listening')
   const child = await waitForElectronApp()
-  await sleep(800)
+  await waitUntil(() => child.exitCode !== null)
   expect(child.exitCode).not.toBeNull()
 
   const started = Date.now()
   await startup.exit()
-  expect(Date.now() - started).toBeLessThan(500)
+  // "Immediately" with headroom for slow CI; a real kill/escalation path takes >= 5s.
+  expect(Date.now() - started).toBeLessThan(1_000)
   console.log('[ok] startup-exit-after-child-gone resolves-immediately')
   await closeDev(plugin, environment).catch(() => {})
 }, 15_000)
@@ -592,22 +621,16 @@ it('shares one in-flight promise across concurrent startup.exit calls', async ()
   await closeDev(plugin, environment).catch(() => {})
 }, 20_000)
 
-it('documents Electron natural exit leaving the Vite host event loop alive', async () => {
+it('exits the Vite CLI host after Electron exits naturally', async () => {
   const host = await startHost('natural-exit')
+  const exited = new Promise<number | null>((resolve) => host.once('exit', (code) => resolve(code)))
   const ready = await waitForMessage(host, (message) => message?.ready || message?.pid)
   const childPid = ready.pid as number
 
-  // Wait for the fixture child to exit on its own.
-  const deadline = Date.now() + 5_000
-  while (Date.now() < deadline && isAlive(childPid)) {
-    await sleep(100)
-  }
+  const code = await Promise.race([exited, sleep(8_000).then(() => 'timeout' as const)])
+  expect(code, 'host should exit even with leftover CLI handles (stdin / timers)').toBe(0)
   expect(isAlive(childPid), 'natural-exit child should have exited').toBe(false)
-  expect(isAlive(host.pid!), 'Vite host keeps a leftover timer after server.close()').toBe(true)
-  console.log(
-    `[ok] natural-exit-leaves-vite-host-alive hostAlive=${isAlive(host.pid!)} childAlive=${isAlive(childPid)}`,
-  )
-  host.kill('SIGKILL')
+  console.log(`[ok] natural-exit-exits-vite-host hostCode=${code} childAlive=${isAlive(childPid)}`)
 }, 15_000)
 
 it('reaps orphaned helpers when Electron exits by itself (win32), documents POSIX', async () => {
@@ -638,15 +661,12 @@ it('reaps orphaned helpers when Electron exits by itself (win32), documents POSI
   extraPids.add(helperPid)
 
   const settled = () => !isAlive(childPid) && closed
-  const deadline = Date.now() + 5_000
-  while (Date.now() < deadline && !settled()) {
-    await sleep(50)
-  }
+  await waitUntil(settled)
   expect(isAlive(childPid), 'child should exit on its own').toBe(false)
   expect(closed, 'natural exit should close the Vite server').toBe(true)
   if (isWindows) {
     // Windows keeps the stale ParentProcessId, so the exit handler finds and tree-kills it.
-    await sleep(300)
+    await waitUntil(() => !isAlive(helperPid))
     expect(isAlive(helperPid), 'natural exit should reap orphaned helpers on Windows').toBe(false)
   }
   // POSIX: the orphan is re-parented to init and cannot be found by the dead pid (by design,
@@ -668,7 +688,7 @@ it('tree-kills a live Electron child when the host exits via process.exit', asyn
   const exited = new Promise<number | null>((resolve) => host.once('exit', (code) => resolve(code)))
   host.send({ type: 'host-exit', code: 3 })
   const code = await exited
-  await sleep(300)
+  await waitUntil(() => !isAlive(childPid) && !isAlive(helperPid))
   expect(code, 'exit hook must not change the host exit code').toBe(3)
   expect(isAlive(childPid), 'host exit hook should kill the Electron child').toBe(false)
   expect(isAlive(helperPid), 'host exit hook should tree-kill helpers').toBe(false)
@@ -705,6 +725,82 @@ it('reaps helpers after exitElectron(SIGTERM) of the direct child', async () => 
   console.log(`[ok] helper-reaped-after-exitElectron-sigterm helperAlive=${isAlive(helperPid)}`)
   await closeDev(plugin, environment).catch(() => {})
 }, 15_000)
+
+const isCI = Boolean(process.env.CI)
+const viteBin = path.join(playgroundDir, 'node_modules/vite/bin/vite.js')
+
+/**
+ * The real-Electron cases need the playground installed with the Electron binary downloaded
+ * (CI may skip it via ELECTRON_SKIP_BINARY_DOWNLOAD / --ignore-scripts), and a display on Linux
+ * (GitHub ubuntu runners have none unless wrapped in xvfb-run).
+ */
+function electronUnavailableReason(): string | undefined {
+  if (process.platform === 'linux' && !process.env.DISPLAY) {
+    return 'no DISPLAY on Linux'
+  }
+  if (!existsSync(viteBin)) {
+    return 'playground/shutdown dependencies are not installed'
+  }
+  try {
+    // electron's index.js throws when the binary download was skipped.
+    const binary = createRequire(path.join(playgroundDir, 'package.json'))('electron') as string
+    return existsSync(binary) ? undefined : `Electron binary missing at ${binary}`
+  } catch (error) {
+    return `electron is not usable: ${(error as Error).message}`
+  }
+}
+
+const electronSkipReason = electronUnavailableReason()
+if (electronSkipReason) {
+  console.log(`[skipped] real Electron shutdown tests: ${electronSkipReason}`)
+}
+
+for (const scenario of ['natural-exit', 'natural-process-exit']) {
+  it.skipIf(Boolean(electronSkipReason))(
+    `startup.treeKill ends Vite, Electron and helpers after ${scenario} (real Electron)`,
+    async () => {
+      const host = spawn(process.execPath, [viteBin], {
+        cwd: playgroundDir,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          SHUTDOWN_SCENARIO: scenario,
+          SHUTDOWN_TREE_KILL: '1',
+          // No window is needed for these assertions; skip it on CI runners.
+          ...(isCI ? { SHUTDOWN_HEADLESS: '1' } : {}),
+          // Linux CI containers usually cannot use Chromium's SUID / userns sandbox.
+          ...(isCI && process.platform === 'linux' ? { ELECTRON_DISABLE_SANDBOX: '1' } : {}),
+        },
+      })
+      track(host)
+      let output = ''
+      let helperPid: number | undefined
+      let electronPid: number | undefined
+      const onData = (chunk: Buffer) => {
+        output += chunk
+        helperPid ??= Number(/spawned helper pid=(\d+)/.exec(output)?.[1]) || undefined
+        electronPid ??= Number(/ready scenario=\S+ pid=(\d+)/.exec(output)?.[1]) || undefined
+      }
+      host.stdout?.on('data', onData)
+      host.stderr?.on('data', onData)
+      const exited = new Promise<number | null>((resolve) =>
+        host.once('exit', (code) => resolve(code)),
+      )
+      const code = await Promise.race([exited, sleep(30_000).then(() => 'timeout' as const)])
+      if (helperPid) {
+        extraPids.add(helperPid)
+      }
+      expect(code, `Vite host should exit by itself. Output:\n${output}`).toBe(0)
+      expect(helperPid, 'playground should report its helper').toBeGreaterThan(0)
+      expect(electronPid, 'playground should report the Electron pid').toBeGreaterThan(0)
+      await waitUntil(() => !isAlive(helperPid!) && !isAlive(electronPid!))
+      expect(isAlive(helperPid!), 'treeKill hook should kill the helper').toBe(false)
+      expect(isAlive(electronPid!), 'Electron should have exited').toBe(false)
+      console.log(`[ok] tree-kill-${scenario} hostCode=${code} helperAlive=${isAlive(helperPid!)}`)
+    },
+    45_000,
+  )
+}
 
 it('documents Windows SIGINT as TerminateProcess, or skips on Unix', async () => {
   if (process.platform !== 'win32') {
