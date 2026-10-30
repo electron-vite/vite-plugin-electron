@@ -105,6 +105,10 @@ for (const mode of ['restart', 'pipes', 'middleware']) {
       }
       try {
         await within(ready, 10_000)
+        // The direct child exits by itself. POSIX re-parents the descendant, so it keeps the
+        // inherited pipes open and the host must still release them. Windows keeps the stale
+        // ParentProcessId, so the plugin finds and reaps the orphan on exit.
+        const descendantSurvives = process.platform !== 'win32'
         if (mode === 'restart') {
           runner.kill('SIGINT')
           expect(await within(exited, 8_000)).toBe(130)
@@ -112,12 +116,12 @@ for (const mode of ['restart', 'pipes', 'middleware']) {
         } else if (mode === 'pipes') {
           expect(await within(exited, 3_000)).toBe(0)
           expect(isAlive(pids[0]!)).toBe(false)
-          expect(isAlive(pids[1]!)).toBe(true)
+          expect(isAlive(pids[1]!)).toBe(descendantSurvives)
         } else {
           await within(cleaned, 3_000)
           expect(runner.exitCode).toBeNull()
           expect(runner.signalCode).toBeNull()
-          expect(isAlive(pids[1]!)).toBe(true)
+          expect(isAlive(pids[1]!)).toBe(descendantSurvives)
         }
       } finally {
         for (const pid of pids) {

@@ -105,6 +105,8 @@ it.each(['normal', 'multi-env'] as const)(
         ? electron(options)
         : multiEnvElectron({ input: entry, onstart, options: { build: buildConfig } })
     const listeners = process.listenerCount('SIGINT')
+    // Real Vite restarts and watcher rebuilds can exceed vi.waitFor's 1s default under CI load.
+    const waitOptions = { timeout: 10_000 }
     const server = await createServer({
       configFile: false,
       root,
@@ -114,11 +116,11 @@ it.each(['normal', 'multi-env'] as const)(
     })
     try {
       await server.listen()
-      await vi.waitFor(() => expect(starts).toHaveLength(1))
+      await vi.waitFor(() => expect(starts).toHaveLength(1), waitOptions)
       await starts[0]
       const first = children[0]!
       await server.restart()
-      await vi.waitFor(() => expect(starts).toHaveLength(2))
+      await vi.waitFor(() => expect(starts).toHaveLength(2), waitOptions)
       await starts[1]
       const second = children[1]!
       expect(first.exitCode !== null || first.signalCode !== null).toBe(true)
@@ -131,7 +133,7 @@ it.each(['normal', 'multi-env'] as const)(
       // A source edit must reach B's watcher exactly once after A is cleaned up.
       await writeFile(`${entry}.next`, 'export const generation = 1')
       await rename(`${entry}.next`, entry)
-      await vi.waitFor(() => expect(starts).toHaveLength(3))
+      await vi.waitFor(() => expect(starts).toHaveLength(3), waitOptions)
       await starts[2]
       expect(second.exitCode !== null || second.signalCode !== null).toBe(true)
       expect(onstart).toHaveBeenCalledTimes(3)
