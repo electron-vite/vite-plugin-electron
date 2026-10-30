@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import type { Plugin, ConfigEnv, UserConfig, ViteDevServer, ServerHook, ResolvedConfig } from 'vite'
 
-import { exitElectron } from './startup'
+import { exitElectron, killElectronSync } from './startup'
 import type { DevSession } from './startup'
 import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule, setIsViteDev } from './utils'
 
@@ -174,13 +174,15 @@ export function createElectronPlugin({
         } else if (!sigintHandler) {
           sigintHandler = () => {
             if (sigintShutdownStarted) {
-              // Second Ctrl+C: keep supervising and escalate in-flight Electron shutdowns.
+              // Second Ctrl+C: like the OS default for an unhandled SIGINT, stop waiting and exit
+              // now. Kill owned Electron children first so they do not outlive the host.
               for (const owned of pendingSessions) {
-                owned.shutdownSignal = 'SIGKILL'
                 if (owned.electronApp) {
-                  void exitElectron(owned.electronApp, 'SIGKILL')
+                  killElectronSync(owned.electronApp)
                 }
               }
+              removeSigintHandler()
+              process.exit(128 + constants.signals.SIGINT)
               return
             }
             sigintShutdownStarted = true
@@ -201,7 +203,7 @@ export function createElectronPlugin({
               process.exit(128 + constants.signals.SIGINT)
             })()
           }
-          // Use `on`, not `once`: a second SIGINT must escalate rather than default-kill the host.
+          // Use `on`, not `once`: the second SIGINT must still kill Electron before exiting.
           process.on('SIGINT', sigintHandler)
         }
 

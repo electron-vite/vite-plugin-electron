@@ -470,11 +470,11 @@ export function parseWindowsProcessTable(out: string): Map<number, number[]> {
 }
 
 function readWindowsProcessTable(): Map<number, number[]> | undefined {
-  const options = {
+  const options: import('node:child_process').ExecFileSyncOptionsWithStringEncoding = {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
     windowsHide: true,
-  } as const
+  }
   try {
     return parseWindowsProcessTable(
       execFileSync('wmic', ['process', 'get', 'ProcessId,ParentProcessId', '/FORMAT:CSV'], options),

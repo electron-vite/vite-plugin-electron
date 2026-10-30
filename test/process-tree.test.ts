@@ -67,6 +67,8 @@ it('resolves on direct exit even while a descendant holds its pipe open', async 
   const packageDir = path.join(root, 'node_modules', 'e2e-electron')
   let descendantPid: number | undefined
   let directChild: ChildProcess | undefined
+  // Descendant reaping is opt-in.
+  startup.treeKill = true
 
   try {
     await mkdir(packageDir, { recursive: true })
@@ -127,5 +129,6 @@ it('resolves on direct exit even while a descendant holds its pipe open', async 
       await startup.exit()
     }
     await rm(root, { recursive: true, force: true })
+    startup.treeKill = false
   }
 }, 20_000)

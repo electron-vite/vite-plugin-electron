@@ -6,7 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createElectronPlugin } from '../src/base'
 import { exitElectron, startup, triggerStartup } from '../src/startup'
 import { TREE_KILL_NODE_OPTIONS_KEY } from '../src/tree-kill-hook'
-import { treeKillSync } from '../src/utils'
+import {
+  killOrphanedChildrenSync,
+  killPidsSync,
+  listDescendantPids,
+  treeKillSync,
+} from '../src/utils'
 
 import { closeDev, configureDev } from './helpers/dev-session'
 
@@ -33,6 +38,9 @@ vi.mock('../src/utils', async (importOriginal) => {
     setupMockHtml,
     // Pass-through spy: Windows tree-kills via taskkill rather than process.kill.
     treeKillSync: vi.fn(actual.treeKillSync),
+    listDescendantPids: vi.fn(() => [] as number[]),
+    killPidsSync: vi.fn(),
+    killOrphanedChildrenSync: vi.fn(() => [] as number[]),
   }
 })
 
@@ -63,8 +71,12 @@ describe('dev process lifecycle', () => {
     setupMockHtml.mockReset()
     // Restores the pass-through implementation.
     vi.mocked(treeKillSync).mockReset()
+    vi.mocked(listDescendantPids).mockReset().mockReturnValue([])
+    vi.mocked(killPidsSync).mockReset()
+    vi.mocked(killOrphanedChildrenSync).mockReset().mockReturnValue([])
 
     startup.prevent = false
+    startup.treeKill = false
     Reflect.deleteProperty(process, 'electronApp')
     process.exitCode = originalExitCode
   })
@@ -342,6 +354,70 @@ describe('dev process lifecycle', () => {
     } finally {
       startup.treeKill = false
     }
+  })
+
+  it('does not scan or kill descendants by default', async () => {
+    const child = Object.assign(createElectronProcess(), { pid: 4242 })
+    spawn.mockReturnValue(child)
+    await startup(['.'])
+
+    const exiting = startup.exit()
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+    child.emit('exit', null, 'SIGTERM')
+    await exiting
+    expect(listDescendantPids).not.toHaveBeenCalled()
+    expect(killPidsSync).not.toHaveBeenCalled()
+
+    const second = Object.assign(createElectronProcess(), { pid: 4343 })
+    spawn.mockReturnValue(second)
+    await startup(['.'])
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    second.emit('exit', 0, null)
+    expect(exit).toHaveBeenCalledWith(0)
+    expect(killOrphanedChildrenSync).not.toHaveBeenCalled()
+  })
+
+  it('kills only the direct child when escalating to SIGKILL by default', async () => {
+    vi.useFakeTimers()
+    const child = Object.assign(createElectronProcess(), { pid: 4242 })
+    spawn.mockReturnValue(child)
+    await startup(['.'])
+
+    const exiting = startup.exit()
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(child.kill).toHaveBeenLastCalledWith('SIGKILL')
+    expect(treeKillSync).not.toHaveBeenCalled()
+    child.emit('exit', null, 'SIGKILL')
+    await exiting
+  })
+
+  it('snapshots, reaps and tree-kills descendants when treeKill is enabled', async () => {
+    vi.useFakeTimers()
+    vi.mocked(treeKillSync).mockImplementation(() => {})
+    vi.mocked(listDescendantPids).mockReturnValue([5001, 5002])
+    startup.treeKill = true
+    const child = Object.assign(createElectronProcess(), { pid: 4242 })
+    spawn.mockReturnValue(child)
+    await startup(['.'])
+    // Applies per child: turning it off later does not change an already started app.
+    startup.treeKill = false
+
+    const exiting = startup.exit()
+    expect(listDescendantPids).toHaveBeenCalledWith(4242)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(treeKillSync).toHaveBeenCalledWith(4242, 'SIGKILL')
+    child.emit('exit', null, 'SIGKILL')
+    await exiting
+    expect(killPidsSync).toHaveBeenCalledWith([5001, 5002])
+
+    startup.treeKill = true
+    const second = Object.assign(createElectronProcess(), { pid: 4343 })
+    spawn.mockReturnValue(second)
+    await startup(['.'])
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    second.emit('exit', 0, null)
+    expect(exit).toHaveBeenCalledWith(0)
+    expect(killOrphanedChildrenSync).toHaveBeenCalledWith(4343)
   })
 
   it('exits the parent for a natural exit from exported startup', async () => {
@@ -973,7 +1049,7 @@ describe('dev process lifecycle', () => {
     expect(process.electronApp).toBeUndefined()
   })
 
-  it('escalates a second SIGINT to SIGKILL without dropping the handler', async () => {
+  it('kills Electron synchronously and exits 130 on a second SIGINT', async () => {
     const electronApp = Object.assign(createElectronProcess(), { pid: 4242 })
     spawn.mockReturnValue(electronApp)
     const plugins = createElectronPlugin({
@@ -994,7 +1070,6 @@ describe('dev process lifecycle', () => {
     }
     const existingListeners = new Set(process.listeners('SIGINT'))
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-    // pid 4242 is fake: assert the tree kill without signalling a real process on any platform.
     const treeKill = vi.mocked(treeKillSync).mockImplementation(() => {})
 
     configureDev(plugins[0]!, server)
@@ -1006,14 +1081,16 @@ describe('dev process lifecycle', () => {
     handler?.('SIGINT')
     await vi.waitFor(() => expect(electronApp.kill).toHaveBeenCalledWith('SIGINT'))
     expect(exit).not.toHaveBeenCalled()
-    expect(treeKill).not.toHaveBeenCalled()
 
+    // The child never emits 'exit': the second Ctrl+C must not wait for it.
     handler?.('SIGINT')
-    await vi.waitFor(() => expect(treeKill).toHaveBeenCalledWith(4242, 'SIGKILL'))
-    expect(process.listeners('SIGINT')).toContain(handler)
+    expect(electronApp.kill).toHaveBeenLastCalledWith('SIGKILL')
+    // Without startup.treeKill only the direct child is killed.
+    expect(treeKill).not.toHaveBeenCalled()
+    expect(exit).toHaveBeenCalledExactlyOnceWith(130)
+    expect(process.listeners('SIGINT')).not.toContain(handler)
 
     electronApp.emit('exit', null, 'SIGKILL')
-    await vi.waitFor(() => expect(exit).toHaveBeenCalledExactlyOnceWith(130))
   })
 
   it('leaves SIGINT ownership to a middleware host while closing Electron on request', async () => {

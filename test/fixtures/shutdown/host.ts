@@ -1,12 +1,18 @@
 import { createServer } from 'vite'
 
 import { createElectronPlugin } from '../../../src/base'
-import { triggerStartup } from '../../../src/startup'
+import { startup, triggerStartup } from '../../../src/startup'
 
 const mode = process.env.SHUTDOWN_REPRO_MODE ?? 'descendants'
 const childPath = process.env.SHUTDOWN_CHILD
 const electronRoot = process.env.SHUTDOWN_ELECTRON_ROOT
 const delayMs = Number(process.env.SHUTDOWN_WATCHER_DELAY_MS ?? 0)
+startup.treeKill = process.env.SHUTDOWN_TREE_KILL === '1'
+
+if (mode === 'user-sigint') {
+  // A programmatic createServer() host with its own Ctrl+C listener, registered before the plugin's.
+  process.on('SIGINT', () => process.send?.({ userSigint: true }))
+}
 
 // Windows has no catchable SIGINT for child.kill(): it is TerminateProcess. The repro
 // drives Ctrl+C over IPC instead so the plugin's real SIGINT handler still runs.

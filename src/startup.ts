@@ -41,23 +41,45 @@ interface ElectronLifecycle {
 
 const electronLifecycles = new WeakMap<ChildProcess, ElectronLifecycle>()
 const exitedChildren = new WeakSet<ChildProcess>()
+// Children spawned while `startup.treeKill` was enabled. Only these get descendant cleanup.
+const treeKillChildren = new WeakSet<ChildProcess>()
 let pendingSpawn: Promise<void> = Promise.resolve()
 
 // Children still alive, for the synchronous host-exit safety net below.
 const liveChildren = new Set<ChildProcess>()
 let hostExitHookInstalled = false
 
+function hasChildExited(child: ChildProcess): boolean {
+  return exitedChildren.has(child) || child.exitCode !== null || child.signalCode !== null
+}
+
+/**
+ * Synchronously SIGKILL a live Electron child. Children started with `startup.treeKill` are
+ * tree-killed; otherwise only the direct child is signaled.
+ */
+export function killElectronSync(child: ChildProcess): void {
+  if (hasChildExited(child)) {
+    return
+  }
+  if (child.pid && treeKillChildren.has(child)) {
+    treeKillSync(child.pid, 'SIGKILL')
+    return
+  }
+  try {
+    child.kill('SIGKILL')
+  } catch {
+    // Already gone.
+  }
+}
+
 /**
  * If the host exits by any path (process.exit, uncaught error, ...) while an Electron child is
- * still alive, tree-kill it synchronously. Normal shutdown paths clear children first, so this
+ * still alive, kill it synchronously. Normal shutdown paths clear children first, so this
  * is a no-op for them and never changes the exit code.
  */
 function onHostExit(): void {
   for (const child of liveChildren) {
-    const gone = exitedChildren.has(child) || child.exitCode !== null || child.signalCode !== null
-    if (!gone && child.pid) {
-      treeKillSync(child.pid, 'SIGKILL')
-    }
+    killElectronSync(child)
   }
   liveChildren.clear()
 }
@@ -104,9 +126,9 @@ function bindElectronExit(
 ): void {
   const lifecycle: ElectronLifecycle = { session }
   // Only runs when Electron exits by itself: exitElectron() detaches this handler first and
-  // reaps descendants from its own pre-kill snapshot.
+  // (with treeKill) reaps descendants from its own pre-kill snapshot.
   const handler: ElectronExitHandler = (code, signal) => {
-    if (child.pid) {
+    if (child.pid && treeKillChildren.has(child)) {
       // Windows: detached helpers keep the stale parent id; reap them before the host exits.
       killOrphanedChildrenSync(child.pid)
     }
@@ -134,14 +156,20 @@ interface StartupFn {
    */
   hookedProcessExit: boolean
   /**
-   * Kill the processes the Electron app started when Electron exits by itself
-   * (`app.quit()`, `app.exit()`, `process.exit()`). Defaults to `false`, in which case the app
-   * must stop its own child processes before quitting.
+   * Kill the processes the Electron app started. Defaults to `false`, in which case the plugin
+   * only signals and waits for the direct Electron child, and the app must stop its own child
+   * processes before quitting.
    *
    * Without this, Electron on Windows stays alive after quitting while a process it started
-   * before its first window is still running. When enabled, a script is preloaded into the
-   * Electron main process via `NODE_OPTIONS=--require` that kills the app's descendant processes
-   * on exit (Chromium's own helpers excluded).
+   * before its first window is still running. When enabled:
+   * - a script is preloaded into the Electron main process via `NODE_OPTIONS=--require` that
+   *   kills the app's descendant processes when Electron exits (Chromium's own helpers excluded);
+   * - plugin-initiated shutdowns (restart, `startup.exit()`, Ctrl+C) snapshot the descendants
+   *   before signaling and kill leftovers afterward, and `SIGKILL` kills the whole tree;
+   * - on Windows, processes orphaned by an Electron self-exit are tree-killed.
+   *
+   * The process-table scans are synchronous and add a short delay to each restart and shutdown
+   * (about 1 second on Windows).
    *
    * Applies to Electron apps started after it is set. Set it on the imported `startup`,
    * e.g. `startup.treeKill = true` in `vite.config.ts`.
@@ -149,7 +177,8 @@ interface StartupFn {
   treeKill: boolean
   /**
    * Stop the current Electron app and resolve after the direct Electron child process exits.
-   * Leftover descendants discovered before the signal are cleaned up afterward.
+   * With `startup.treeKill`, leftover descendants discovered before the signal are cleaned up
+   * afterward.
    * @param signal shutdown signal (defaults to SIGTERM)
    */
   exit: (signal?: KillSignal) => Promise<void>
@@ -287,6 +316,9 @@ async function startElectron(
     })
 
     process.electronApp = electronApp
+    if (startup.treeKill) {
+      treeKillChildren.add(electronApp)
+    }
     trackLiveChild(electronApp)
     if (session) {
       session.electronApp = electronApp
@@ -320,13 +352,9 @@ export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<
   }
   const state = lifecycle
   if (state.exitPromise) {
-    // Allow a later SIGKILL (e.g. second Ctrl+C) to escalate an in-flight graceful exit.
-    if (signal === 'SIGKILL' && child.pid) {
-      const alreadyGone =
-        exitedChildren.has(child) || child.exitCode !== null || child.signalCode !== null
-      if (!alreadyGone) {
-        treeKillSync(child.pid, 'SIGKILL')
-      }
+    // Allow a later SIGKILL to escalate an in-flight graceful exit.
+    if (signal === 'SIGKILL') {
+      killElectronSync(child)
     }
     return state.exitPromise
   }
@@ -337,11 +365,12 @@ export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<
     state.exitHandler = undefined
   }
 
-  const hasExited = () =>
-    exitedChildren.has(child) || child.exitCode !== null || child.signalCode !== null
+  const hasExited = () => hasChildExited(child)
 
-  // Snapshot while the direct child is still alive so detached helpers can be reaped.
-  const knownDescendants = !hasExited() && child.pid ? listDescendantPids(child.pid) : []
+  // With treeKill, snapshot while the direct child is still alive so detached helpers can be
+  // reaped. Skipped by default: the scan is synchronous and slow on Windows.
+  const knownDescendants =
+    treeKillChildren.has(child) && !hasExited() && child.pid ? listDescendantPids(child.pid) : []
 
   const exitPromise = new Promise<void>((resolve, reject) => {
     if (hasExited()) {
@@ -366,16 +395,15 @@ export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<
     }
     function kill(requestedSignal: KillSignal) {
       try {
-        const pid = child.pid
-        if (requestedSignal === 'SIGKILL' && pid) {
-          treeKillSync(pid, 'SIGKILL')
+        if (requestedSignal === 'SIGKILL') {
+          killElectronSync(child)
           if (hasExited()) {
             onExit()
           }
           return
         }
-        // Windows child.kill(SIGINT|SIGTERM) is TerminateProcess on one pid; leftovers
-        // are reaped after exit via knownDescendants. POSIX gets a real signal first.
+        // Windows child.kill(SIGINT|SIGTERM) is TerminateProcess on one pid; with treeKill,
+        // leftovers are reaped after exit via knownDescendants. POSIX gets a real signal first.
         if (!child.kill(requestedSignal)) {
           if (hasExited()) {
             onExit()

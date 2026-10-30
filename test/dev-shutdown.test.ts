@@ -105,10 +105,10 @@ for (const mode of ['restart', 'pipes', 'middleware']) {
       }
       try {
         await within(ready, 10_000)
-        // The direct child exits by itself. POSIX re-parents the descendant, so it keeps the
-        // inherited pipes open and the host must still release them. Windows keeps the stale
-        // ParentProcessId, so the plugin finds and reaps the orphan on exit.
-        const descendantSurvives = process.platform !== 'win32'
+        // The direct child exits by itself. Without startup.treeKill the plugin leaves the
+        // descendant alone on every platform, so it keeps the inherited pipes open and the host
+        // must still release them.
+        const descendantSurvives = true
         if (mode === 'restart') {
           runner.kill('SIGINT')
           expect(await within(exited, 8_000)).toBe(130)

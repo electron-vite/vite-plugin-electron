@@ -205,7 +205,10 @@ async function startTrackedChild(
   return started
 }
 
-async function startHost(mode: string): Promise<ChildProcess> {
+async function startHost(
+  mode: string,
+  { treeKill = false }: { treeKill?: boolean } = {},
+): Promise<ChildProcess> {
   const child = spawn(process.execPath, [hostPath], {
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     env: {
@@ -214,6 +217,7 @@ async function startHost(mode: string): Promise<ChildProcess> {
       SHUTDOWN_CHILD: childFixture,
       SHUTDOWN_HELPER: helperFixture,
       SHUTDOWN_ELECTRON_ROOT: electronRoot,
+      SHUTDOWN_TREE_KILL: treeKill ? '1' : '0',
     },
   })
   track(child)
@@ -276,11 +280,12 @@ afterEach(() => {
   killPid(process.electronApp?.pid)
   Reflect.deleteProperty(process, 'electronApp')
   startup.prevent = false
+  startup.treeKill = false
   process.exitCode = originalExitCode
 })
 
-it('reaps leftover descendants after the direct child exits on SIGINT', async () => {
-  const host = await startHost('descendants')
+it('with treeKill, reaps leftover descendants after the direct child exits on SIGINT', async () => {
+  const host = await startHost('descendants', { treeKill: true })
   const ready = await waitForMessage(host, (message) => message?.helperPid)
   const childPid = ready.pid as number
   const helperPid = ready.helperPid as number
@@ -304,8 +309,49 @@ it('reaps leftover descendants after the direct child exits on SIGINT', async ()
   )
 }, 20_000)
 
-it('tree-kills helpers when escalating an unresponsive child to SIGKILL', async () => {
-  const host = await startHost('ignore-signals')
+it('by default, waits for the direct child on SIGINT and leaves app descendants alone', async () => {
+  const host = await startHost('descendants')
+  const ready = await waitForMessage(host, (message) => message?.helperPid)
+  const childPid = ready.pid as number
+  const helperPid = ready.helperPid as number
+  extraPids.add(helperPid)
+
+  const exited = new Promise<number | null>((resolve) => host.once('exit', (code) => resolve(code)))
+  sendSigint(host)
+  const code = await Promise.race([exited, sleep(8_000).then(() => null)])
+
+  expect(code, 'host should wait for the direct child then exit 130').toBe(130)
+  expect(isAlive(childPid)).toBe(false)
+  expect(isAlive(helperPid), 'without treeKill the app owns its descendants').toBe(true)
+  console.log(`[ok] default-sigint-direct-child-only helperAlive=${isAlive(helperPid)}`)
+}, 20_000)
+
+it('runs a programmatic createServer() host SIGINT listener and still waits for Electron', async () => {
+  const host = await startHost('user-sigint')
+  const ready = await waitForMessage(host, (message) => message?.pid)
+  const childPid = ready.pid as number
+  if (typeof ready.helperPid === 'number') {
+    extraPids.add(ready.helperPid)
+  }
+  let userSigint = false
+  host.on('message', (message: { userSigint?: boolean } | null) => {
+    if (message?.userSigint) {
+      userSigint = true
+    }
+  })
+
+  const exited = new Promise<number | null>((resolve) => host.once('exit', (code) => resolve(code)))
+  sendSigint(host)
+  const code = await Promise.race([exited, sleep(8_000).then(() => null)])
+
+  expect(userSigint, "the host's own SIGINT listener should run").toBe(true)
+  expect(code).toBe(130)
+  expect(isAlive(childPid)).toBe(false)
+  console.log(`[ok] create-server-sigint userSigint=${userSigint} hostCode=${code}`)
+}, 20_000)
+
+it('with treeKill, tree-kills helpers when escalating an unresponsive child to SIGKILL', async () => {
+  const host = await startHost('ignore-signals', { treeKill: true })
   const ready = await waitForMessage(host, (message) => message?.helperPid)
   const childPid = ready.pid as number
   const helperPid = ready.helperPid as number
@@ -332,7 +378,7 @@ it('tree-kills helpers when escalating an unresponsive child to SIGKILL', async 
   )
 }, 20_000)
 
-it('escalates a second SIGINT instead of dropping Electron supervision', async () => {
+it('exits immediately on a second SIGINT after killing Electron', async () => {
   const host = await startHost('ignore-signals')
   const ready = await waitForMessage(host, (message) => message?.pid)
   const childPid = ready.pid as number
@@ -347,18 +393,18 @@ it('escalates a second SIGINT instead of dropping Electron supervision', async (
   })
   sendSigint(host)
   await sleep(200)
+  const secondAt = Date.now()
   sendSigint(host)
   const result = await Promise.race([exited, sleep(8_000).then(() => null)])
+  const elapsed = Date.now() - secondAt
 
-  expect(result, 'host should stay supervised and exit 130 after escalated kill').not.toBe(null)
+  expect(result, 'host should exit after the second SIGINT').not.toBe(null)
   expect(result?.code).toBe(130)
-  expect(isAlive(childPid), 'second SIGINT should escalate to SIGKILL of the child').toBe(false)
-  if (helperPid) {
-    expect(isAlive(helperPid), 'escalated tree kill should reap helpers').toBe(false)
-  }
-  console.log(
-    `[ok] second-sigint-escalates hostCode=${result?.code} childAlive=${isAlive(childPid)}`,
-  )
+  // Well under the 5s graceful timeout: the second Ctrl+C does not wait.
+  expect(elapsed).toBeLessThan(3_000)
+  await waitUntil(() => !isAlive(childPid))
+  expect(isAlive(childPid), 'second SIGINT should kill the Electron child').toBe(false)
+  console.log(`[ok] second-sigint-exits hostCode=${result?.code} elapsedMs=${elapsed}`)
 }, 15_000)
 
 it('documents Electron natural exit closing Vite without process.exit', async () => {
@@ -612,8 +658,8 @@ it('shares one in-flight promise across concurrent startup.exit calls', async ()
   expect(first).toBe(second)
 
   await expect(first).resolves.toBeUndefined()
-  // Shared exitPromise: the second caller must not issue its own immediate kill.
-  // SIGTERM is ignored by the fixture, so the 5s escalator may send SIGKILL too.
+  // Shared exitPromise: the second caller does not start a second shutdown. Its SIGKILL only
+  // escalates the in-flight one, so at most one extra kill is sent.
   expect(killCount).toBeGreaterThanOrEqual(1)
   expect(killCount).toBeLessThanOrEqual(2)
   console.log(`[ok] concurrent-startup-exit-shares-promise killCount=${killCount}`)
@@ -633,7 +679,8 @@ it('exits the Vite CLI host after Electron exits naturally', async () => {
   console.log(`[ok] natural-exit-exits-vite-host hostCode=${code} childAlive=${isAlive(childPid)}`)
 }, 15_000)
 
-it('reaps orphaned helpers when Electron exits by itself (win32), documents POSIX', async () => {
+it('with treeKill, reaps orphaned helpers when Electron exits by itself (win32), documents POSIX', async () => {
+  startup.treeKill = true
   const httpServer = Object.assign(new EventEmitter(), { address: () => null })
   let closed = false
   const plugins = createElectronPlugin({
@@ -677,8 +724,8 @@ it('reaps orphaned helpers when Electron exits by itself (win32), documents POSI
   await closeDev(plugin, environment).catch(() => {})
 }, 15_000)
 
-it('tree-kills a live Electron child when the host exits via process.exit', async () => {
-  const host = await startHost('descendants')
+it('with treeKill, tree-kills a live Electron child when the host exits via process.exit', async () => {
+  const host = await startHost('descendants', { treeKill: true })
   const ready = await waitForMessage(host, (message) => message?.helperPid)
   const childPid = ready.pid as number
   const helperPid = ready.helperPid as number
@@ -695,36 +742,58 @@ it('tree-kills a live Electron child when the host exits via process.exit', asyn
   console.log(`[ok] host-process-exit-tree-kills code=${code}`)
 }, 15_000)
 
-it('reaps helpers after exitElectron(SIGTERM) of the direct child', async () => {
-  const httpServer = Object.assign(new EventEmitter(), { address: () => null })
-  const plugins = createElectronPlugin({
-    prefix: 'shutdown-helper-survives-sigterm',
-    async dev(context, server, _isESM, session) {
-      await startTrackedChild(context, server, session, 'descendants')
-    },
-    build() {},
-  })
-  const plugin = plugins[0]!
-  const server = {
-    config: { root: electronRoot, server: { middlewareMode: true } },
-    httpServer,
-    close: async () => {},
-  }
-  const environment = configureDev(plugin, server)
-  httpServer.emit('listening')
-  const child = await waitForElectronApp()
-  const childPid = child.pid!
-  const ready = await waitForReproReady(child)
+it('by default, kills only the direct Electron child when the host exits via process.exit', async () => {
+  const host = await startHost('descendants')
+  const ready = await waitForMessage(host, (message) => message?.helperPid)
+  const childPid = ready.pid as number
   const helperPid = ready.helperPid as number
-  expect(helperPid).toBeGreaterThan(0)
-  expect(isAlive(helperPid)).toBe(true)
+  extraPids.add(helperPid)
 
-  await startup.exit('SIGTERM')
-  expect(isAlive(childPid)).toBe(false)
-  expect(isAlive(helperPid), 'exitElectron should reap snapshotted helper descendants').toBe(false)
-  console.log(`[ok] helper-reaped-after-exitElectron-sigterm helperAlive=${isAlive(helperPid)}`)
-  await closeDev(plugin, environment).catch(() => {})
+  const exited = new Promise<number | null>((resolve) => host.once('exit', (code) => resolve(code)))
+  host.send({ type: 'host-exit', code: 3 })
+  const code = await exited
+  await waitUntil(() => !isAlive(childPid))
+  expect(code, 'exit hook must not change the host exit code').toBe(3)
+  expect(isAlive(childPid), 'host exit hook should kill the Electron child').toBe(false)
+  expect(isAlive(helperPid), 'without treeKill the app owns its descendants').toBe(true)
+  console.log(`[ok] host-process-exit-direct-child-only code=${code}`)
 }, 15_000)
+
+for (const treeKill of [true, false]) {
+  it(`${treeKill ? 'reaps' : 'leaves'} helpers after exitElectron(SIGTERM) of the direct child (treeKill=${treeKill})`, async () => {
+    startup.treeKill = treeKill
+    const httpServer = Object.assign(new EventEmitter(), { address: () => null })
+    const plugins = createElectronPlugin({
+      prefix: `shutdown-helper-sigterm-${treeKill}`,
+      async dev(context, server, _isESM, session) {
+        await startTrackedChild(context, server, session, 'descendants')
+      },
+      build() {},
+    })
+    const plugin = plugins[0]!
+    const server = {
+      config: { root: electronRoot, server: { middlewareMode: true } },
+      httpServer,
+      close: async () => {},
+    }
+    const environment = configureDev(plugin, server)
+    httpServer.emit('listening')
+    const child = await waitForElectronApp()
+    const childPid = child.pid!
+    const ready = await waitForReproReady(child)
+    const helperPid = ready.helperPid as number
+    expect(helperPid).toBeGreaterThan(0)
+    expect(isAlive(helperPid)).toBe(true)
+
+    await startup.exit('SIGTERM')
+    expect(isAlive(childPid)).toBe(false)
+    expect(isAlive(helperPid), 'only treeKill reaps snapshotted helper descendants').toBe(!treeKill)
+    console.log(
+      `[ok] helper-after-exitElectron-sigterm treeKill=${treeKill} helperAlive=${isAlive(helperPid)}`,
+    )
+    await closeDev(plugin, environment).catch(() => {})
+  }, 15_000)
+}
 
 const isCI = Boolean(process.env.CI)
 const viteBin = path.join(playgroundDir, 'node_modules/vite/bin/vite.js')
