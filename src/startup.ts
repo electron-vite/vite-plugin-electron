@@ -1,4 +1,4 @@
-import type { SpawnOptions, StdioOptions } from 'node:child_process'
+import type { ChildProcess, SpawnOptions, StdioOptions } from 'node:child_process'
 import path from 'node:path'
 
 import type { ViteDevServer } from 'vite'
@@ -23,6 +23,51 @@ function parseEnvVar(value: string | undefined): boolean | string {
   return value
 }
 
+type KillSignal = NonNullable<SpawnOptions['killSignal']>
+
+/** Grace period before a stuck Electron child is SIGKILLed during shutdown. */
+const ELECTRON_SHUTDOWN_TIMEOUT = 5_000
+/** Handlers that end the host when Electron exits by itself; detached before a planned shutdown. */
+const selfExitHandlers = new WeakMap<ChildProcess, (code: number | null) => void>()
+/** In-flight shutdowns, so concurrent `startup.exit()` calls share one wait. */
+const exiting = new WeakMap<ChildProcess, Promise<void>>()
+
+function terminate(child: ChildProcess, signal: KillSignal): Promise<void> {
+  const pending = exiting.get(child)
+  if (pending) {
+    return pending
+  }
+  const handler = selfExitHandlers.get(child)
+  if (handler) {
+    child.removeListener('exit', handler)
+    selfExitHandlers.delete(child)
+  }
+  const release = () => {
+    if (process.electronApp === child) {
+      process.electronApp = undefined
+    }
+  }
+  if (child.exitCode !== null || child.signalCode !== null) {
+    release()
+    return Promise.resolve()
+  }
+  const promise = new Promise<void>((resolve) => {
+    const timer = setTimeout(() => child.kill('SIGKILL'), ELECTRON_SHUTDOWN_TIMEOUT)
+    const done = () => {
+      clearTimeout(timer)
+      child.removeListener('exit', done)
+      child.removeListener('error', done)
+      release()
+      resolve()
+    }
+    child.once('exit', done)
+    child.once('error', done)
+    child.kill(signal)
+  })
+  exiting.set(child, promise)
+  return promise
+}
+
 interface StartupFn {
   (
     argv?: string[],
@@ -38,7 +83,12 @@ interface StartupFn {
    * @deprecated No use
    */
   hookedProcessExit: boolean
-  exit: () => void
+  /**
+   * Stop the current Electron app and resolve after it has exited.
+   * It is SIGKILLed if it has not exited within 5 seconds.
+   * @param signal signal sent to Electron (defaults to `SIGTERM`)
+   */
+  exit: (signal?: KillSignal) => Promise<void>
 }
 
 /**
@@ -109,7 +159,11 @@ export const startup: StartupFn = async (
 
   const electronPath = electron.default ?? electron
 
-  startup.exit()
+  // Wait for the previous app to exit. Loop because a concurrent `startup()` may spawn a new
+  // one while we were waiting; the last caller wins.
+  while (process.electronApp) {
+    await startup.exit()
+  }
 
   // Start Electron.app
   const stdio: StdioOptions =
@@ -138,7 +192,10 @@ export const startup: StartupFn = async (
   })
 
   // Exit command after Electron.app exits
-  process.electronApp.on('exit', process.exit)
+  const electronApp = process.electronApp
+  const onSelfExit = (code: number | null) => process.exit(code ?? 0)
+  selfExitHandlers.set(electronApp, onSelfExit)
+  electronApp.on('exit', onSelfExit)
 
   return true
 }
@@ -149,9 +206,9 @@ startup.send = (message: string) => {
   }
 }
 startup.hookedProcessExit = startup.prevent = false
-startup.exit = () => {
-  process.electronApp?.removeAllListeners()
-  process.electronApp?.kill()
+startup.exit = (signal = 'SIGTERM') => {
+  const child = process.electronApp
+  return child ? terminate(child, signal) : Promise.resolve()
 }
 
 export interface OnStartOptions {

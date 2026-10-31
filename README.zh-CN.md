@@ -488,6 +488,12 @@ build({
 
 Await `startup()` 的返回值可以知道是否触发了启动，或者被控制选项阻止了。
 
+### 退出
+
+按 Ctrl+C 时，`vite serve` 会向 Electron 应用发送 `SIGINT`，等待它退出后再退出自身（退出码 `130`）。5 秒内仍未退出的应用会被强制结束；再按一次 Ctrl+C 可立即结束。`server.middlewareMode` 下由宿主进程自行处理信号。
+
+`startup.exit(signal?)` 返回一个 Promise，在 Electron 应用退出后 resolve。
+
 ## 内置插件
 
 ### notBundle 插件

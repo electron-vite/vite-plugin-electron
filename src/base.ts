@@ -1,9 +1,62 @@
+import { constants } from 'node:os'
+
 import type { Plugin, ConfigEnv, UserConfig, ViteDevServer, ServerHook } from 'vite'
 
 import { startup } from './startup'
 import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule, setIsViteDev } from './utils'
 
 export type ConfigServerContext = ThisParameterType<ServerHook>
+
+// Vite only handles SIGTERM, so an unhandled SIGINT (Ctrl+C) would end this process at once while
+// Electron is still shutting down. Supervise it here: close the servers, wait for Electron to
+// exit, then exit with the conventional 128 + signal code.
+const SIGINT_EXIT_CODE = 128 + constants.signals.SIGINT
+/** Dev servers that own the process lifetime (not middleware mode). */
+const supervisedServers = new Set<ViteDevServer>()
+/** Per-server cleanup that must finish before the process exits. */
+const pendingCloses = new Set<Promise<void>>()
+let sigintReceived = false
+
+function onSigint() {
+  if (sigintReceived) {
+    // Second Ctrl+C: stop waiting, but do not leave Electron behind.
+    const child = process.electronApp
+    if (child && child.exitCode === null && child.signalCode === null) {
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        // Already gone (an unhandled `error` from a dying child must not change the exit code).
+      }
+    }
+    process.exit(SIGINT_EXIT_CODE)
+  }
+  sigintReceived = true
+  void (async () => {
+    await Promise.allSettled([
+      startup.exit('SIGINT'),
+      ...[...supervisedServers].map(async (server) => server.close()),
+    ])
+    await Promise.allSettled(pendingCloses)
+    process.exit(SIGINT_EXIT_CODE)
+  })()
+}
+
+function superviseSigint(server: ViteDevServer) {
+  supervisedServers.add(server)
+  if (!process.listeners('SIGINT').includes(onSigint)) {
+    sigintReceived = false
+    // `on`, not `once`: the second SIGINT must still reach the handler.
+    process.on('SIGINT', onSigint)
+  }
+}
+
+function releaseSigint(server: ViteDevServer) {
+  supervisedServers.delete(server)
+  // During a Ctrl+C shutdown, keep handling SIGINT so a second Ctrl+C still kills Electron.
+  if (supervisedServers.size === 0 && !sigintReceived) {
+    process.removeListener('SIGINT', onSigint)
+  }
+}
 
 interface FactoryOptions {
   prefix: string
@@ -46,12 +99,22 @@ export function createElectronPlugin({
         }
       },
       configureServer(server) {
-        server.httpServer?.once('close', async () => {
-          if (cleanupMock) {
-            await cleanupMock()
-            cleanupMock = undefined
-          }
-          startup.exit()
+        // Middleware hosts own the process lifetime and its signals.
+        if (server.httpServer && !server.config.server.middlewareMode) {
+          superviseSigint(server)
+        }
+
+        server.httpServer?.once('close', () => {
+          releaseSigint(server)
+          const closing = (async () => {
+            if (cleanupMock) {
+              await cleanupMock()
+              cleanupMock = undefined
+            }
+            await startup.exit()
+          })().catch(() => {})
+          pendingCloses.add(closing)
+          void closing.finally(() => pendingCloses.delete(closing))
         })
 
         server.httpServer?.once('listening', async () => {
