@@ -110,11 +110,23 @@ interface StartupFn {
  * @param customElectronPkg custom electron package name (default: 'electron')
  * @returns `true` if the Electron app is started, or `false` if the startup is prevented by `startup.prevent` or `ELECTRON_STARTUP_PREVENT` env var.
  */
-export const startup: StartupFn = async (
+export const startup: StartupFn = (argv, options, customElectronPkg) =>
+  startElectron(argv, options, customElectronPkg)
+
+/** A dev server's claim on Electron startup. Closed sessions (e.g. after a Vite restart) never start Electron. */
+export interface DevSession {
+  closed: boolean
+}
+
+async function startElectron(
   argv = ['.', '--no-sandbox'],
   options?: SpawnOptions,
   customElectronPkg?: string,
-) => {
+  session?: DevSession,
+): Promise<boolean> {
+  if (session?.closed) {
+    return false
+  }
   if (startup.prevent || parseEnvVar(process.env.ELECTRON_STARTUP_PREVENT?.trim())) {
     process.electronApp = undefined
     return false
@@ -163,6 +175,10 @@ export const startup: StartupFn = async (
   // one while we were waiting; the last caller wins.
   while (process.electronApp) {
     await startup.exit()
+  }
+  // The dev server may have closed while we were resolving or waiting.
+  if (session?.closed) {
+    return false
   }
 
   // Start Electron.app
@@ -256,18 +272,29 @@ export interface OnStartOptions {
  * @param context The `this` of `configServer()` hook, used for calling `this` in `options.onstart`.
  * @param server The Vite development server instance.
  * @param options The `onstart` options
+ * @param session The dev server's session; nothing is started once it is closed.
  */
 export function triggerStartup(
   context: ConfigServerContext,
   server: ViteDevServer,
   options: OnStartOptions,
+  session?: DevSession,
 ): void {
+  // A watcher of a closed (e.g. restarted) dev server may still finish one last build.
+  if (session?.closed) {
+    return
+  }
   const startupWithRoot = (
     argv?: string[],
     spawnOptions?: import('node:child_process').SpawnOptions,
     customElectronPkg?: string,
   ) => {
-    return startup(argv, { cwd: server.config.root, ...spawnOptions }, customElectronPkg)
+    return startElectron(
+      argv,
+      { cwd: server.config.root, ...spawnOptions },
+      customElectronPkg,
+      session,
+    )
   }
   if (options.onstart) {
     options.onstart.call(context, {
