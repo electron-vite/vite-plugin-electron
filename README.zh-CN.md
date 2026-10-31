@@ -496,6 +496,32 @@ Await `startup()` 的返回值可以知道是否触发了启动，或者被控�
 
 Electron 应用自行退出时，会先关闭开发服务器，再以应用的退出码退出 Vite。若 Vite 经由其他途径退出（`process.exit()`、未捕获的错误），正在运行的 Electron 应用会收到 `SIGTERM`。
 
+#### 结束应用启动的子进程
+
+默认情况下，插件只向 Electron 进程本身发送信号并等待它退出。应用自己启动的进程（本地服务、worker 可执行文件等）由应用负责，例如在 `app.on('will-quit')` 中结束它们。在 Windows 上，如果应用在第一个窗口出现前启动的进程仍在运行，Electron 退出后也不会真正结束，开发进程就会一直挂着。
+
+设置 `startup.treeKill = true` 可以让插件在开发期间清理这些进程：
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite'
+import electron, { startup } from 'vite-plugin-electron'
+
+startup.treeKill = true
+
+export default defineConfig({
+  plugins: [electron({ entry: 'electron/main.ts' })],
+})
+```
+
+开启后：
+
+- 通过 `NODE_OPTIONS=--require` 向 Electron 主进程预加载一个小脚本（保留你自己的 `NODE_OPTIONS`，应用启动的进程看到的仍是原始值）。主进程退出时，它会结束应用启动的所有进程（包括 detached 进程），但不包括 Chromium 自己的辅助进程。脚本写入 Vite [`cacheDir`](https://cn.vite.dev/config/shared-options#cachedir)（默认 `node_modules/.vite`）下的 `vite-plugin-electron/` 目录，而不是共享的临时目录，也不会进入生产构建。
+- 插件发起的关闭（重新构建后的重启、`startup.exit()`、Ctrl+C）会在发送信号前列出 Electron 的后代进程，并在它退出后结束残留的进程。`SIGKILL`（5 秒超时、第二次 Ctrl+C）会结束整棵进程树。
+- 在 Windows 上，Electron 自行退出或崩溃后遗留的进程会被结束。
+
+进程表是同步读取的（Windows 上用 PowerShell 或 `wmic`，其他平台用 `ps`），每次重启和关闭会因此多花一点时间，Windows 上约 1 秒。未开启 `startup.treeKill` 时，插件从不读取进程表。
+
 ## 内置插件
 
 ### notBundle 插件

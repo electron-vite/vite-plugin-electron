@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import type { Plugin, ConfigEnv, UserConfig, ViteDevServer, ServerHook, ResolvedConfig } from 'vite'
 
-import { startup } from './startup'
+import { killElectronSync, startup } from './startup'
 import type { DevSession } from './startup'
 import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule, setIsViteDev } from './utils'
 
@@ -22,13 +22,8 @@ let sigintReceived = false
 function onSigint() {
   if (sigintReceived) {
     // Second Ctrl+C: stop waiting, but do not leave Electron behind.
-    const child = process.electronApp
-    if (child && child.exitCode === null && child.signalCode === null) {
-      try {
-        child.kill('SIGKILL')
-      } catch {
-        // Already gone (an unhandled `error` from a dying child must not change the exit code).
-      }
+    if (process.electronApp) {
+      killElectronSync(process.electronApp)
     }
     process.exit(SIGINT_EXIT_CODE)
   }

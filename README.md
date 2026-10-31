@@ -520,6 +520,32 @@ On Ctrl+C, `vite serve` sends `SIGINT` to the Electron app and waits for it to e
 
 When the Electron app quits by itself, the dev server is closed first and then Vite exits with the app's exit code. If Vite exits by any other path (`process.exit()`, an uncaught error), the running Electron app is sent `SIGTERM`.
 
+#### Killing the App's Child Processes
+
+By default the plugin only signals and waits for the Electron process itself. Processes the app starts (a local server, a worker binary, ...) are the app's responsibility, e.g. stop them in `app.on('will-quit')`. On Windows, Electron also stays alive after quitting while a process it started before its first window is still running, so the dev process never ends.
+
+Set `startup.treeKill = true` to let the plugin clean them up during development:
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite'
+import electron, { startup } from 'vite-plugin-electron'
+
+startup.treeKill = true
+
+export default defineConfig({
+  plugins: [electron({ entry: 'electron/main.ts' })],
+})
+```
+
+When enabled:
+
+- A small script is preloaded into the Electron main process via `NODE_OPTIONS=--require` (your own `NODE_OPTIONS` are kept, and processes the app starts see the original value). When the main process exits, it kills every process the app started, including detached ones, but not Chromium's own helpers. The script is written to `vite-plugin-electron/` inside Vite's [`cacheDir`](https://vite.dev/config/shared-options#cachedir) (`node_modules/.vite` by default), not a shared temp directory, and is never part of production builds.
+- Shutdowns the plugin starts (restart after a rebuild, `startup.exit()`, Ctrl+C) list Electron's descendants before signaling it and kill the leftovers after it exits. A `SIGKILL` (the 5-second timeout, a second Ctrl+C) kills the whole tree.
+- On Windows, processes left behind when Electron exits by itself or crashes are killed.
+
+The process table is read synchronously (PowerShell or `wmic` on Windows, `ps` elsewhere), which adds a short delay to each restart and shutdown, about 1 second on Windows. Without `startup.treeKill`, the plugin never reads the process table.
+
 ## Builtin Plugins
 
 ### notBundle Plugin

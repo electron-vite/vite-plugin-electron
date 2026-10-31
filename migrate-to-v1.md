@@ -22,7 +22,7 @@ Use the main README for current v1 behavior. Use this file only when migrating o
    - Confirm every externalized runtime package exists in the Electron runtime layout.
 5. Review `startup()` usage:
    - Handle the new boolean return value if callers await `startup()`.
-   - `startup.exit()` returns a Promise that resolves once the direct Electron child has exited; it does not wait for processes the app started.
+   - `startup.exit()` returns a Promise that resolves once the direct Electron child has exited; it does not wait for processes the app started. Set `startup.treeKill = true` for v0.x-style process-tree cleanup during development (see the README).
 6. Build and test:
    - Run the app in dev mode.
    - Run production build.

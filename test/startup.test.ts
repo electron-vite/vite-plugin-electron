@@ -1,4 +1,6 @@
 import { EventEmitter } from 'node:events'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -179,5 +181,23 @@ describe('src/startup', () => {
       expect.stringContaining('sync failure'),
       expect.stringContaining('async failure'),
     ])
+  })
+  it('preloads the tree-kill hook only when startup.treeKill is set', async () => {
+    const cwd = await mkdtemp(path.join(tmpdir(), 'startup-tree-kill-'))
+    try {
+      await startup(['.'], { cwd, env: { NODE_OPTIONS: '--no-deprecation' } })
+      expect(spawn.mock.lastCall?.[2].env).toEqual({ NODE_OPTIONS: '--no-deprecation' })
+
+      startup.treeKill = true
+      await startup(['.'], { cwd, env: { NODE_OPTIONS: '--no-deprecation' } })
+      const hook = path.join(cwd, 'node_modules', '.vite', 'vite-plugin-electron')
+      const { NODE_OPTIONS } = spawn.mock.lastCall![2].env
+      expect(NODE_OPTIONS).toMatch(/^--no-deprecation --require "/)
+      expect(JSON.parse(NODE_OPTIONS.slice('--no-deprecation --require '.length))).toContain(hook)
+    } finally {
+      startup.treeKill = false
+      await startup.exit()
+      await rm(cwd, { recursive: true, force: true })
+    }
   })
 })

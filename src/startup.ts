@@ -6,6 +6,13 @@ import path from 'node:path'
 import type { ViteDevServer } from 'vite'
 
 import type { ConfigServerContext } from './base'
+import {
+  killOrphanedChildrenSync,
+  killPidsSync,
+  listDescendantPids,
+  treeKillSync,
+} from './process-tree'
+import { ensureTreeKillHook, withTreeKillHook } from './tree-kill-hook'
 
 const startupEnv = {
   REMOTE_DEBUGGING_PORT: '--remote-debugging-port',
@@ -35,6 +42,27 @@ const selfExitHandlers = new WeakMap<ChildProcess, (code: number | null) => void
 const exiting = new WeakMap<ChildProcess, Promise<void>>()
 /** Chains Electron replacements so concurrent starts run one at a time. */
 let spawnQueue: Promise<void> = Promise.resolve()
+/** Children started with `startup.treeKill`, with the epoch ms taken just before spawning them. */
+const treeKillChildren = new WeakMap<ChildProcess, number>()
+/** Vite's resolved `cacheDir` of the latest dev server, for the hook of direct `startup()` calls. */
+let lastViteCacheDir: string | undefined
+
+const hasExited = (child: ChildProcess) => child.exitCode !== null || child.signalCode !== null
+
+/** SIGKILL Electron now; for a `startup.treeKill` child, its whole process tree. */
+export function killElectronSync(child: ChildProcess): void {
+  if (hasExited(child)) {
+    return
+  }
+  try {
+    if (child.pid && treeKillChildren.has(child)) {
+      treeKillSync(child.pid, 'SIGKILL')
+    }
+    child.kill('SIGKILL')
+  } catch {
+    // Already gone.
+  }
+}
 
 function terminate(child: ChildProcess, signal: KillSignal): Promise<void> {
   const pending = exiting.get(child)
@@ -51,17 +79,25 @@ function terminate(child: ChildProcess, signal: KillSignal): Promise<void> {
       process.electronApp = undefined
     }
   }
-  if (child.exitCode !== null || child.signalCode !== null) {
+  if (hasExited(child)) {
     release()
     return Promise.resolve()
   }
+  // With treeKill, list the descendants while Electron is still alive: after a Windows
+  // TerminateProcess or a SIGKILL, nothing inside Electron gets to clean them up.
+  const descendants = child.pid && treeKillChildren.has(child) ? listDescendantPids(child.pid) : []
+  // Leftovers are killed only if they started before this point (guards against PID reuse).
+  const snapshotAt = Date.now()
   const promise = new Promise<void>((resolve) => {
-    const timer = setTimeout(() => child.kill('SIGKILL'), ELECTRON_SHUTDOWN_TIMEOUT)
+    const timer = setTimeout(() => killElectronSync(child), ELECTRON_SHUTDOWN_TIMEOUT)
     const done = () => {
       clearTimeout(timer)
       child.removeListener('exit', done)
       child.removeListener('error', done)
       release()
+      if (descendants.length) {
+        killPidsSync(descendants, snapshotAt)
+      }
       resolve()
     }
     child.once('exit', done)
@@ -87,6 +123,23 @@ interface StartupFn {
    * @deprecated No use
    */
   hookedProcessExit: boolean
+  /**
+   * Kill the processes the Electron app started. Defaults to `false`: the plugin only signals
+   * and waits for the direct Electron child, and the app must stop its own child processes.
+   *
+   * Without this, Electron on Windows stays alive after quitting while a process it started
+   * before its first window is still running. When enabled:
+   * - a script preloaded into the Electron main process via `NODE_OPTIONS=--require` kills the
+   *   app's descendant processes when Electron exits (Chromium's own helpers excluded);
+   * - shutdowns the plugin starts (restart, `startup.exit()`, Ctrl+C) list the descendants before
+   *   signaling Electron and kill leftovers afterward, and `SIGKILL` kills the whole tree;
+   * - on Windows, processes orphaned when Electron exits by itself are killed.
+   *
+   * The process-table scans are synchronous and add a short delay to each restart and shutdown
+   * (about 1 second on Windows). Applies to Electron apps started after it is set, e.g.
+   * `startup.treeKill = true` in `vite.config.ts`.
+   */
+  treeKill: boolean
   /**
    * Stop the current Electron app and resolve after it has exited.
    * It is SIGKILLed if it has not exited within 5 seconds.
@@ -115,19 +168,27 @@ interface StartupFn {
  * @returns `true` if the Electron app is started, or `false` if the startup is prevented by `startup.prevent` or `ELECTRON_STARTUP_PREVENT` env var.
  */
 export const startup: StartupFn = (argv, options, customElectronPkg) =>
-  startElectron(argv, options, customElectronPkg)
+  startElectron(argv, options, customElectronPkg, {})
 
 /** A dev server's claim on Electron startup. Closed sessions (e.g. after a Vite restart) never start Electron. */
 export interface DevSession {
   closed: boolean
 }
 
+/** What a plugin-driven start adds to a plain `startup()` call. */
+interface StartContext {
+  session?: DevSession
+  /** Called when Electron exits by itself (defaults to exiting this process with its code). */
+  onSelfExit?: (code: number | null) => void
+  /** Vite's resolved `cacheDir`, where the tree-kill hook is written. */
+  cacheDir?: string
+}
+
 async function startElectron(
-  argv = ['.', '--no-sandbox'],
-  options?: SpawnOptions,
-  customElectronPkg?: string,
-  session?: DevSession,
-  onSelfExit: (code: number | null) => void = (code) => process.exit(code ?? 0),
+  argv: string[] | undefined,
+  options: SpawnOptions | undefined,
+  customElectronPkg: string | undefined,
+  { session, onSelfExit = (code) => process.exit(code ?? 0), cacheDir }: StartContext,
 ): Promise<boolean> {
   if (session?.closed) {
     return false
@@ -188,7 +249,7 @@ async function startElectron(
     if (session?.closed) {
       return false
     }
-    spawnElectron(electronPath, argv, options, onSelfExit)
+    spawnElectron(electronPath, argv ?? ['.', '--no-sandbox'], options, onSelfExit, cacheDir)
     return true
   } finally {
     release()
@@ -200,6 +261,7 @@ function spawnElectron(
   argv: string[],
   options: SpawnOptions | undefined,
   onSelfExit: (code: number | null) => void,
+  cacheDir: string | undefined,
 ): void {
   // Start Electron.app
   const stdio: StdioOptions =
@@ -222,15 +284,41 @@ function spawnElectron(
     }
   }
 
+  const treeKill = startup.treeKill
+  const env = treeKill
+    ? withTreeKillHook(
+        options?.env ?? process.env,
+        ensureTreeKillHook(
+          cacheDir ??
+            lastViteCacheDir ??
+            // No dev server in this process: Vite's default location. Absolute, because Electron
+            // resolves `NODE_OPTIONS=--require` from `options.cwd`.
+            path.resolve(
+              typeof options?.cwd === 'string' ? options.cwd : process.cwd(),
+              'node_modules',
+              '.vite',
+            ),
+        ),
+      )
+    : undefined
+  const startedAt = Date.now()
   const electronApp = spawn(electronPath, targetArgv, {
     stdio,
     ...options,
+    ...(env ? { env } : {}),
   })
   process.electronApp = electronApp
+  if (treeKill) {
+    treeKillChildren.set(electronApp, startedAt)
+  }
   trackLiveChild(electronApp)
 
   // Exit command after Electron.app exits
   const handler = (code: number | null) => {
+    if (treeKill && electronApp.pid) {
+      // Windows: Electron's detached helpers keep its (now stale) pid as their parent id.
+      killOrphanedChildrenSync(electronApp.pid, startedAt)
+    }
     selfExitHandlers.delete(electronApp)
     if (process.electronApp === electronApp) {
       process.electronApp = undefined
@@ -248,7 +336,11 @@ const liveChildren = new Set<ChildProcess>()
 function killLiveChildren(): void {
   for (const child of liveChildren) {
     try {
-      child.kill()
+      if (child.pid && treeKillChildren.has(child)) {
+        treeKillSync(child.pid, 'SIGTERM')
+      } else {
+        child.kill()
+      }
     } catch {
       // Already gone.
     }
@@ -272,7 +364,7 @@ startup.send = (message: string) => {
     process.electronApp.send?.(message)
   }
 }
-startup.hookedProcessExit = startup.prevent = false
+startup.hookedProcessExit = startup.prevent = startup.treeKill = false
 startup.exit = (signal = 'SIGTERM') => {
   const child = process.electronApp
   return child ? terminate(child, signal) : Promise.resolve()
@@ -359,13 +451,14 @@ export function triggerStartup(
     spawnOptions?: import('node:child_process').SpawnOptions,
     customElectronPkg?: string,
   ) => {
-    return startElectron(
-      argv,
-      { cwd: server.config.root, ...spawnOptions },
-      customElectronPkg,
+    return startElectron(argv, { cwd: server.config.root, ...spawnOptions }, customElectronPkg, {
       session,
       onSelfExit,
-    )
+      cacheDir: server.config.cacheDir,
+    })
+  }
+  if (server.config.cacheDir) {
+    lastViteCacheDir = server.config.cacheDir
   }
   if (options.onstart) {
     let started: void | Promise<void>
