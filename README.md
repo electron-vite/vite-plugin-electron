@@ -512,6 +512,12 @@ Use `startup.prevent = true`, `ELECTRON_STARTUP_PREVENT=1`, or `ELECTRON_STARTUP
 
 Await the return value of `startup()` to know if the startup was triggered or prevented by the controls.
 
+### Shutdown
+
+On Ctrl+C, `vite serve` sends `SIGINT` to the Electron app and waits for it to exit before exiting itself (exit code `130`). An app that has not exited after 5 seconds is killed. Press Ctrl+C a second time to kill it immediately. In `server.middlewareMode`, the host process handles signals itself.
+
+`startup.exit(signal?)` returns a Promise that resolves once the Electron app has exited.
+
 ## Builtin Plugins
 
 ### notBundle Plugin
