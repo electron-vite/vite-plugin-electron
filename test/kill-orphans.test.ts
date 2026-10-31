@@ -164,6 +164,46 @@ it('skips snapshot PIDs reused after the snapshot on POSIX', () => {
   expect(killed).toEqual([200])
 })
 
+it('drops snapshot PIDs when ps exits 1 silently because none of them exist', () => {
+  setPlatform('linux')
+  const killed: number[] = []
+  vi.spyOn(process, 'kill').mockImplementation(((pid: number, signal?: string | number) => {
+    if (signal === 'SIGKILL') {
+      killed.push(pid)
+      return true
+    }
+    throw Object.assign(new Error('gone'), { code: 'ESRCH' })
+  }) as typeof process.kill)
+  mockedExec.mockImplementation((() => {
+    throw Object.assign(new Error('Command failed'), { status: 1, stdout: '', stderr: '' })
+  }) as typeof execFileSync)
+
+  killPidsSync([200, 201], Date.parse('Sat Oct 31 10:00:00 2026'))
+  expect(killed).toEqual([])
+})
+
+it('kills every snapshot PID when ps cannot report start times (e.g. busybox)', () => {
+  setPlatform('linux')
+  const killed: number[] = []
+  vi.spyOn(process, 'kill').mockImplementation(((pid: number, signal?: string | number) => {
+    if (signal === 'SIGKILL') {
+      killed.push(pid)
+      return true
+    }
+    throw Object.assign(new Error('gone'), { code: 'ESRCH' })
+  }) as typeof process.kill)
+  mockedExec.mockImplementation((() => {
+    throw Object.assign(new Error('Command failed'), {
+      status: 1,
+      stdout: '',
+      stderr: "ps: bad -o argument 'lstart'\n",
+    })
+  }) as typeof execFileSync)
+
+  killPidsSync([200, 201], Date.parse('Sat Oct 31 10:00:00 2026'))
+  expect(killed).toEqual([200, 201])
+})
+
 it('kills every PID when no snapshot time is given', () => {
   setPlatform('linux')
   const killed: number[] = []

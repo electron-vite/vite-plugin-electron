@@ -542,9 +542,15 @@ When enabled:
 
 - A small script is preloaded into the Electron main process via `NODE_OPTIONS=--require` (your own `NODE_OPTIONS` are kept, and processes the app starts see the original value). When the main process exits, it kills every process the app started, including detached ones, but not Chromium's own helpers. The script is written to `vite-plugin-electron/` inside Vite's [`cacheDir`](https://vite.dev/config/shared-options#cachedir) (`node_modules/.vite` by default), not a shared temp directory, and is never part of production builds.
 - Shutdowns the plugin starts (restart after a rebuild, `startup.exit()`, Ctrl+C) list Electron's descendants before signaling it and kill the leftovers after it exits. A `SIGKILL` (the 5-second timeout, a second Ctrl+C) kills the whole tree.
-- On Windows, processes left behind when Electron exits by itself or crashes are killed.
+- On Windows, if Electron exits without the preloaded script finishing its cleanup (a crash, a kill from outside such as Task Manager, or the script was not loaded), the plugin finds the processes left behind and kills them. When the script did finish, it leaves a marker file next to itself and the plugin skips this extra scan.
 
 The process table is read synchronously (PowerShell or `wmic` on Windows, `ps` elsewhere), which adds a short delay to each restart and shutdown, about 1 second on Windows. Without `startup.treeKill`, the plugin never reads the process table.
+
+Limitations:
+
+- On macOS and Linux, processes the app started are not cleaned up when Electron crashes or is killed from outside (e.g. `kill -9`). They are re-parented to init and can no longer be traced back to Electron, and the preloaded script never gets to run.
+- The script is loaded through `NODE_OPTIONS`, so it is skipped when Electron's `EnableNodeOptionsEnvironmentVariable` fuse is turned off. If it cannot be written to `cacheDir`, a warning is printed and Electron starts without it. In both cases only the plugin-side cleanup above applies.
+- Processes started from a `utilityProcess` (or another Chromium helper) are only cleaned up by shutdowns the plugin starts.
 
 ## Builtin Plugins
 

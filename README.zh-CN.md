@@ -518,9 +518,15 @@ export default defineConfig({
 
 - 通过 `NODE_OPTIONS=--require` 向 Electron 主进程预加载一个小脚本（保留你自己的 `NODE_OPTIONS`，应用启动的进程看到的仍是原始值）。主进程退出时，它会结束应用启动的所有进程（包括 detached 进程），但不包括 Chromium 自己的辅助进程。脚本写入 Vite [`cacheDir`](https://cn.vite.dev/config/shared-options#cachedir)（默认 `node_modules/.vite`）下的 `vite-plugin-electron/` 目录，而不是共享的临时目录，也不会进入生产构建。
 - 插件发起的关闭（重新构建后的重启、`startup.exit()`、Ctrl+C）会在发送信号前列出 Electron 的后代进程，并在它退出后结束残留的进程。`SIGKILL`（5 秒超时、第二次 Ctrl+C）会结束整棵进程树。
-- 在 Windows 上，Electron 自行退出或崩溃后遗留的进程会被结束。
+- 在 Windows 上，如果 Electron 退出时预加载脚本没有完成清理（崩溃、被任务管理器等外部手段结束，或脚本没有加载），插件会找出遗留的进程并结束它们。脚本完成了清理时，会在自己旁边留下一个标记文件，插件据此跳过这次额外的扫描。
 
 进程表是同步读取的（Windows 上用 PowerShell 或 `wmic`，其他平台用 `ps`），每次重启和关闭会因此多花一点时间，Windows 上约 1 秒。未开启 `startup.treeKill` 时，插件从不读取进程表。
+
+限制：
+
+- 在 macOS 和 Linux 上，Electron 崩溃或被外部结束（例如 `kill -9`）时，应用启动的进程不会被清理。它们会被过继给 init，无法再追溯到 Electron，而预加载脚本也没有机会运行。
+- 脚本通过 `NODE_OPTIONS` 加载，所以关闭了 Electron 的 `EnableNodeOptionsEnvironmentVariable` fuse 时不会生效。脚本无法写入 `cacheDir` 时，会打印一条警告，Electron 照常启动但不带脚本。这两种情况下只有上面插件侧的清理。
+- 由 `utilityProcess`（或其他 Chromium 辅助进程）启动的进程，只在插件发起的关闭中被清理。
 
 ## 内置插件
 

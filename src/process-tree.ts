@@ -81,7 +81,7 @@ export interface WindowsProcessTable {
   created: Map<number, number>
 }
 
-// WMI DMTF datetime: yyyymmddHHMMSS.ffffff卤UUU (UUU = UTC offset in minutes).
+// WMI DMTF datetime: yyyymmddHHMMSS.ffffff±UUU (UUU = UTC offset in minutes).
 const DMTF_DATETIME = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\.(\d{3})\d*([+-]\d+)$/
 
 /** Parse a WMI DMTF datetime or epoch milliseconds into epoch milliseconds. */
@@ -332,14 +332,24 @@ function readStartTimes(pids: number[]): Map<number, number> | undefined {
   try {
     out = execFileSync('ps', ['-o', 'pid=,lstart=', '-p', pids.join(',')], {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       // `lstart` follows LC_TIME; pin the format Date.parse understands.
       env: { ...process.env, LC_ALL: 'C' },
     })
   } catch (error) {
-    // ps exits 1 when none of the PIDs exist, still printing the (empty) listing.
-    const stdout = (error as { stdout?: unknown }).stdout
-    if (typeof stdout !== 'string') {
+    // ps exits 1 silently when none of the PIDs exist, still printing the (empty) listing. Any
+    // other failure (e.g. busybox rejecting `lstart`, which also exits 1 but complains on stderr)
+    // means the start times are unknown: return `undefined` so the caller keeps every PID.
+    const { status, stdout, stderr } = error as {
+      status?: unknown
+      stdout?: unknown
+      stderr?: unknown
+    }
+    if (
+      status !== 1 ||
+      typeof stdout !== 'string' ||
+      (typeof stderr === 'string' && stderr.trim())
+    ) {
       return
     }
     out = stdout
@@ -368,6 +378,8 @@ export function killPidsSync(pids: number[], snapshotAt?: number): void {
       targets = targets.filter((pid) => {
         const time = started.get(pid)
         // Keep PIDs whose start time could not be parsed; nothing to compare against.
+        // POSIX `lstart` has 1-second precision, so a PID reused within the snapshot's second
+        // is still targeted; erring towards cleanup there is accepted.
         return time !== undefined && (Number.isNaN(time) || time <= snapshotAt)
       })
     }

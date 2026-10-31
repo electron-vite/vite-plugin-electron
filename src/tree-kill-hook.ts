@@ -1,9 +1,11 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 
 /** Holds the user's original `NODE_OPTIONS` so the hook can restore it for Electron's own children. */
 export const TREE_KILL_NODE_OPTIONS_KEY = '__VITE_PLUGIN_ELECTRON_NODE_OPTIONS'
+/** Holds the path of the marker file the hook writes after its exit cleanup succeeded. */
+export const TREE_KILL_MARKER_KEY = '__VITE_PLUGIN_ELECTRON_TREE_KILL_MARKER'
 
 interface ProcessRow {
   pid: number
@@ -18,7 +20,9 @@ interface ProcessRow {
  *
  * On `process` `exit` (reached by `app.quit()`, `app.exit()` and `process.exit()`), it synchronously
  * kills every process the app started, excluding Chromium's own helpers (`--type=...`). Electron on
- * Windows otherwise stays alive after quitting while such a child is still running.
+ * Windows otherwise stays alive after quitting while such a child is still running. When the cleanup
+ * succeeds, it writes the marker file named by `markerKey`, so the plugin can skip its own
+ * (slow, ~1 second on Windows) orphan sweep for this exit.
  *
  * Serialized with `Function.prototype.toString()` and run inside Electron, so it must stay
  * self-contained: no outer variables or imports (pass them as arguments), and no syntax the build
@@ -26,7 +30,14 @@ interface ProcessRow {
  * generated call because bundlers rewrite `require()` calls in ESM output. `isWindows` is fixed
  * when the source is generated: the plugin and Electron run on the same machine.
  */
-function treeKillHook(key: string, isWindows: boolean, nodeRequire: NodeJS.Require): void {
+function treeKillHook(
+  key: string,
+  markerKey: string,
+  isWindows: boolean,
+  nodeRequire: NodeJS.Require,
+): void {
+  const marker = process.env[markerKey]
+  delete process.env[markerKey]
   if (key in process.env) {
     // Do not leak the hook into processes the app spawns.
     const original = process.env[key]
@@ -147,8 +158,12 @@ function treeKillHook(key: string, isWindows: boolean, nodeRequire: NodeJS.Requi
   process.once('exit', () => {
     try {
       killAppDescendants()
+      if (marker) {
+        const fs = nodeRequire('node:fs') as typeof import('node:fs')
+        fs.writeFileSync(marker, '')
+      }
     } catch {
-      // Best effort: never change how Electron exits.
+      // Best effort: never change how Electron exits. Without the marker, the plugin sweeps.
     }
   })
 }
@@ -156,7 +171,7 @@ function treeKillHook(key: string, isWindows: boolean, nodeRequire: NodeJS.Requi
 /** CommonJS source of the hook file preloaded into Electron. */
 export const TREE_KILL_HOOK_SOURCE: string = `'use strict';\n(${treeKillHook})(${JSON.stringify(
   TREE_KILL_NODE_OPTIONS_KEY,
-)}, ${process.platform === 'win32'}, require);\n`
+)}, ${JSON.stringify(TREE_KILL_MARKER_KEY)}, ${process.platform === 'win32'}, require);\n`
 
 function readFileIfExists(file: string): string | undefined {
   try {
@@ -200,8 +215,9 @@ type Env = Record<string, string | undefined>
 /**
  * Return a copy of `env` whose `NODE_OPTIONS` preloads the tree-kill hook.
  * The original `NODE_OPTIONS` is kept under {@link TREE_KILL_NODE_OPTIONS_KEY} for the hook to restore.
+ * @param marker file the hook creates after a successful exit cleanup, see {@link consumeTreeKillMarker}
  */
-export function withTreeKillHook(env: Env, file: string): NodeJS.ProcessEnv {
+export function withTreeKillHook(env: Env, file: string, marker?: string): NodeJS.ProcessEnv {
   const original = env.NODE_OPTIONS ?? ''
   // NODE_OPTIONS treats backslashes inside double quotes as escapes; JSON escaping matches that.
   const require = `--require ${JSON.stringify(file)}`
@@ -210,6 +226,30 @@ export function withTreeKillHook(env: Env, file: string): NodeJS.ProcessEnv {
     NODE_OPTIONS: original ? `${original} ${require}` : require,
     [TREE_KILL_NODE_OPTIONS_KEY]: original,
   }
+  if (marker) {
+    result[TREE_KILL_MARKER_KEY] = marker
+  }
   // The repo's ProcessEnv augmentation marks app keys as required; spawn only needs a string map.
   return result as NodeJS.ProcessEnv
+}
+
+/** Unique marker path next to the hook file, for one Electron launch. */
+export function createTreeKillMarker(hookFile: string): string {
+  return path.join(path.dirname(hookFile), `exited-${randomUUID()}`)
+}
+
+/**
+ * Remove the marker the hook writes after its exit cleanup, and report whether it existed: `true`
+ * means the app's descendants were already killed from inside Electron.
+ */
+export function consumeTreeKillMarker(marker: string | undefined): boolean {
+  if (!marker) {
+    return false
+  }
+  try {
+    fs.rmSync(marker)
+    return true
+  } catch {
+    return false
+  }
 }

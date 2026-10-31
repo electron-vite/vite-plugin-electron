@@ -12,7 +12,12 @@ import {
   listDescendantPids,
   treeKillSync,
 } from './process-tree'
-import { ensureTreeKillHook, withTreeKillHook } from './tree-kill-hook'
+import {
+  consumeTreeKillMarker,
+  createTreeKillMarker,
+  ensureTreeKillHook,
+  withTreeKillHook,
+} from './tree-kill-hook'
 
 const startupEnv = {
   REMOTE_DEBUGGING_PORT: '--remote-debugging-port',
@@ -42,8 +47,14 @@ const selfExitHandlers = new WeakMap<ChildProcess, (code: number | null) => void
 const exiting = new WeakMap<ChildProcess, Promise<void>>()
 /** Chains Electron replacements so concurrent starts run one at a time. */
 let spawnQueue: Promise<void> = Promise.resolve()
-/** Children started with `startup.treeKill`, with the epoch ms taken just before spawning them. */
-const treeKillChildren = new WeakMap<ChildProcess, number>()
+/** Children started with `startup.treeKill`. */
+const treeKillChildren = new WeakMap<
+  ChildProcess,
+  {
+    /** Marker the hook writes after its exit cleanup; unset when the hook could not be written. */
+    marker?: string
+  }
+>()
 /** Vite's resolved `cacheDir` of the latest dev server, for the hook of direct `startup()` calls. */
 let lastViteCacheDir: string | undefined
 
@@ -95,6 +106,8 @@ function terminate(child: ChildProcess, signal: KillSignal): Promise<void> {
       child.removeListener('exit', done)
       child.removeListener('error', done)
       release()
+      // Planned shutdowns use the pre-kill snapshot; just drop the hook's marker if it wrote one.
+      consumeTreeKillMarker(treeKillChildren.get(child)?.marker)
       if (descendants.length) {
         killPidsSync(descendants, snapshotAt)
       }
@@ -133,7 +146,11 @@ interface StartupFn {
    *   app's descendant processes when Electron exits (Chromium's own helpers excluded);
    * - shutdowns the plugin starts (restart, `startup.exit()`, Ctrl+C) list the descendants before
    *   signaling Electron and kill leftovers afterward, and `SIGKILL` kills the whole tree;
-   * - on Windows, processes orphaned when Electron exits by itself are killed.
+   * - on Windows, when Electron exits without the preloaded script finishing its cleanup (a
+   *   crash, an outside kill, or the script was not loaded), the orphans are found and killed.
+   *
+   * On macOS and Linux, processes the app started are not cleaned up when Electron crashes or is
+   * killed from outside: they are re-parented to init and cannot be traced back to Electron.
    *
    * The process-table scans are synchronous and add a short delay to each restart and shutdown
    * (about 1 second on Windows). Applies to Electron apps started after it is set, e.g.
@@ -285,22 +302,31 @@ function spawnElectron(
   }
 
   const treeKill = startup.treeKill
-  const env = treeKill
-    ? withTreeKillHook(
-        options?.env ?? process.env,
-        ensureTreeKillHook(
-          cacheDir ??
-            lastViteCacheDir ??
-            // No dev server in this process: Vite's default location. Absolute, because Electron
-            // resolves `NODE_OPTIONS=--require` from `options.cwd`.
-            path.resolve(
-              typeof options?.cwd === 'string' ? options.cwd : process.cwd(),
-              'node_modules',
-              '.vite',
-            ),
-        ),
+  let env: NodeJS.ProcessEnv | undefined
+  let marker: string | undefined
+  if (treeKill) {
+    const hookDir =
+      cacheDir ??
+      lastViteCacheDir ??
+      // No dev server in this process: Vite's default location. Absolute, because Electron
+      // resolves `NODE_OPTIONS=--require` from `options.cwd`.
+      path.resolve(
+        typeof options?.cwd === 'string' ? options.cwd : process.cwd(),
+        'node_modules',
+        '.vite',
       )
-    : undefined
+    try {
+      const hookFile = ensureTreeKillHook(hookDir)
+      marker = createTreeKillMarker(hookFile)
+      env = withTreeKillHook(options?.env ?? process.env, hookFile, marker)
+    } catch (error) {
+      // Best effort: an unwritable cacheDir must not keep Electron from starting. The plugin-side
+      // cleanup (pre-kill snapshot, Windows orphan sweep) still applies.
+      console.warn(
+        `[vite-plugin-electron] startup.treeKill: failed to write the tree-kill hook to ${hookDir}, starting Electron without it: ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
+  }
   const startedAt = Date.now()
   const electronApp = spawn(electronPath, targetArgv, {
     stdio,
@@ -309,14 +335,16 @@ function spawnElectron(
   })
   process.electronApp = electronApp
   if (treeKill) {
-    treeKillChildren.set(electronApp, startedAt)
+    treeKillChildren.set(electronApp, { marker })
   }
   trackLiveChild(electronApp)
 
   // Exit command after Electron.app exits
   const handler = (code: number | null) => {
-    if (treeKill && electronApp.pid) {
-      // Windows: Electron's detached helpers keep its (now stale) pid as their parent id.
+    // The hook already killed the app's descendants unless Electron crashed, was killed from
+    // outside, or the hook was not loaded. Only then sweep for orphans (Windows: they keep
+    // Electron's now-stale pid as their parent id; a no-op on POSIX, where they are re-parented).
+    if (treeKill && electronApp.pid && !consumeTreeKillMarker(marker)) {
       killOrphanedChildrenSync(electronApp.pid, startedAt)
     }
     selfExitHandlers.delete(electronApp)

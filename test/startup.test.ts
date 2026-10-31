@@ -1,13 +1,23 @@
 import { EventEmitter } from 'node:events'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { access, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { startup, triggerStartup } from '../src/startup'
+import { TREE_KILL_MARKER_KEY } from '../src/tree-kill-hook'
 
-const { spawn, createRequire } = vi.hoisted(() => ({ spawn: vi.fn(), createRequire: vi.fn() }))
+const { spawn, createRequire, killOrphanedChildrenSync } = vi.hoisted(() => ({
+  spawn: vi.fn(),
+  createRequire: vi.fn(),
+  killOrphanedChildrenSync: vi.fn((): number[] => []),
+}))
+
+vi.mock('../src/process-tree', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/process-tree')>()),
+  killOrphanedChildrenSync,
+}))
 
 vi.mock('node:child_process', () => ({
   spawn,
@@ -195,6 +205,59 @@ describe('src/startup', () => {
       expect(NODE_OPTIONS).toMatch(/^--no-deprecation --require "/)
       expect(JSON.parse(NODE_OPTIONS.slice('--no-deprecation --require '.length))).toContain(hook)
     } finally {
+      startup.treeKill = false
+      await startup.exit()
+      await rm(cwd, { recursive: true, force: true })
+    }
+  })
+  it('skips the orphan sweep after a self-exit only when the hook reported its cleanup', async () => {
+    const cwd = await mkdtemp(path.join(tmpdir(), 'startup-tree-kill-marker-'))
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => {}) as typeof process.exit)
+    /** Start Electron, optionally play the hook's part, then let it exit by itself. */
+    const runAndSelfExit = async (hookCleanedUp: boolean) => {
+      await startup(['.'], { cwd, env: {} })
+      const marker: string = spawn.mock.lastCall![2].env[TREE_KILL_MARKER_KEY]
+      expect(path.dirname(marker)).toBe(
+        path.join(cwd, 'node_modules', '.vite', 'vite-plugin-electron'),
+      )
+      if (hookCleanedUp) {
+        await writeFile(marker, '')
+      }
+      const child = spawn.mock.results.at(-1)!.value as ReturnType<typeof fakeChild>
+      child.exitCode = 0
+      child.emit('exit', 0, null)
+      return marker
+    }
+    try {
+      startup.treeKill = true
+      killOrphanedChildrenSync.mockClear()
+      const consumed = await runAndSelfExit(true)
+      expect(killOrphanedChildrenSync).not.toHaveBeenCalled()
+      await expect(access(consumed)).rejects.toThrow()
+
+      await runAndSelfExit(false)
+      expect(killOrphanedChildrenSync).toHaveBeenCalledTimes(1)
+      expect(killOrphanedChildrenSync).toHaveBeenCalledWith(1234, expect.any(Number))
+      expect(exit).toHaveBeenCalledTimes(2)
+    } finally {
+      exit.mockRestore()
+      startup.treeKill = false
+      await rm(cwd, { recursive: true, force: true })
+    }
+  })
+  it('starts Electron without the tree-kill hook when the hook cannot be written', async () => {
+    const cwd = await mkdtemp(path.join(tmpdir(), 'startup-tree-kill-unwritable-'))
+    // A file where the cache directory should go makes mkdir fail on every platform and as root.
+    await writeFile(path.join(cwd, 'node_modules'), '')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      startup.treeKill = true
+      const env = { NODE_OPTIONS: '--no-deprecation' }
+      await expect(startup(['.'], { cwd, env })).resolves.toBe(true)
+      expect(spawn.mock.lastCall?.[2].env).toEqual(env)
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('startup.treeKill'))
+    } finally {
+      warn.mockRestore()
       startup.treeKill = false
       await startup.exit()
       await rm(cwd, { recursive: true, force: true })
