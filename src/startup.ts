@@ -4,7 +4,7 @@ import path from 'node:path'
 import type { ViteDevServer } from 'vite'
 
 import type { ConfigServerContext } from './base'
-import { withTreeKillHook } from './tree-kill-hook'
+import { ensureTreeKillHook, withTreeKillHook } from './tree-kill-hook'
 import { killOrphanedChildrenSync, killPidsSync, listDescendantPids, treeKillSync } from './utils'
 
 const startupEnv = {
@@ -43,7 +43,12 @@ const electronLifecycles = new WeakMap<ChildProcess, ElectronLifecycle>()
 const exitedChildren = new WeakSet<ChildProcess>()
 // Children spawned while `startup.treeKill` was enabled. Only these get descendant cleanup.
 const treeKillChildren = new WeakSet<ChildProcess>()
+// Epoch ms taken just before spawning a treeKill child, to tell its orphans from PID-reuse strangers.
+const spawnedAt = new WeakMap<ChildProcess, number>()
 let pendingSpawn: Promise<void> = Promise.resolve()
+// Vite's resolved `config.cacheDir` from the latest dev server, so the exported `startup()`
+// (e.g. imported directly inside `onstart`) writes the tree-kill hook to the same place.
+let lastViteCacheDir: string | undefined
 
 // Children still alive, for the synchronous host-exit safety net below.
 const liveChildren = new Set<ChildProcess>()
@@ -130,7 +135,7 @@ function bindElectronExit(
   const handler: ElectronExitHandler = (code, signal) => {
     if (child.pid && treeKillChildren.has(child)) {
       // Windows: detached helpers keep the stale parent id; reap them before the host exits.
-      killOrphanedChildrenSync(child.pid)
+      killOrphanedChildrenSync(child.pid, spawnedAt.get(child))
     }
     clearElectron(child, lifecycle)
     onExit(code, signal)
@@ -212,6 +217,7 @@ async function startElectron(
   customElectronPkg?: string,
   onExit: ElectronExitHandler = (code) => process.exit(code ?? 0),
   session?: DevSession,
+  viteCacheDir?: string,
 ): Promise<boolean> {
   if (
     session?.closed ||
@@ -309,15 +315,33 @@ async function startElectron(
       }
     }
 
+    const treeKill = startup.treeKill
+    const env = treeKill
+      ? withTreeKillHook(
+          options?.env ?? process.env,
+          ensureTreeKillHook(
+            viteCacheDir ??
+              lastViteCacheDir ??
+              // No Vite dev server in this process: use Vite's default location under cwd.
+              path.join(
+                typeof options?.cwd === 'string' ? options.cwd : process.cwd(),
+                'node_modules',
+                '.vite',
+              ),
+          ),
+        )
+      : undefined
+    const startedAt = Date.now()
     const electronApp = spawn(electronPath, targetArgv, {
       stdio,
       ...options,
-      ...(startup.treeKill ? { env: withTreeKillHook(options?.env ?? process.env) } : {}),
+      ...(env ? { env } : {}),
     })
 
     process.electronApp = electronApp
-    if (startup.treeKill) {
+    if (treeKill) {
       treeKillChildren.add(electronApp)
+      spawnedAt.set(electronApp, startedAt)
     }
     trackLiveChild(electronApp)
     if (session) {
@@ -371,6 +395,8 @@ export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<
   // reaped. Skipped by default: the scan is synchronous and slow on Windows.
   const knownDescendants =
     treeKillChildren.has(child) && !hasExited() && child.pid ? listDescendantPids(child.pid) : []
+  // Leftovers are killed only if they still started before this point (guards PID reuse).
+  const snapshotAt = Date.now()
 
   const exitPromise = new Promise<void>((resolve, reject) => {
     if (hasExited()) {
@@ -404,12 +430,10 @@ export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<
         }
         // Windows child.kill(SIGINT|SIGTERM) is TerminateProcess on one pid; with treeKill,
         // leftovers are reaped after exit via knownDescendants. POSIX gets a real signal first.
-        if (!child.kill(requestedSignal)) {
-          if (hasExited()) {
-            onExit()
-          } else {
-            onError(new Error(`Failed to send ${requestedSignal} to Electron child`))
-          }
+        // `false` without an `error` event means ESRCH: the child already died but its `exit`
+        // event is still pending. Keep waiting for it; the SIGKILL timer bounds the wait.
+        if (!child.kill(requestedSignal) && hasExited()) {
+          onExit()
         }
       } catch (error) {
         onError(error as Error)
@@ -428,14 +452,14 @@ export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<
     () => {
       clearElectron(child, state)
       if (knownDescendants.length) {
-        killPidsSync(knownDescendants)
+        killPidsSync(knownDescendants, snapshotAt)
       }
     },
     (error: unknown) => {
       if (hasExited()) {
         clearElectron(child, state)
         if (knownDescendants.length) {
-          killPidsSync(knownDescendants)
+          killPidsSync(knownDescendants, snapshotAt)
         }
       } else {
         state.exitPromise = undefined
@@ -504,6 +528,14 @@ export function triggerStartup(
   options: OnStartOptions,
   session?: DevSession,
 ): void {
+  // Plugin-driven starts have no caller to await them; report failures instead of leaving an
+  // unhandled rejection that would crash the dev server.
+  const report = (error: unknown) => {
+    server.config.logger.error(
+      `[vite-plugin-electron] Electron startup failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
+      { error: error instanceof Error ? error : null },
+    )
+  }
   const startupWithRoot = (
     argv?: string[],
     spawnOptions?: import('node:child_process').SpawnOptions,
@@ -529,31 +561,42 @@ export function triggerStartup(
         }
       },
       session,
+      server.config.cacheDir,
     )
   }
+  if (server.config.cacheDir) {
+    lastViteCacheDir = server.config.cacheDir
+  }
   if (options.onstart) {
-    options.onstart.call(context, {
-      startup: startupWithRoot,
-      // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
-      // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
-      // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
-      reload() {
-        if (session?.closed) {
-          return
-        }
-        const live = session?.electronApp ?? process.electronApp
-        if (live) {
-          ;(server.hot || server.ws).send({ type: 'full-reload' })
+    let started: void | Promise<void>
+    try {
+      started = options.onstart.call(context, {
+        startup: startupWithRoot,
+        // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
+        // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
+        // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
+        reload() {
+          if (session?.closed) {
+            return
+          }
+          const live = session?.electronApp ?? process.electronApp
+          if (live) {
+            ;(server.hot || server.ws).send({ type: 'full-reload' })
 
-          // For Electron apps that don't need to use the renderer process.
-          live.send?.('electron-vite&type=hot-reload')
-        } else {
-          startupWithRoot()
-        }
-      },
-    })
+            // For Electron apps that don't need to use the renderer process.
+            live.send?.('electron-vite&type=hot-reload')
+          } else {
+            startupWithRoot().catch(report)
+          }
+        },
+      })
+    } catch (error) {
+      report(error)
+      return
+    }
+    Promise.resolve(started).catch(report)
   } else {
-    startupWithRoot()
+    startupWithRoot().catch(report)
   }
 }
 

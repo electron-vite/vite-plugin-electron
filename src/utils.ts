@@ -405,15 +405,19 @@ export function getIsViteDev(): boolean {
 }
 
 /**
- * List descendant PIDs of `pid` (not including `pid` itself).
+ * List descendant PIDs of `pid` (not including `pid` itself), parents before children.
  * Best-effort: process listings can race with exits.
+ *
+ * On Windows a process keeps its dead parent's id in `ParentProcessId` and PIDs are reused, so a
+ * process only counts as a child when it was created no earlier than its parent.
  */
 export function listDescendantPids(pid: number): number[] {
   if (!pid || pid <= 0) {
     return []
   }
   if (process.platform === 'win32') {
-    return listWindowsDescendantPids(pid)
+    const table = readWindowsProcessTable()
+    return table ? walkWindowsTree(table, pid) : []
   }
   const result: number[] = []
   const stack = [pid]
@@ -445,9 +449,39 @@ export function listDescendantPids(pid: number): number[] {
   return result
 }
 
-/** Parse `wmic process get ProcessId,ParentProcessId /FORMAT:CSV` (or equivalent) into ppid -> pids. */
-export function parseWindowsProcessTable(out: string): Map<number, number[]> {
-  const childrenByParent = new Map<number, number[]>()
+export interface WindowsProcessTable {
+  /** Parent pid -> child pids. */
+  children: Map<number, number[]>
+  /** Pid -> creation time in epoch milliseconds, when known. */
+  created: Map<number, number>
+}
+
+// WMI DMTF datetime: yyyymmddHHMMSS.ffffff±UUU (UUU = UTC offset in minutes).
+const DMTF_DATETIME = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\.(\d{3})\d*([+-]\d+)$/
+
+/** Parse a WMI DMTF datetime or epoch milliseconds into epoch milliseconds. */
+function parseCreationDate(value: string | undefined): number | undefined {
+  if (!value) {
+    return
+  }
+  if (/^\d+$/.test(value)) {
+    return Number(value)
+  }
+  const match = DMTF_DATETIME.exec(value)
+  if (!match) {
+    return
+  }
+  const [, year, month, day, hour, minute, second, millisecond, offset] = match.map(Number)
+  return Date.UTC(year!, month! - 1, day!, hour!, minute!, second!, millisecond!) - offset! * 60_000
+}
+
+/**
+ * Parse `wmic process get CreationDate,ParentProcessId,ProcessId /FORMAT:CSV` (or the PowerShell
+ * equivalent). Rows end with `CreationDate,ParentProcessId,ProcessId`; `CreationDate` is optional.
+ */
+export function parseWindowsProcessTable(out: string): WindowsProcessTable {
+  const children = new Map<number, number[]>()
+  const created = new Map<number, number>()
   for (const line of out.split(/\r?\n/)) {
     const parts = line.trim().split(',')
     if (parts.length < 3) {
@@ -456,20 +490,26 @@ export function parseWindowsProcessTable(out: string): Map<number, number[]> {
     const ppid = Number(parts[parts.length - 2])
     const pid = Number(parts[parts.length - 1])
     // Skip the CSV header and malformed rows; wmic lists the System Idle Process as pid 0.
-    if (!Number.isFinite(pid) || !Number.isFinite(ppid) || pid <= 0) {
+    if (!Number.isInteger(pid) || !Number.isInteger(ppid) || pid <= 0 || pid === ppid) {
       continue
     }
-    const list = childrenByParent.get(ppid)
+    if (parts.length >= 4) {
+      const time = parseCreationDate(parts[parts.length - 3])
+      if (time !== undefined) {
+        created.set(pid, time)
+      }
+    }
+    const list = children.get(ppid)
     if (list) {
       list.push(pid)
     } else {
-      childrenByParent.set(ppid, [pid])
+      children.set(ppid, [pid])
     }
   }
-  return childrenByParent
+  return { children, created }
 }
 
-function readWindowsProcessTable(): Map<number, number[]> | undefined {
+function readWindowsProcessTable(): WindowsProcessTable | undefined {
   const options: import('node:child_process').ExecFileSyncOptionsWithStringEncoding = {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
@@ -477,7 +517,11 @@ function readWindowsProcessTable(): Map<number, number[]> | undefined {
   }
   try {
     return parseWindowsProcessTable(
-      execFileSync('wmic', ['process', 'get', 'ProcessId,ParentProcessId', '/FORMAT:CSV'], options),
+      execFileSync(
+        'wmic',
+        ['process', 'get', 'CreationDate,ParentProcessId,ProcessId', '/FORMAT:CSV'],
+        options,
+      ),
     )
   } catch {
     // wmic is removed from recent Windows 10/11 builds; fall back to PowerShell (same CSV shape).
@@ -490,7 +534,7 @@ function readWindowsProcessTable(): Map<number, number[]> | undefined {
           '-NoProfile',
           '-NonInteractive',
           '-Command',
-          "Get-CimInstance Win32_Process | ForEach-Object { 'P,' + $_.ParentProcessId + ',' + $_.ProcessId }",
+          "Get-CimInstance Win32_Process | ForEach-Object { $c = if ($_.CreationDate) { ([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() } else { '' }; 'P,' + $c + ',' + $_.ParentProcessId + ',' + $_.ProcessId }",
         ],
         options,
       ),
@@ -500,25 +544,54 @@ function readWindowsProcessTable(): Map<number, number[]> | undefined {
   }
 }
 
-function listWindowsDescendantPids(rootPid: number): number[] {
-  const childrenByParent = readWindowsProcessTable()
-  if (!childrenByParent) {
-    return []
+/** `true` unless `time` is known and falls outside `[notBefore, notAfter]`. */
+function createdWithin(time: number | undefined, notBefore?: number, notAfter?: number): boolean {
+  if (time === undefined) {
+    return true
   }
+  return (
+    (notBefore === undefined || time >= notBefore) && (notAfter === undefined || time <= notAfter)
+  )
+}
+
+/**
+ * Walk the Windows process tree from `rootPid`, parents before children. A row only counts as a
+ * child when it was created no earlier than its parent: otherwise its `ParentProcessId` is stale
+ * and names an earlier process whose PID was later reused.
+ */
+function walkWindowsTree(table: WindowsProcessTable, rootPid: number): number[] {
   const result: number[] = []
   const stack = [rootPid]
   const seen = new Set<number>([rootPid])
   while (stack.length) {
     const current = stack.pop()!
-    for (const child of childrenByParent.get(current) ?? []) {
-      if (!seen.has(child)) {
-        seen.add(child)
-        result.push(child)
-        stack.push(child)
+    const parentCreated = table.created.get(current)
+    for (const child of table.children.get(current) ?? []) {
+      if (seen.has(child) || !createdWithin(table.created.get(child), parentCreated)) {
+        continue
       }
+      seen.add(child)
+      result.push(child)
+      stack.push(child)
     }
   }
   return result
+}
+
+/** `taskkill /F` the given PIDs (no `/T`: its tree walk trusts stale parent ids). */
+function taskkillSync(pids: number[]): void {
+  if (!pids.length) {
+    return
+  }
+  const args = ['/F']
+  for (const pid of pids) {
+    args.push('/PID', String(pid))
+  }
+  try {
+    execFileSync('taskkill', args, { stdio: 'ignore', windowsHide: true })
+  } catch {
+    // Some targets may already be gone (taskkill exit 128).
+  }
 }
 
 /**
@@ -526,50 +599,45 @@ function listWindowsDescendantPids(rootPid: number): number[] {
  * (e.g. Electron `app.quit()` / `process.exit()`), when no pre-exit snapshot exists.
  *
  * Windows keeps the dead parent's id in `ParentProcessId`, so the orphans are still findable;
- * each is tree-killed with `taskkill /T /F`. Trade-off: PIDs are reused on Windows, but this
- * runs synchronously within milliseconds of the parent's exit, so a reused `deadPid` that has
- * already spawned children of its own is very unlikely.
+ * each is killed with its descendants. Because PIDs are reused, only processes created while the
+ * dead child was alive (`startedAt` until now) count as its orphans.
  *
  * POSIX re-parents orphans to init/subreaper, so they cannot be found by the dead pid; this is a
  * no-op there (plugin-initiated shutdown still reaps them via its pre-kill snapshot).
+ * @param startedAt epoch milliseconds taken before the dead child was spawned
  * @returns the orphan PIDs that were targeted
  */
-export function killOrphanedChildrenSync(deadPid: number): number[] {
+export function killOrphanedChildrenSync(deadPid: number, startedAt?: number): number[] {
   if (process.platform !== 'win32' || !deadPid || deadPid <= 0) {
     return []
   }
-  const orphans = (readWindowsProcessTable()?.get(deadPid) ?? []).filter(
-    (pid) => pid !== deadPid && pid !== process.pid,
-  )
-  for (const pid of orphans) {
-    try {
-      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
-        stdio: 'ignore',
-        windowsHide: true,
-      })
-    } catch {
-      // Already gone (taskkill exit 128).
-    }
+  const exitedAt = Date.now()
+  const table = readWindowsProcessTable()
+  if (!table) {
+    return []
   }
+  // A live row for `deadPid` is a new process that reused the PID; bound by time, not by it.
+  const orphans = (table.children.get(deadPid) ?? []).filter(
+    (pid) => pid !== process.pid && createdWithin(table.created.get(pid), startedAt, exitedAt),
+  )
+  const targets: number[] = []
+  for (const orphan of orphans) {
+    targets.push(...walkWindowsTree(table, orphan).reverse(), orphan)
+  }
+  taskkillSync(targets)
   return orphans
 }
 
 /**
- * Terminate `pid` and its descendants. On Windows uses `taskkill /T /F`.
- * On POSIX walks the process tree and signals leaves before parents.
+ * Terminate `pid` and its descendants. On Windows uses `taskkill /F` on the tree found by
+ * {@link listDescendantPids}. On POSIX walks the process tree and signals leaves before parents.
  */
 export function treeKillSync(pid: number, signal: NodeJS.Signals = 'SIGKILL'): void {
   if (!pid || pid <= 0) {
     return
   }
   if (process.platform === 'win32') {
-    try {
-      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
-        stdio: 'ignore',
-      })
-    } catch {
-      // Process may already be gone (taskkill exit 128).
-    }
+    taskkillSync([...listDescendantPids(pid).reverse(), pid])
     return
   }
   const descendants = listDescendantPids(pid)
@@ -587,7 +655,6 @@ export function treeKillSync(pid: number, signal: NodeJS.Signals = 'SIGKILL'): v
   }
 }
 
-/** Best-effort SIGKILL of leftover PIDs after the direct child has exited. */
 function isPidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0)
@@ -598,22 +665,82 @@ function isPidAlive(pid: number): boolean {
 }
 
 /**
+ * Read process start times (epoch milliseconds) for `pids`. Missing PIDs are gone; `NaN` means the
+ * start time could not be parsed. Returns `undefined` when the process table cannot be read.
+ */
+function readStartTimes(pids: number[]): Map<number, number> | undefined {
+  if (process.platform === 'win32') {
+    const table = readWindowsProcessTable()
+    if (!table) {
+      return
+    }
+    const alive = new Set<number>()
+    for (const list of table.children.values()) {
+      for (const pid of list) {
+        alive.add(pid)
+      }
+    }
+    const result = new Map<number, number>()
+    for (const pid of pids) {
+      if (alive.has(pid)) {
+        result.set(pid, table.created.get(pid) ?? Number.NaN)
+      }
+    }
+    return result
+  }
+  let out: string
+  try {
+    out = execFileSync('ps', ['-o', 'pid=,lstart=', '-p', pids.join(',')], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      // `lstart` follows LC_TIME; pin the format Date.parse understands.
+      env: { ...process.env, LC_ALL: 'C' },
+    })
+  } catch (error) {
+    // ps exits 1 when none of the PIDs exist, still printing the (empty) listing.
+    const stdout = (error as { stdout?: unknown }).stdout
+    if (typeof stdout !== 'string') {
+      return
+    }
+    out = stdout
+  }
+  const result = new Map<number, number>()
+  for (const line of out.split(/\r?\n/)) {
+    const match = /^\s*(\d+)\s+(.+?)\s*$/.exec(line)
+    if (match) {
+      result.set(Number(match[1]), Date.parse(match[2]!))
+    }
+  }
+  return result
+}
+
+/**
  * Best-effort SIGKILL of leftover PIDs after the direct child has exited.
  * Waits briefly so callers observing liveness do not race kernel reaping.
+ * @param snapshotAt epoch milliseconds right after `pids` were listed. When given, PIDs that are
+ * gone or now belong to a process started after the snapshot (PID reuse) are skipped.
  */
-export function killPidsSync(pids: number[]): void {
-  const targets = pids.filter((pid) => pid > 0)
-  for (const pid of targets) {
-    try {
-      if (process.platform === 'win32') {
-        execFileSync('taskkill', ['/PID', String(pid), '/F'], {
-          stdio: 'ignore',
-        })
-      } else {
+export function killPidsSync(pids: number[], snapshotAt?: number): void {
+  let targets = pids.filter((pid) => pid > 0)
+  if (snapshotAt !== undefined && targets.length) {
+    const started = readStartTimes(targets)
+    if (started) {
+      targets = targets.filter((pid) => {
+        const time = started.get(pid)
+        // Keep PIDs whose start time could not be parsed; nothing to compare against.
+        return time !== undefined && (Number.isNaN(time) || time <= snapshotAt)
+      })
+    }
+  }
+  if (process.platform === 'win32') {
+    taskkillSync(targets)
+  } else {
+    for (const pid of targets) {
+      try {
         process.kill(pid, 'SIGKILL')
+      } catch {
+        // Already gone.
       }
-    } catch {
-      // Already gone.
     }
   }
   const deadline = Date.now() + 500

@@ -55,6 +55,40 @@ it('isolates dev and mock cleanup across a real Vite restart with the same plugi
   }
 })
 
+it('shares SIGINT supervision and the mock lease across fresh plugin instances', async () => {
+  // The Vite CLI re-evaluates vite.config.ts on restart, so each generation gets a new
+  // electron() instance. Overlap two servers the way a restart does.
+  const root = await mkdtemp(path.join(tmpdir(), 'electron-vite-fresh-instance-'))
+  const makePlugins = () =>
+    createElectronPlugin({ prefix: 'fresh-instance-test', dev() {}, build() {} })
+  const listeners = process.listenerCount('SIGINT')
+  const options = {
+    configFile: false as const,
+    root,
+    logLevel: 'silent' as const,
+    server: { host: '127.0.0.1', port: 0 },
+  }
+  const a = await createServer({ ...options, plugins: makePlugins() })
+  let b: Awaited<ReturnType<typeof createServer>> | undefined
+  try {
+    await a.listen()
+    b = await createServer({ ...options, plugins: makePlugins() })
+    await b.listen()
+    expect(process.listenerCount('SIGINT')).toBe(listeners + 1)
+    await a.close()
+    // B still holds a lease on the mock A created, and is still supervised.
+    expect(await readFile(path.join(root, 'index.html'), 'utf8')).toContain('<!doctype html>')
+    expect(process.listenerCount('SIGINT')).toBe(listeners + 1)
+    await b.close()
+    expect(process.listenerCount('SIGINT')).toBe(listeners)
+    await expect(readFile(path.join(root, 'index.html'))).rejects.toMatchObject({ code: 'ENOENT' })
+  } finally {
+    await a.close()
+    await b?.close()
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 it.each(['normal', 'multi-env'] as const)(
   '%s keeps real watcher startup and Node child ownership isolated across restart',
   async (mode) => {
@@ -139,6 +173,9 @@ it.each(['normal', 'multi-env'] as const)(
       expect(onstart).toHaveBeenCalledTimes(3)
       if (mode === 'normal') {
         expect(options.vite).not.toHaveProperty('plugins')
+        // Dev-only build settings must not leak into the user's nested build object.
+        expect(buildConfig).not.toHaveProperty('watch')
+        expect(buildConfig).not.toHaveProperty('minify')
       }
       await server.close()
       expect(children.every((child) => child.exitCode !== null || child.signalCode !== null)).toBe(

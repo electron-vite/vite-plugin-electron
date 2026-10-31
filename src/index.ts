@@ -46,12 +46,14 @@ export default function electron(options: ElectronOptions | ElectronOptions[]): 
       try {
         for (const originalOptions of optionsArray) {
           const options = { ...originalOptions, vite: mergeConfig({}, originalOptions.vite ?? {}) }
+          // mergeConfig copies nested objects missing from the defaults by reference;
+          // copy `build` so the dev-only settings below never reach the user's object.
+          options.vite.build = { ...options.vite.build }
           options.vite.mode ??= server.config.mode
           options.vite.root ??= server.config.root
           options.vite.envDir ??= server.config.envDir
           options.vite.envPrefix ??= server.config.envPrefix
 
-          options.vite.build ??= {}
           if (!('watch' in options.vite.build)) {
             // #252
             options.vite.build.watch = {}

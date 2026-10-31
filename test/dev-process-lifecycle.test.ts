@@ -299,7 +299,7 @@ describe('dev process lifecycle', () => {
     await currentExit
   })
 
-  it('retains a live child and session ownership when kill returns false', async () => {
+  it('keeps waiting for exit when kill returns false before the exit event arrives', async () => {
     const child = createElectronProcess()
     spawn.mockReturnValue(child)
     const session = { closed: false, electronApp: undefined as ChildProcess | undefined }
@@ -315,14 +315,47 @@ describe('dev process lifecycle', () => {
       session,
     )
     await start()
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    // Windows: the process already died (ESRCH) but libuv has not delivered 'exit' yet.
     vi.mocked(child.kill).mockReturnValueOnce(false)
-    await expect(exitElectron(child)).rejects.toThrow('Failed to send SIGTERM')
+    let settled = false
+    const exiting = exitElectron(child).then(() => {
+      settled = true
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
     expect(process.electronApp).toBe(child)
     expect(session.electronApp).toBe(child)
-    const retry = exitElectron(child)
-    child.emit('exit', null, 'SIGTERM')
-    await retry
+    child.emit('exit', 0, null)
+    await exiting
+    expect(child.kill).toHaveBeenCalledOnce()
     expect(session.electronApp).toBeUndefined()
+    // The late exit is a plugin-initiated one, not Electron quitting by itself.
+    expect(exit).not.toHaveBeenCalled()
+  })
+
+  it('logs plugin-driven startup failures instead of leaving unhandled rejections', async () => {
+    createRequire.mockReturnValue(() => {
+      throw new Error('missing electron')
+    })
+    const error = vi.fn()
+    const server = { config: { root: '/app', logger: { error } } } as never
+    triggerStartup({} as never, server, {})
+    triggerStartup({} as never, server, {
+      async onstart() {
+        throw new Error('onstart failed')
+      },
+    })
+    triggerStartup({} as never, server, {
+      onstart() {
+        throw new Error('sync onstart failed')
+      },
+    })
+    await vi.waitFor(() => expect(error).toHaveBeenCalledTimes(3))
+    const messages = error.mock.calls.map(([message]) => String(message))
+    expect(messages.some((message) => message.includes('Unable to resolve "electron"'))).toBe(true)
+    expect(messages.some((message) => message.includes('onstart failed'))).toBe(true)
+    expect(messages.some((message) => message.includes('sync onstart failed'))).toBe(true)
   })
 
   it('does not touch the Electron env unless treeKill is enabled', async () => {
@@ -353,6 +386,34 @@ describe('dev process lifecycle', () => {
       await startup.exit()
     } finally {
       startup.treeKill = false
+    }
+  })
+
+  it("writes the tree-kill hook under the dev server's Vite cacheDir", async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const path = await import('node:path')
+    const cacheDir = mkdtempSync(path.join(tmpdir(), 'vite-cache-'))
+    spawn.mockImplementation(() => exitingOnKill())
+    startup.treeKill = true
+    try {
+      const server = { config: { root: '/app', cacheDir } } as never
+      let start!: () => Promise<boolean>
+      triggerStartup({} as never, server, {
+        onstart({ startup: startWithRoot }) {
+          start = () => startWithRoot()
+        },
+      })
+      await start()
+      const hook = path.join(cacheDir, 'vite-plugin-electron')
+      expect(spawn.mock.calls[0]![2].env.NODE_OPTIONS).toContain(JSON.stringify(hook).slice(1, -1))
+      // The exported startup() reuses the latest dev server's cacheDir.
+      await startup(['.'])
+      expect(spawn.mock.calls[1]![2].env.NODE_OPTIONS).toContain(JSON.stringify(hook).slice(1, -1))
+      await startup.exit()
+    } finally {
+      startup.treeKill = false
+      rmSync(cacheDir, { recursive: true, force: true })
     }
   })
 
@@ -408,16 +469,20 @@ describe('dev process lifecycle', () => {
     expect(treeKillSync).toHaveBeenCalledWith(4242, 'SIGKILL')
     child.emit('exit', null, 'SIGKILL')
     await exiting
-    expect(killPidsSync).toHaveBeenCalledWith([5001, 5002])
+    expect(killPidsSync).toHaveBeenCalledWith([5001, 5002], expect.any(Number))
 
     startup.treeKill = true
     const second = Object.assign(createElectronProcess(), { pid: 4343 })
     spawn.mockReturnValue(second)
+    const beforeSpawn = Date.now()
     await startup(['.'])
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
     second.emit('exit', 0, null)
     expect(exit).toHaveBeenCalledWith(0)
-    expect(killOrphanedChildrenSync).toHaveBeenCalledWith(4343)
+    // The spawn time lets orphan reaping skip strangers that reuse the dead pid.
+    const [deadPid, startedAt] = vi.mocked(killOrphanedChildrenSync).mock.calls[0]!
+    expect(deadPid).toBe(4343)
+    expect(startedAt).toBeGreaterThanOrEqual(beforeSpawn)
   })
 
   it('exits the parent for a natural exit from exported startup', async () => {
@@ -999,11 +1064,11 @@ describe('dev process lifecycle', () => {
     const envA = configureDev(plugin, a)
     a.httpServer.emit('listening')
     const b = makeServer()
-    const envB = configureDev(plugin, b)
+    configureDev(plugin, b)
     b.httpServer.emit('listening')
+    // A restart closes A while its child is still exiting; B keeps serving.
     const closingA = closeDev(plugin, envA)
     await vi.waitFor(() => expect(child.kill).toHaveBeenCalledOnce())
-    await closeDev(plugin, envB)
 
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
     const handler = process
@@ -1012,6 +1077,8 @@ describe('dev process lifecycle', () => {
     expect(handler).toBeDefined()
     handler!('SIGINT')
     await vi.waitFor(() => expect(b.close).toHaveBeenCalledOnce())
+    // A already closed its server during the restart.
+    expect(a.close).not.toHaveBeenCalled()
     expect(exit).not.toHaveBeenCalled()
     child.emit('exit', null, 'SIGTERM')
     await closingA
@@ -1047,6 +1114,52 @@ describe('dev process lifecycle', () => {
     electronApp.emit('exit', null, 'SIGTERM')
     await retry
     expect(process.electronApp).toBeUndefined()
+  })
+
+  it('waits for sessions of every plugin instance on Ctrl+C', async () => {
+    const childA = createElectronProcess()
+    const childB = createElectronProcess()
+    const makeInstance = (child: ChildProcess) =>
+      createElectronPlugin({
+        prefix: 'multi-instance',
+        dev(_context, _server, _isESM, session) {
+          session.electronApp = child
+        },
+        build() {},
+      })[0]!
+    const pluginA = makeInstance(childA)
+    const pluginB = makeInstance(childB)
+    const makeServer = () => ({
+      config: { server: { middlewareMode: false } },
+      httpServer: Object.assign(new EventEmitter(), { address: () => null }),
+      close: vi.fn(async () => {}),
+    })
+    // Two electron() plugins (or two config generations) each own a session.
+    const a = makeServer()
+    configureDev(pluginA, a)
+    a.httpServer.emit('listening')
+    const b = makeServer()
+    configureDev(pluginB, b)
+    b.httpServer.emit('listening')
+    const handlers = process
+      .listeners('SIGINT')
+      .filter((listener) => !originalSigintListeners.has(listener))
+    expect(handlers).toHaveLength(1)
+
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    handlers[0]!('SIGINT')
+    await vi.waitFor(() => {
+      expect(childA.kill).toHaveBeenCalledExactlyOnceWith('SIGINT')
+      expect(childB.kill).toHaveBeenCalledExactlyOnceWith('SIGINT')
+    })
+    expect(a.close).toHaveBeenCalledOnce()
+    expect(b.close).toHaveBeenCalledOnce()
+    childA.emit('exit', null, 'SIGINT')
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    // B's Electron is still in its graceful window: do not exit yet.
+    expect(exit).not.toHaveBeenCalled()
+    childB.emit('exit', null, 'SIGINT')
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledExactlyOnceWith(130))
   })
 
   it('kills Electron synchronously and exits 130 on a second SIGINT', async () => {

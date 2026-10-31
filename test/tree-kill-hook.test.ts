@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 
 import {
   TREE_KILL_HOOK_SOURCE,
@@ -12,11 +12,29 @@ import {
   withTreeKillHook,
 } from '../src/tree-kill-hook'
 
+// Stands in for Vite's resolved config.cacheDir.
+const hookCacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tree-kill-hook-vite-cache-'))
+const withHook = (env: Record<string, string | undefined>) =>
+  withTreeKillHook(env, ensureTreeKillHook(hookCacheDir))
+
+afterAll(() => {
+  fs.rmSync(hookCacheDir, { recursive: true, force: true })
+})
+
 describe('tree-kill hook', () => {
-  it('writes the hook once to a stable temp file', () => {
-    const file = ensureTreeKillHook()
-    expect(fs.readFileSync(file, 'utf8')).toBe(TREE_KILL_HOOK_SOURCE)
-    expect(ensureTreeKillHook()).toBe(file)
+  it("writes the hook under Vite's cacheDir and replaces a file whose content does not match", () => {
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tree-kill-hook-cache-'))
+    try {
+      const file = ensureTreeKillHook(cacheDir)
+      expect(path.dirname(file)).toBe(path.join(cacheDir, 'vite-plugin-electron'))
+      expect(fs.readFileSync(file, 'utf8')).toBe(TREE_KILL_HOOK_SOURCE)
+      expect(ensureTreeKillHook(cacheDir)).toBe(file)
+      fs.writeFileSync(file, 'process.exit(1)\n')
+      expect(ensureTreeKillHook(cacheDir)).toBe(file)
+      expect(fs.readFileSync(file, 'utf8')).toBe(TREE_KILL_HOOK_SOURCE)
+    } finally {
+      fs.rmSync(cacheDir, { recursive: true, force: true })
+    }
   })
 
   it('preloads the hook and keeps the original NODE_OPTIONS for restoring', () => {
@@ -41,7 +59,7 @@ describe('tree-kill hook', () => {
       JSON.parse(
         execFileSync(process.execPath, ['-e', script], {
           encoding: 'utf8',
-          env: withTreeKillHook(env),
+          env: withHook(env),
         }),
       )
 
@@ -71,7 +89,7 @@ describe('tree-kill hook', () => {
         setTimeout(() => process.exit(0), 300)
       `
       const { NODE_OPTIONS: _ignored, ...base } = process.env
-      const env = withTreeKillHook({
+      const env = withHook({
         ...base,
         NODE_OPTIONS: `--require ${JSON.stringify(asBrowser)}`,
       })

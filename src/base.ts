@@ -30,6 +30,128 @@ interface FactoryOptions {
   buildConfig?: (config: UserConfig, env: ConfigEnv) => Promise<UserConfig | undefined>
 }
 
+interface ConfigState {
+  isESM: boolean
+  cleanupMock?: () => Promise<void>
+}
+interface Session extends DevSession, ConfigState {
+  server: ViteDevServer
+  devStarted?: Promise<DevCleanup | void>
+  closing?: Promise<void>
+  shutdownSignal?: NodeJS.Signals
+}
+
+// Process-wide state. The Vite CLI re-evaluates `vite.config.ts` on every restart, creating new
+// plugin instances, and a config may mount several electron() plugins. Ctrl+C supervision and the
+// mock `index.html` lease must span all of them, so they live here rather than per instance.
+const mocks = new Map<string, { references: number; cleanup: () => Promise<void> }>()
+// Sessions not yet fully closed (still serving, or waiting for their Electron child to exit).
+const pendingSessions = new Set<Session>()
+let sigintShutdownStarted = false
+
+function removeSigintHandler() {
+  process.removeListener('SIGINT', onSigint)
+  sigintShutdownStarted = false
+}
+
+function onSigint() {
+  if (sigintShutdownStarted) {
+    // Second Ctrl+C: like the OS default for an unhandled SIGINT, stop waiting and exit
+    // now. Kill owned Electron children first so they do not outlive the host.
+    for (const owned of pendingSessions) {
+      if (owned.electronApp) {
+        killElectronSync(owned.electronApp)
+      }
+    }
+    removeSigintHandler()
+    process.exit(128 + constants.signals.SIGINT)
+    return
+  }
+  sigintShutdownStarted = true
+  const pending = [...pendingSessions]
+  // Sessions whose server is still serving; earlier generations already closed theirs.
+  const servers = new Set(pending.filter((owned) => !owned.closed).map((owned) => owned.server))
+  for (const owned of pending) {
+    owned.closed = true
+    owned.shutdownSignal = 'SIGINT'
+  }
+  void (async () => {
+    // A restart can publish B while A is still waiting for its child.
+    // Wait for every generation and plugin instance, even if closing Vite rejects.
+    await Promise.allSettled([
+      ...pending.map(closeSession),
+      ...[...servers].map((server) => Promise.resolve().then(() => server.close())),
+    ])
+    // Shells report signal termination as 128 plus the signal number.
+    process.exit(128 + constants.signals.SIGINT)
+  })()
+}
+
+/**
+ * Supervise Ctrl+C while a pending session belongs to a server that owns the process lifetime
+ * (not middleware mode). Middleware hosts handle their own signals.
+ */
+function updateSigintHandler() {
+  const needed = [...pendingSessions].some((owned) => !owned.server.config.server.middlewareMode)
+  if (needed && !process.listeners('SIGINT').includes(onSigint)) {
+    sigintShutdownStarted = false
+    // Use `on`, not `once`: the second SIGINT must still kill Electron before exiting.
+    process.on('SIGINT', onSigint)
+  } else if (!needed) {
+    removeSigintHandler()
+  }
+}
+
+function closeSession(session: Session): Promise<void> {
+  session.closed = true
+  if (session.closing) {
+    return session.closing
+  }
+  const closing = (async () => {
+    const errors: unknown[] = []
+    try {
+      await session.cleanupMock?.()
+    } catch (error) {
+      errors.push(error)
+    }
+    try {
+      const cleanup = await session.devStarted
+      await cleanup?.()
+    } catch (error) {
+      errors.push(error)
+    }
+    try {
+      const child = session.electronApp
+      if (child) {
+        await exitElectron(child, session.shutdownSignal)
+        // Resolved means the child exited; release it even if it was not bound to this session.
+        if (session.electronApp === child) {
+          session.electronApp = undefined
+        }
+      }
+    } catch (error) {
+      errors.push(error)
+    } finally {
+      if (!session.electronApp) {
+        pendingSessions.delete(session)
+      }
+      // Keep supervising earlier generations until all owned children exit.
+      updateSigintHandler()
+    }
+    if (errors.length) {
+      throw errors[0]
+    }
+  })()
+  session.closing = closing
+  // A failed close must be retryable: clear the cached rejection so close() can run again.
+  void closing.catch(() => {
+    if (session.closing === closing) {
+      session.closing = undefined
+    }
+  })
+  return closing
+}
+
 export function createElectronPlugin({
   prefix,
   buildConfig,
@@ -41,79 +163,9 @@ export function createElectronPlugin({
   let cleanupMock: (() => Promise<void>) | undefined
   let isESM: boolean
 
-  interface ConfigState {
-    isESM: boolean
-    cleanupMock?: () => Promise<void>
-  }
-  interface Session extends DevSession, ConfigState {
-    server: ViteDevServer
-    devStarted?: Promise<DevCleanup | void>
-    closing?: Promise<void>
-    shutdownSignal?: NodeJS.Signals
-  }
   const configs = new WeakMap<ResolvedConfig, ConfigState>()
+  // Per instance: two electron() plugins on one server each own a session for its environments.
   const sessions = new WeakMap<object, Session>()
-  const mocks = new Map<string, { references: number; cleanup: () => Promise<void> }>()
-  const pendingSessions = new Set<Session>()
-  let activeSession: Session | undefined
-  let sigintHandler: (() => void) | undefined
-  let sigintShutdownStarted = false
-
-  function removeSigintHandler() {
-    if (sigintHandler) {
-      process.removeListener('SIGINT', sigintHandler)
-      sigintHandler = undefined
-    }
-    sigintShutdownStarted = false
-  }
-
-  function closeSession(session: Session): Promise<void> {
-    session.closed = true
-    if (session.closing) {
-      return session.closing
-    }
-    const closing = (async () => {
-      const errors: unknown[] = []
-      try {
-        await session.cleanupMock?.()
-      } catch (error) {
-        errors.push(error)
-      }
-      try {
-        const cleanup = await session.devStarted
-        await cleanup?.()
-      } catch (error) {
-        errors.push(error)
-      }
-      try {
-        if (session.electronApp) {
-          await exitElectron(session.electronApp, session.shutdownSignal)
-        }
-      } catch (error) {
-        errors.push(error)
-      } finally {
-        if (!session.electronApp) {
-          pendingSessions.delete(session)
-        }
-        // Keep supervising earlier generations until all owned children exit.
-        if (pendingSessions.size === 0) {
-          removeSigintHandler()
-          sigintShutdownStarted = false
-        }
-      }
-      if (errors.length) {
-        throw errors[0]
-      }
-    })()
-    session.closing = closing
-    // A failed close must be retryable: clear the cached rejection so close() can run again.
-    void closing.catch(() => {
-      if (session.closing === closing) {
-        session.closing = undefined
-      }
-    })
-    return closing
-  }
 
   return [
     {
@@ -128,7 +180,8 @@ export function createElectronPlugin({
         const state: ConfigState = { isESM: checkESModule(config.root) }
         const input = resolveInput(config)
         let mock = mocks.get(config.root)
-        // A restart resolves B while A's mock still exists. Give B its own lease.
+        // A restart (or a second electron() plugin) resolves B while A's mock still exists.
+        // Give B its own lease; the map is process-wide so new plugin instances see A's mock.
         if (!input || (mock && input === path.join(config.root, 'index.html'))) {
           if (!mock) {
             mock = { references: 0, cleanup: setupMockHtml(config, false, config.logger) }
@@ -162,50 +215,11 @@ export function createElectronPlugin({
           server,
           ...(configs.get(server.config) ?? { isESM: false }),
         }
-        activeSession = session
         pendingSessions.add(session)
         for (const environment of Object.values(server.environments ?? {})) {
           sessions.set(environment, session)
         }
-
-        if (server.config.server.middlewareMode) {
-          removeSigintHandler()
-          sigintShutdownStarted = false
-        } else if (!sigintHandler) {
-          sigintHandler = () => {
-            if (sigintShutdownStarted) {
-              // Second Ctrl+C: like the OS default for an unhandled SIGINT, stop waiting and exit
-              // now. Kill owned Electron children first so they do not outlive the host.
-              for (const owned of pendingSessions) {
-                if (owned.electronApp) {
-                  killElectronSync(owned.electronApp)
-                }
-              }
-              removeSigintHandler()
-              process.exit(128 + constants.signals.SIGINT)
-              return
-            }
-            sigintShutdownStarted = true
-            const current = activeSession
-            const pending = [...pendingSessions]
-            for (const owned of pending) {
-              owned.closed = true
-              owned.shutdownSignal = 'SIGINT'
-            }
-            void (async () => {
-              // A restart can publish B while A is still waiting for its child.
-              // Wait for every generation, even if closing Vite rejects.
-              await Promise.allSettled([
-                ...pending.map(closeSession),
-                Promise.resolve().then(() => current?.server.close()),
-              ])
-              // Shells report signal termination as 128 plus the signal number.
-              process.exit(128 + constants.signals.SIGINT)
-            })()
-          }
-          // Use `on`, not `once`: the second SIGINT must still kill Electron before exiting.
-          process.on('SIGINT', sigintHandler)
-        }
+        updateSigintHandler()
 
         server.httpServer?.once('listening', async () => {
           if (session.closed) {
