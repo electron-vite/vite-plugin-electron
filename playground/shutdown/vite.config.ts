@@ -39,6 +39,11 @@ export default defineConfig({
       ? [
           electron({
             entry: 'electron/second.ts',
+            // `entry` only selects what is built; the default startup would launch `.` (the
+            // first app) again, so start this plugin's own build explicitly.
+            onstart({ startup }) {
+              return void startup(['dist-electron/second.js', '--no-sandbox'])
+            },
           }),
         ]
       : []),

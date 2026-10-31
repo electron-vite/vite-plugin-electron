@@ -66,15 +66,40 @@ export function killElectronSync(child: ChildProcess): void {
   if (hasChildExited(child)) {
     return
   }
-  if (child.pid && treeKillChildren.has(child)) {
-    treeKillSync(child.pid, 'SIGKILL')
-    return
-  }
   try {
-    child.kill('SIGKILL')
+    sigkillElectron(child)
   } catch {
     // Already gone.
   }
+}
+
+/**
+ * SIGKILL the child, throwing if the direct child cannot be signaled. The tree cleanup is best
+ * effort, and the direct kill is always attempted afterwards (a failed `taskkill` is swallowed).
+ */
+function sigkillElectron(child: ChildProcess): void {
+  if (child.pid && treeKillChildren.has(child)) {
+    treeKillSync(child.pid, 'SIGKILL')
+  }
+  child.kill('SIGKILL')
+}
+
+/**
+ * The global Electron child when no dev session owns it (started through the exported `startup()`),
+ * so session shutdown can still stop it without touching children owned by other sessions.
+ */
+export function getUnownedElectron(): ChildProcess | undefined {
+  const child = process.electronApp
+  if (!child || hasChildExited(child)) {
+    return undefined
+  }
+  return electronLifecycles.get(child)?.session ? undefined : child
+}
+
+/** `true` when `child` is unowned or owned by `session`. */
+function isUsableBy(child: ChildProcess, session?: DevSession): boolean {
+  const owner = electronLifecycles.get(child)?.session
+  return !session || !owner || owner === session
 }
 
 /**
@@ -282,8 +307,7 @@ async function startElectron(
       } else if (process.electronApp) {
         // Replace an unowned global child (manual startup() before a session start).
         // Do not kill a child owned by a different live session.
-        const life = electronLifecycles.get(process.electronApp)
-        if (!life?.session || life.session === session) {
+        if (isUsableBy(process.electronApp, session)) {
           await exitElectron(process.electronApp)
         }
       }
@@ -323,7 +347,8 @@ async function startElectron(
             viteCacheDir ??
               lastViteCacheDir ??
               // No Vite dev server in this process: use Vite's default location under cwd.
-              path.join(
+              // Absolute: the child resolves `NODE_OPTIONS=--require` after changing to `options.cwd`.
+              path.resolve(
                 typeof options?.cwd === 'string' ? options.cwd : process.cwd(),
                 'node_modules',
                 '.vite',
@@ -422,7 +447,8 @@ export function exitElectron(child: ChildProcess, signal?: KillSignal): Promise<
     function kill(requestedSignal: KillSignal) {
       try {
         if (requestedSignal === 'SIGKILL') {
-          killElectronSync(child)
+          // Throws if the direct child cannot be signaled, so the shutdown rejects and can retry.
+          sigkillElectron(child)
           if (hasExited()) {
             onExit()
           }
@@ -549,14 +575,15 @@ export function triggerStartup(
         if (session?.closed) {
           return
         }
-        if (code !== null) {
-          process.exitCode ??= code
-        }
         // `async` turns a synchronous throw from close() into a rejection.
         const closing = (async () => server.close())().catch(() => {})
-        // Middleware hosts own the process lifetime. The Vite CLI does not exit by itself after
-        // close() (its stdin shortcut reader stays open), so end it like the Ctrl+C path does.
+        // Middleware hosts own the process lifetime, including its exit code. The Vite CLI does
+        // not exit by itself after close() (its stdin shortcut reader stays open), so end it like
+        // the Ctrl+C path does.
         if (!server.config.server?.middlewareMode) {
+          if (code !== null) {
+            process.exitCode ??= code
+          }
           void closing.then(() => process.exit())
         }
       },
@@ -568,6 +595,10 @@ export function triggerStartup(
     lastViteCacheDir = server.config.cacheDir
   }
   if (options.onstart) {
+    // Do not run user callback side effects against a closed or restarted server.
+    if (session?.closed) {
+      return
+    }
     let started: void | Promise<void>
     try {
       started = options.onstart.call(context, {
@@ -579,7 +610,11 @@ export function triggerStartup(
           if (session?.closed) {
             return
           }
-          const live = session?.electronApp ?? process.electronApp
+          // Reuse the global alias only when it is unowned or belongs to this session.
+          const global = process.electronApp
+          const live =
+            session?.electronApp ??
+            (global && !hasChildExited(global) && isUsableBy(global, session) ? global : undefined)
           if (live) {
             ;(server.hot || server.ws).send({ type: 'full-reload' })
 

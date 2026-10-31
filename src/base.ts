@@ -1,9 +1,10 @@
 import { constants } from 'node:os'
+import type { ChildProcess } from 'node:child_process'
 import path from 'node:path'
 
 import type { Plugin, ConfigEnv, UserConfig, ViteDevServer, ServerHook, ResolvedConfig } from 'vite'
 
-import { exitElectron, killElectronSync } from './startup'
+import { exitElectron, getUnownedElectron, killElectronSync } from './startup'
 import type { DevSession } from './startup'
 import { resolveServerUrl, resolveInput, setupMockHtml, checkESModule, setIsViteDev } from './utils'
 
@@ -39,12 +40,17 @@ interface Session extends DevSession, ConfigState {
   devStarted?: Promise<DevCleanup | void>
   closing?: Promise<void>
   shutdownSignal?: NodeJS.Signals
+  /** Child whose exit will release this session after a failed shutdown. */
+  exitWatch?: ChildProcess
 }
 
 // Process-wide state. The Vite CLI re-evaluates `vite.config.ts` on every restart, creating new
 // plugin instances, and a config may mount several electron() plugins. Ctrl+C supervision and the
 // mock `index.html` lease must span all of them, so they live here rather than per instance.
-const mocks = new Map<string, { references: number; cleanup: () => Promise<void> }>()
+const mocks = new Map<
+  string,
+  { references: number; cleanup: () => Promise<void>; cleaning?: Promise<void> }
+>()
 // Sessions not yet fully closed (still serving, or waiting for their Electron child to exit).
 const pendingSessions = new Set<Session>()
 let sigintShutdownStarted = false
@@ -121,7 +127,9 @@ function closeSession(session: Session): Promise<void> {
       errors.push(error)
     }
     try {
-      const child = session.electronApp
+      // A child started through the exported `startup()` has no session; stop it too, unless
+      // another session owns it.
+      const child = session.electronApp ?? getUnownedElectron()
       if (child) {
         await exitElectron(child, session.shutdownSignal)
         // Resolved means the child exited; release it even if it was not bound to this session.
@@ -132,8 +140,24 @@ function closeSession(session: Session): Promise<void> {
     } catch (error) {
       errors.push(error)
     } finally {
-      if (!session.electronApp) {
+      const stale = session.electronApp
+      if (!stale) {
         pendingSessions.delete(session)
+      } else if (session.exitWatch !== stale) {
+        // Shutdown failed: release the session once the child exits on its own.
+        session.exitWatch = stale
+        const release = () => {
+          if (session.electronApp === stale) {
+            session.electronApp = undefined
+          }
+          pendingSessions.delete(session)
+          updateSigintHandler()
+        }
+        if (stale.exitCode !== null || stale.signalCode !== null) {
+          release()
+        } else {
+          stale.once('exit', release)
+        }
       }
       // Keep supervising earlier generations until all owned children exit.
       updateSigintHandler()
@@ -176,10 +200,19 @@ export function createElectronPlugin({
           setIsViteDev()
         }
       },
-      configResolved(config) {
+      async configResolved(config) {
         const state: ConfigState = { isESM: checkESModule(config.root) }
-        const input = resolveInput(config)
         let mock = mocks.get(config.root)
+        // The last release is still deleting the mock file. Wait for it so this session neither
+        // mistakes the file for a real entry nor has it deleted underneath it.
+        while (mock?.cleaning) {
+          await mock.cleaning.catch(() => {})
+          if (mocks.get(config.root) === mock) {
+            mocks.delete(config.root)
+          }
+          mock = mocks.get(config.root)
+        }
+        const input = resolveInput(config)
         // A restart (or a second electron() plugin) resolves B while A's mock still exists.
         // Give B its own lease; the map is process-wide so new plugin instances see A's mock.
         if (!input || (mock && input === path.join(config.root, 'index.html'))) {
@@ -196,8 +229,14 @@ export function createElectronPlugin({
             }
             released = true
             if (--ownedMock.references === 0) {
-              mocks.delete(config.root)
-              await ownedMock.cleanup()
+              // Keep the entry until the file is gone so new sessions can coordinate with it.
+              const cleaning = ownedMock.cleanup().finally(() => {
+                if (mocks.get(config.root) === ownedMock) {
+                  mocks.delete(config.root)
+                }
+              })
+              ownedMock.cleaning = cleaning
+              await cleaning
             }
           }
         }

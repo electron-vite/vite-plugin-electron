@@ -616,10 +616,17 @@ export function killOrphanedChildrenSync(deadPid: number, startedAt?: number): n
   if (!table) {
     return []
   }
-  // A live row for `deadPid` is a new process that reused the PID; bound by time, not by it.
-  const orphans = (table.children.get(deadPid) ?? []).filter(
-    (pid) => pid !== process.pid && createdWithin(table.created.get(pid), startedAt, exitedAt),
-  )
+  // A live row for `deadPid` is a new process that reused the PID. Bound by time, and exclude
+  // anything created at or after that replacement, which belongs to it rather than the dead child.
+  const replacementCreated = table.created.get(deadPid)
+  const orphans = (table.children.get(deadPid) ?? []).filter((pid) => {
+    const created = table.created.get(pid)
+    return (
+      pid !== process.pid &&
+      createdWithin(created, startedAt, exitedAt) &&
+      (replacementCreated === undefined || created === undefined || created < replacementCreated)
+    )
+  })
   const targets: number[] = []
   for (const orphan of orphans) {
     targets.push(...walkWindowsTree(table, orphan).reverse(), orphan)
