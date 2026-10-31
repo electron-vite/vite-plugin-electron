@@ -494,6 +494,8 @@ Await `startup()` 的返回值可以知道是否触发了启动，或者被控�
 
 `startup.exit(signal?)` 返回一个 Promise，在 Electron 应用退出后 resolve。
 
+Electron 应用自行退出时，会先关闭开发服务器，再以应用的退出码退出 Vite。若 Vite 经由其他途径退出（`process.exit()`、未捕获的错误），正在运行的 Electron 应用会收到 `SIGTERM`。
+
 ## 内置插件
 
 ### notBundle 插件

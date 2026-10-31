@@ -1,4 +1,6 @@
+import { spawn } from 'node:child_process'
 import type { ChildProcess, SpawnOptions, StdioOptions } from 'node:child_process'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 
 import type { ViteDevServer } from 'vite'
@@ -31,6 +33,8 @@ const ELECTRON_SHUTDOWN_TIMEOUT = 5_000
 const selfExitHandlers = new WeakMap<ChildProcess, (code: number | null) => void>()
 /** In-flight shutdowns, so concurrent `startup.exit()` calls share one wait. */
 const exiting = new WeakMap<ChildProcess, Promise<void>>()
+/** Chains Electron replacements so concurrent starts run one at a time. */
+let spawnQueue: Promise<void> = Promise.resolve()
 
 function terminate(child: ChildProcess, signal: KillSignal): Promise<void> {
   const pending = exiting.get(child)
@@ -123,6 +127,7 @@ async function startElectron(
   options?: SpawnOptions,
   customElectronPkg?: string,
   session?: DevSession,
+  onSelfExit: (code: number | null) => void = (code) => process.exit(code ?? 0),
 ): Promise<boolean> {
   if (session?.closed) {
     return false
@@ -131,8 +136,6 @@ async function startElectron(
     process.electronApp = undefined
     return false
   }
-  const { spawn } = await import('node:child_process')
-  const { createRequire } = await import('node:module')
   const electronPackage = customElectronPkg ?? 'electron'
   const roots = new Set<string>([
     ...(typeof options?.cwd === 'string' ? [options.cwd] : []),
@@ -171,16 +174,33 @@ async function startElectron(
 
   const electronPath = electron.default ?? electron
 
-  // Wait for the previous app to exit. Loop because a concurrent `startup()` may spawn a new
-  // one while we were waiting; the last caller wins.
-  while (process.electronApp) {
+  // One replacement at a time: concurrent calls would otherwise both see no running app and
+  // each spawn one, orphaning the first. The last caller wins.
+  const previous = spawnQueue
+  let release!: () => void
+  spawnQueue = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await previous
+  try {
     await startup.exit()
+    // The dev server may have closed while we were resolving or waiting.
+    if (session?.closed) {
+      return false
+    }
+    spawnElectron(electronPath, argv, options, onSelfExit)
+    return true
+  } finally {
+    release()
   }
-  // The dev server may have closed while we were resolving or waiting.
-  if (session?.closed) {
-    return false
-  }
+}
 
+function spawnElectron(
+  electronPath: string,
+  argv: string[],
+  options: SpawnOptions | undefined,
+  onSelfExit: (code: number | null) => void,
+): void {
   // Start Electron.app
   const stdio: StdioOptions =
     process.platform === 'linux'
@@ -202,18 +222,49 @@ async function startElectron(
     }
   }
 
-  process.electronApp = spawn(electronPath, targetArgv, {
+  const electronApp = spawn(electronPath, targetArgv, {
     stdio,
     ...options,
   })
+  process.electronApp = electronApp
+  trackLiveChild(electronApp)
 
   // Exit command after Electron.app exits
-  const electronApp = process.electronApp
-  const onSelfExit = (code: number | null) => process.exit(code ?? 0)
-  selfExitHandlers.set(electronApp, onSelfExit)
-  electronApp.on('exit', onSelfExit)
+  const handler = (code: number | null) => {
+    selfExitHandlers.delete(electronApp)
+    if (process.electronApp === electronApp) {
+      process.electronApp = undefined
+    }
+    onSelfExit(code)
+  }
+  selfExitHandlers.set(electronApp, handler)
+  electronApp.on('exit', handler)
+}
 
-  return true
+// Safety net: if this process exits by any other path (`process.exit()`, an uncaught error, ...)
+// while Electron is still running, do not leave it behind. Normal shutdowns wait for Electron
+// first, so this is a no-op for them.
+const liveChildren = new Set<ChildProcess>()
+function killLiveChildren(): void {
+  for (const child of liveChildren) {
+    try {
+      child.kill()
+    } catch {
+      // Already gone.
+    }
+  }
+}
+function trackLiveChild(child: ChildProcess): void {
+  if (liveChildren.size === 0) {
+    process.on('exit', killLiveChildren)
+  }
+  liveChildren.add(child)
+  child.once('exit', () => {
+    liveChildren.delete(child)
+    if (liveChildren.size === 0) {
+      process.removeListener('exit', killLiveChildren)
+    }
+  })
 }
 startup.send = (message: string) => {
   if (process.electronApp) {
@@ -284,6 +335,25 @@ export function triggerStartup(
   if (session?.closed) {
     return
   }
+  // Plugin-driven starts have no caller to handle a failure; log it instead of crashing the
+  // dev server with an unhandled rejection.
+  const report = (error: unknown) => {
+    server.config.logger.error(
+      `[vite-plugin-electron] Electron startup failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
+      { error: error instanceof Error ? error : null },
+    )
+  }
+  // When Electron quits by itself, close the dev server first so it cleans up (build watchers,
+  // the mock `index.html`), then exit with Electron's exit code.
+  const onSelfExit = (code: number | null) => {
+    if (session?.closed) {
+      // Already shutting down; the closing server decides how the process ends.
+      return
+    }
+    void (async () => server.close())()
+      .catch(() => {})
+      .then(() => process.exit(code ?? 0))
+  }
   const startupWithRoot = (
     argv?: string[],
     spawnOptions?: import('node:child_process').SpawnOptions,
@@ -294,27 +364,35 @@ export function triggerStartup(
       { cwd: server.config.root, ...spawnOptions },
       customElectronPkg,
       session,
+      onSelfExit,
     )
   }
   if (options.onstart) {
-    options.onstart.call(context, {
-      startup: startupWithRoot,
-      // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
-      // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
-      // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
-      reload() {
-        if (process.electronApp) {
-          ;(server.hot || server.ws).send({ type: 'full-reload' })
+    let started: void | Promise<void>
+    try {
+      started = options.onstart.call(context, {
+        startup: startupWithRoot,
+        // Why not use Vite's built-in `/@vite/client` to implement Hot reload?
+        // Because Vite only inserts `/@vite/client` into the `*.html` entry file, the preload scripts are usually a `*.js` file.
+        // @see - https://github.com/vitejs/vite/blob/v5.2.11/packages/vite/src/node/server/middlewares/indexHtml.ts#L399
+        reload() {
+          if (process.electronApp) {
+            ;(server.hot || server.ws).send({ type: 'full-reload' })
 
-          // For Electron apps that don't need to use the renderer process.
-          startup.send('electron-vite&type=hot-reload')
-        } else {
-          startupWithRoot()
-        }
-      },
-    })
+            // For Electron apps that don't need to use the renderer process.
+            startup.send('electron-vite&type=hot-reload')
+          } else {
+            startupWithRoot().catch(report)
+          }
+        },
+      })
+    } catch (error) {
+      report(error)
+      return
+    }
+    Promise.resolve(started).catch(report)
   } else {
-    startupWithRoot()
+    startupWithRoot().catch(report)
   }
 }
 

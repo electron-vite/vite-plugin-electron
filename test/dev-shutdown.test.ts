@@ -7,26 +7,18 @@ import path from 'node:path'
 import { build } from 'vite'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
-// https://github.com/electron-vite/vite-plugin-electron/issues/311
-// Ctrl+C must not end the Vite process before the Electron app has exited.
+// How the Vite dev process and the Electron app end together. The runner is a real Vite dev
+// server in its own process; plain Node stands in for Electron (test/fixtures/dev-shutdown-child.cjs).
 
 let root: string
 beforeAll(async () => {
-  root = await mkdtemp(path.join(tmpdir(), 'electron-sigint-'))
+  root = await mkdtemp(path.join(tmpdir(), 'electron-dev-shutdown-'))
   await symlink(path.resolve('node_modules'), path.join(root, 'node_modules'), 'junction')
-  // `startup()` resolves its electron package from the project root; point it at plain Node.
-  const packageDir = path.join(root, 'app/node_modules/node-electron-fixture')
-  await mkdir(packageDir, { recursive: true })
-  await writeFile(path.join(packageDir, 'package.json'), '{"main":"index.cjs"}')
-  await writeFile(
-    path.join(packageDir, 'index.cjs'),
-    `module.exports = ${JSON.stringify(process.execPath)}`,
-  )
   await build({
     configFile: false,
     logLevel: 'silent',
     build: {
-      ssr: path.resolve('test/fixtures/sigint-runner.ts'),
+      ssr: path.resolve('test/fixtures/dev-shutdown-runner.ts'),
       outDir: path.join(root, 'dist'),
       rollupOptions: { output: { entryFileNames: 'runner.mjs' } },
     },
@@ -48,15 +40,44 @@ function isAlive(pid: number): boolean {
   }
 }
 
-async function run(mode: 'slow' | 'stubborn', body: (ctx: RunContext) => Promise<void>) {
-  const marker = path.join(root, `${mode}.marker`)
+async function waitForDeath(pid: number, timeout = 3_000): Promise<boolean> {
+  const deadline = Date.now() + timeout
+  while (isAlive(pid) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  return !isAlive(pid)
+}
+
+interface RunContext {
+  app: string
+  marker: string
+  send: (message: 'sigint' | 'host-exit') => void
+  exited: (timeout: number) => Promise<number | null>
+  childPid: () => number
+}
+
+async function run(
+  mode: 'slow' | 'stubborn' | 'quit',
+  body: (ctx: RunContext) => Promise<void>,
+): Promise<void> {
+  // A fresh project per run: a forced exit may leave the mock index.html behind.
+  const app = await mkdtemp(path.join(root, 'app-'))
+  const marker = path.join(app, 'marker')
+  // `startup()` resolves its electron package from the project root; point it at plain Node.
+  const packageDir = path.join(app, 'node_modules/node-electron-fixture')
+  await mkdir(packageDir, { recursive: true })
+  await writeFile(path.join(packageDir, 'package.json'), '{"main":"index.cjs"}')
+  await writeFile(
+    path.join(packageDir, 'index.cjs'),
+    `module.exports = ${JSON.stringify(process.execPath)}`,
+  )
   const runner = spawn(
     process.execPath,
     [
       path.join(root, 'dist/runner.mjs'),
       mode,
-      path.join(root, 'app'),
-      path.resolve('test/fixtures/sigint-child.cjs'),
+      app,
+      path.resolve('test/fixtures/dev-shutdown-child.cjs'),
       marker,
     ],
     { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] },
@@ -90,8 +111,9 @@ async function run(mode: 'slow' | 'stubborn', body: (ctx: RunContext) => Promise
   try {
     await within(ready, 10_000)
     await body({
+      app,
       marker,
-      sigint: () => runner.send('sigint'),
+      send: (message) => runner.send(message),
       exited: (timeout) => within(exited, timeout),
       childPid: () => childPid,
     })
@@ -109,16 +131,10 @@ async function run(mode: 'slow' | 'stubborn', body: (ctx: RunContext) => Promise
   }
 }
 
-interface RunContext {
-  marker: string
-  sigint: () => void
-  exited: (timeout: number) => Promise<number | null>
-  childPid: () => number
-}
-
+// https://github.com/electron-vite/vite-plugin-electron/issues/311
 it('waits for Electron to exit before the Vite process exits on Ctrl+C', async () => {
   await run('slow', async (ctx) => {
-    ctx.sigint()
+    ctx.send('sigint')
     expect(await ctx.exited(8_000)).toBe(130)
     // The child needs ~300ms to shut down; the host must not have left before it finished.
     // (On Windows `kill()` terminates immediately, so only the exit itself is checked.)
@@ -131,20 +147,32 @@ it('waits for Electron to exit before the Vite process exits on Ctrl+C', async (
 
 it('force-exits on a second Ctrl+C without leaving Electron behind', async () => {
   await run('stubborn', async (ctx) => {
-    ctx.sigint()
+    ctx.send('sigint')
     // On POSIX the child ignores termination signals, so the first Ctrl+C is still waiting on it.
-    // (On Windows kill() terminates it outright, so there is nothing left to wait for.)
+    // (On Windows `kill()` terminates it outright, so there is nothing left to wait for.)
     if (process.platform !== 'win32') {
       await new Promise((resolve) => setTimeout(resolve, 500))
       expect(isAlive(ctx.childPid())).toBe(true)
     }
-    ctx.sigint()
+    ctx.send('sigint')
     expect(await ctx.exited(3_000)).toBe(130)
-    const pid = ctx.childPid()
-    const deadline = Date.now() + 3_000
-    while (isAlive(pid) && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 50))
-    }
-    expect(isAlive(pid)).toBe(false)
+    expect(await waitForDeath(ctx.childPid())).toBe(true)
+  })
+}, 25_000)
+
+it('closes the dev server and exits with its code when Electron quits by itself', async () => {
+  await run('quit', async (ctx) => {
+    expect(await ctx.exited(8_000)).toBe(3)
+    // The project has no index.html, so the plugin served a mock; closing the server removes it.
+    expect(existsSync(path.join(ctx.app, 'index.html'))).toBe(false)
+  })
+}, 25_000)
+
+it('stops Electron when the Vite process exits by another path', async () => {
+  // Only discriminating on POSIX: on Windows the Node stand-in dies with its parent anyway.
+  await run('slow', async (ctx) => {
+    ctx.send('host-exit')
+    expect(await ctx.exited(8_000)).toBe(0)
+    expect(await waitForDeath(ctx.childPid())).toBe(true)
   })
 }, 25_000)

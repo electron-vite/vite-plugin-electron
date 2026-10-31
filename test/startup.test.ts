@@ -1,11 +1,11 @@
+import { EventEmitter } from 'node:events'
 import path from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { startup } from '../src/startup'
+import { startup, triggerStartup } from '../src/startup'
 
-const spawn = vi.fn()
-const createRequire = vi.fn()
+const { spawn, createRequire } = vi.hoisted(() => ({ spawn: vi.fn(), createRequire: vi.fn() }))
 
 vi.mock('node:child_process', () => ({
   spawn,
@@ -30,6 +30,24 @@ const envKeys = [
 
 const originalEnvValues = new Map(envKeys.map((key) => [key, process.env[key]] as const))
 
+/** A child process stand-in that exits shortly after being signaled. */
+function fakeChild() {
+  const child = Object.assign(new EventEmitter(), {
+    pid: 1234,
+    exitCode: null as number | null,
+    signalCode: null as NodeJS.Signals | null,
+    send: vi.fn(),
+    kill: vi.fn((signal: NodeJS.Signals = 'SIGTERM') => {
+      setTimeout(() => {
+        child.signalCode = signal
+        child.emit('exit', null, signal)
+      }, 10)
+      return true
+    }),
+  })
+  return child
+}
+
 function restoreEnv() {
   for (const key of envKeys) {
     const value = originalEnvValues.get(key)
@@ -50,17 +68,13 @@ describe('src/startup', () => {
     createRequire.mockReset()
 
     createRequire.mockReturnValue(() => '/mock/electron')
-    spawn.mockReturnValue({
-      on: vi.fn(),
-      removeAllListeners: vi.fn(),
-      kill: vi.fn(),
-      send: vi.fn(),
-    })
+    spawn.mockImplementation(() => fakeChild())
 
     Reflect.deleteProperty(process, 'electronApp')
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await startup.exit()
     restoreEnv()
     Reflect.deleteProperty(process, 'electronApp')
   })
@@ -131,5 +145,39 @@ describe('src/startup', () => {
         stdio: defaultStdio,
       }),
     )
+  })
+  it('serializes concurrent starts so no Electron app is left behind', async () => {
+    const results = await Promise.all([startup(['.']), startup(['.'])])
+
+    expect(results).toEqual([true, true])
+    expect(spawn).toHaveBeenCalledTimes(2)
+    const [first, second] = spawn.mock.results.map((result) => result.value)
+    // The second start replaced the first instead of racing it.
+    expect(first.kill).toHaveBeenCalledOnce()
+    expect(first.signalCode).not.toBeNull()
+    expect(second.kill).not.toHaveBeenCalled()
+    expect(process.electronApp).toBe(second)
+  })
+
+  it('logs plugin-driven startup failures instead of rejecting', async () => {
+    const error = vi.fn()
+    const server = { config: { root: '/app', logger: { error } } } as any
+
+    triggerStartup({} as any, server, {
+      onstart() {
+        throw new Error('sync failure')
+      },
+    })
+    triggerStartup({} as any, server, {
+      async onstart() {
+        throw new Error('async failure')
+      },
+    })
+
+    await vi.waitFor(() => expect(error).toHaveBeenCalledTimes(2))
+    expect(error.mock.calls.map(([message]) => message)).toEqual([
+      expect.stringContaining('sync failure'),
+      expect.stringContaining('async failure'),
+    ])
   })
 })

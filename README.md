@@ -518,6 +518,8 @@ On Ctrl+C, `vite serve` sends `SIGINT` to the Electron app and waits for it to e
 
 `startup.exit(signal?)` returns a Promise that resolves once the Electron app has exited.
 
+When the Electron app quits by itself, the dev server is closed first and then Vite exits with the app's exit code. If Vite exits by any other path (`process.exit()`, an uncaught error), the running Electron app is sent `SIGTERM`.
+
 ## Builtin Plugins
 
 ### notBundle Plugin
